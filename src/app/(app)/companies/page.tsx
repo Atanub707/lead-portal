@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
-import { AddWithAI } from "@/components/ai-chat";
+import { PasteUrl } from "@/components/paste-url";
 import { CompanyAvatar, KindBadge, StatusDot } from "@/components/badges";
 import { getCompanies } from "@/lib/data";
 import {
@@ -112,7 +112,7 @@ export default async function CompaniesPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <AddWithAI list={list} />
+          <PasteUrl list={list} />
           <Link href={`/companies/new?list=${list}`} className="btn-primary">
             + Add company
           </Link>

@@ -14,7 +14,6 @@
     "@ai-sdk/groq": "^4.0.54",
     "@ai-sdk/openai": "^4.0.83",
     "@ai-sdk/openai-compatible": "^3.0.62",
-    "@ai-sdk/react": "^4.0.130",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "ai": "^7.0.127",

@@ -83,57 +83,44 @@ files (members + interaction logs). Safe to re-run — existing companies are sk
 > (a few per hour). For reliable delivery connect custom SMTP
 > (free tiers: Resend, Brevo) in **Authentication → SMTP**.
 
-## AI assistant ("Add with AI")
+## AI assistant ("Paste URL with AI")
 
-Each pipeline page has an **Add with AI** button next to "Add company". It opens a
-chat panel where you paste research — links, notes, member lists — and the assistant
-documents the company into that pipeline (it defaults to the pipeline you opened it
-from) with duplicate-checking, using your own permissions. Manual entry stays on
-every screen.
+Each pipeline page has a **Paste URL with AI** button next to "Add company". Paste a
+company website, pick the pipeline (POS or Compliance — it defaults to the page you
+opened), and press **Go**. There is no chat: one URL in, a full pipeline record out.
 
-### Website & LinkedIn research
+The assistant does the whole job in one shot:
 
-Paste just a website URL and the assistant will:
+1. **Fetches the site** (plus /about, /team, /contact) — using TinyFish when
+   `TINYFISH_API_KEY` is set (free; renders JavaScript-heavy sites) and falling back
+   to a built-in fetcher otherwise
+2. **Extracts the company** — name, description, LinkedIn company URL, emails, and the
+   people published on the site (team/about pages)
+3. **Saves everything** — creates the company in the selected pipeline (or updates it
+   when it already exists) and adds the contacts it found; duplicates are skipped
 
-1. **Fetch the site** (plus /about, /team, /contact) — extracting the company name,
-   description, LinkedIn company URL, emails, and any team members published on the site.
-   With TinyFish connected it also renders JavaScript-heavy sites and can recover the
-   LinkedIn company page via search when the site doesn't link it.
-2. **Discover LinkedIn employees via Apify** (optional) — creates contacts with names,
-   titles, and profile URLs; prefers founders and senior people
+It finishes with a short summary: record link, contacts added, whether the LinkedIn
+company URL was found, and what's still missing so you can fill it by hand.
 
-**Website rendering & search — free, optional:** create a key at
+### LinkedIn employee rosters are manual
+
+Employee scraping is intentionally not automated (LinkedIn blocks bots, and paid actors
+aren't worth it for this use case). The pipeline record keeps the company's LinkedIn
+URL — the research step finds it — and people are added manually on the company page.
+
+**Costs:** all research is free — TinyFish Fetch/Search are free on every plan
+(limits around 1,000 fetched URLs/day and 500 searches/hour) and the built-in fallback
+costs nothing. Only the AI extraction call is metered, covered by your OpenCode Go
+subscription.
+
+**Guardrails:** only the exact domain you pasted (plus up to 3 subpages of it) is ever
+fetched, private/local addresses are blocked, and the TinyFish search fallback only ever
+looks up the company's own LinkedIn page — never people.
+
+**Optional TinyFish upgrade:** create a key at
 [agent.tinyfish.ai](https://agent.tinyfish.ai) → **API Keys**, then add
-`TINYFISH_API_KEY=...` to `.env.local` and Vercel. TinyFish Fetch + Search are free on
-every plan (no wallet needed). Without a key the portal falls back to a built-in
-fetcher and skips the search fallback — everything still works.
-
-To enable LinkedIn research, connect a free Apify account:
-
-1. [apify.com](https://apify.com) → sign up (free plan includes $5/month credit)
-2. Apify Console → **Settings → Integrations** → copy the **API token**
-3. Add `APIFY_API_TOKEN=...` to `.env.local` and Vercel
-4. Optional: swap the actor with `APIFY_LINKEDIN_ACTOR_ID` (default:
-   `harvestapi/linkedin-company-employees`) and its input via `APIFY_LINKEDIN_ACTOR_INPUT`
-
-Without Apify, website research still works and LinkedIn profiles stay manual.
-Direct LinkedIn scraping is intentionally not implemented — LinkedIn blocks automation;
-Apify actors are the supported route.
-
-**Cost & guardrails (so your free credit never drains by accident):**
-
-- **Website research is free** — it only ever fetches the exact domain you pasted
-  (plus up to 3 subpages of that same domain), is capped at 10 fetches per conversation,
-  and private/local addresses are blocked. TinyFish (when configured) is also free:
-  Fetch handles up to 1,000 URLs/day and the search fallback only ever looks up the
-  company's own LinkedIn page — never people.
-- **LinkedIn research costs Apify credit** — each run starts around $0.02 plus a small
-  per-profile fee (roughly $0.05–$0.12 per company lookup; see the actor page for current
-  pricing, ~40–100 lookups on the free $5 credit). It runs **only when you explicitly ask**
-  ("find the members", "who is the owner"), never automatically, and is hard-capped at
-  **2 runs per conversation**.
-- **Set a hard stop anyway:** Apify Console → **Settings → Limits** → monthly usage limit
-  (e.g. $5). Even a bug can then never exceed it.
+`TINYFISH_API_KEY=...` to `.env.local` and Vercel. Without it the portal falls back to a
+built-in fetcher and skips the search fallback — everything still works.
 
 Enable it with an OpenCode subscription key (one model, fixed: **DeepSeek V4.1 Flash**):
 
@@ -152,7 +139,8 @@ fallback models.
 
 1. Push this `admin-portal` folder to a GitHub repository (or use the Vercel CLI)
 2. [vercel.com](https://vercel.com) → **Add New → Project** → import the repo
-3. Add the two `NEXT_PUBLIC_*` environment variables
+3. Add the environment variables (Supabase publishable/secret keys, `OPENCODE_API_KEY`,
+   and optionally `TINYFISH_API_KEY`) — see `.env.example`
 4. Deploy, then add `https://<your-app>.vercel.app/auth/callback` to
    Supabase → Authentication → URL Configuration → Redirect URLs
    (and update the Site URL)

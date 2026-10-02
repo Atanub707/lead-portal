@@ -72,23 +72,23 @@ Pipeline stages:
 - **No email reminders yet** — next action + last contact are tracked for manual review.
 - **Free tier** — the Supabase project pauses after ~1 week of inactivity; data is safe and restore is one click.
 
-## Research pipeline ("Add with AI")
+## Research pipeline ("Paste URL with AI")
 
+- **Flow** (`src/app/api/paste/route.ts`): one POST does research → AI extraction →
+  duplicate-checked writes (company + contacts) and returns a summary. No chat.
 - **Website research** (`src/lib/research.ts` → `researchWebsite`): fetches a public site
   plus up to 3 subpages (/about, /team, /contact). Prefers TinyFish Fetch when
   `TINYFISH_API_KEY` is set (free — JS-rendered pages, clean markdown) with a TinyFish
   Search fallback for the LinkedIn company URL when it is not linked on the site;
   otherwise falls back to a built-in SSRF-guarded fetcher (public hosts only — redirects
   re-validated; size/time caps). Extracts title/description/LinkedIn URLs/emails/socials
-  plus page text excerpts so the model can pull member names/titles.
-- **LinkedIn research** (`runApifyLinkedIn`): runs an Apify actor synchronously (default
-  `harvestapi/linkedin-company-employees`, cookie-free) and returns up to 15 people
-  (name / title / LinkedIn URL / location). Actor + input configurable via
-  `APIFY_LINKEDIN_ACTOR_ID` / `APIFY_LINKEDIN_ACTOR_INPUT` (with a `{{query}}` placeholder).
-  Only exposed when `APIFY_API_TOKEN` is set. Direct LinkedIn scraping is deliberately not
-  implemented — it is the blocked/banned surface; Apify is the supported route.
-- Chat route: `maxDuration = 60s` (Apify runs can take up to ~45s); the model is
-  instructed to never invent LinkedIn URLs, emails, or people.
+  plus page text excerpts.
+- **AI extraction** (`src/lib/ai.ts` → `pickModel`): one structured call
+  (`generateObject` + zod schema) turns the research into company fields + contacts;
+  the model is instructed to never invent URLs, emails, or people.
+- **LinkedIn employee rosters are manual** — direct scraping is the blocked/banned
+  surface, and the paid Apify actor was removed (2026-10) in favor of the free
+  company-URL lookup. The old integration is recoverable from git history if needed.
 
 ## Future upgrades
 

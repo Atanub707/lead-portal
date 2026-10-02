@@ -1,8 +1,7 @@
-// Server-side research helpers for the "Add with AI" assistant.
-// 1) researchWebsite — free: fetches a public website and extracts company data.
-//    Uses TinyFish (optional TINYFISH_API_KEY) for JS-rendered fetch + LinkedIn
-//    company URL search, and falls back to a built-in fetcher when not configured.
-// 2) runApifyLinkedIn — optional: runs an Apify actor to discover LinkedIn employees.
+// Server-side research helper for the "Paste URL with AI" flow.
+// researchWebsite — free: fetches a public website and extracts company data.
+// Uses TinyFish (optional TINYFISH_API_KEY) for JS-rendered fetch + LinkedIn
+// company URL search, and falls back to a built-in fetcher when not configured.
 
 const FETCH_TIMEOUT_MS = 8000;
 const MAX_HTML_BYTES = 800_000;
@@ -502,83 +501,3 @@ async function researchWebsiteDirect(url: URL, rawUrl: string): Promise<WebsiteR
   };
 }
 
-export interface LinkedInPerson {
-  name: string | null;
-  title: string | null;
-  linkedin_url: string | null;
-  location: string | null;
-}
-
-function pickString(item: Record<string, unknown>, keys: string[]): string | null {
-  for (const key of keys) {
-    const value = item[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return null;
-}
-
-export async function runApifyLinkedIn(
-  query: string
-): Promise<{ count: number; people: LinkedInPerson[] } | { error: string }> {
-  const token = process.env.APIFY_API_TOKEN;
-  if (!token) {
-    return { error: "Apify is not configured (missing APIFY_API_TOKEN)." };
-  }
-
-  const actor =
-    process.env.APIFY_LINKEDIN_ACTOR_ID ?? "harvestapi/linkedin-company-employees";
-  const template =
-    process.env.APIFY_LINKEDIN_ACTOR_INPUT ??
-    '{"companies":["{{query}}"],"profileScraperMode":"Short"}';
-
-  let input: unknown;
-  try {
-    input = JSON.parse(template.replaceAll("{{query}}", query.replace(/"/g, '\\"')));
-  } catch {
-    return { error: "APIFY_LINKEDIN_ACTOR_INPUT is not valid JSON." };
-  }
-
-  try {
-    const res = await fetch(
-      `https://api.apify.com/v2/acts/${encodeURIComponent(actor)}/run-sync-get-dataset-items?token=${token}&timeout=45`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-        signal: AbortSignal.timeout(55000),
-      }
-    );
-
-    if (!res.ok) {
-      const text = await res.text();
-      return { error: `Apify ${res.status}: ${text.slice(0, 300)}` };
-    }
-
-    const items = (await res.json()) as Record<string, unknown>[];
-    const people: LinkedInPerson[] = items
-      .slice(0, 15)
-      .map((item) => ({
-        name:
-          pickString(item, ["name", "fullName"]) ??
-          ([pickString(item, ["firstName"]), pickString(item, ["lastName"])]
-            .filter(Boolean)
-            .join(" ") ||
-            null),
-        title: pickString(item, [
-          "headline",
-          "position",
-          "jobTitle",
-          "currentPosition",
-        ]),
-        linkedin_url: pickString(item, ["linkedinUrl", "url", "profileUrl"]),
-        location: pickString(item, ["location", "locationName"]),
-      }))
-      .filter((person) => person.name || person.linkedin_url);
-
-    return { count: items.length, people };
-  } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : "Apify request failed",
-    };
-  }
-}
