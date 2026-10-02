@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { KindBadge, StatusPill } from "@/components/badges";
+import { Search } from "lucide-react";
+import { CompanyAvatar, KindBadge, StatusDot } from "@/components/badges";
 import { getCompanies } from "@/lib/data";
 import {
   KIND_LABEL,
@@ -37,132 +38,143 @@ export default async function CompaniesPage({
   const companies = await getCompanies({ list, q, status, kind, priority });
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto max-w-[1200px] px-8 py-8">
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
             {LIST_LABEL[list]}
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {companies.length} {companies.length === 1 ? "company" : "companies"}
+          <p className="mt-1 text-[13px] text-zinc-500">
+            {companies.length}{" "}
+            {companies.length === 1 ? "company" : "companies"}
           </p>
         </div>
         <Link href={`/companies/new?list=${list}`} className="btn-primary">
-          Add company
+          + Add company
         </Link>
       </header>
 
       <form
         method="get"
-        className="card mt-6 flex flex-wrap items-end gap-3 p-4"
+        className="mt-5 flex flex-wrap items-center gap-2"
+        aria-label="Filters"
       >
         <input type="hidden" name="list" value={list} />
-        <div className="min-w-[180px] flex-1">
-          <label className="label" htmlFor="q">
-            Search
-          </label>
+        <div className="relative min-w-[200px] flex-1">
+          <Search
+            className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400"
+            aria-hidden="true"
+          />
           <input
             id="q"
             name="q"
             defaultValue={q}
-            placeholder="Company name…"
-            className="input"
+            placeholder="Search companies…"
+            aria-label="Search companies"
+            className="input pl-8"
           />
         </div>
-        <div>
-          <label className="label" htmlFor="status">
-            Status
-          </label>
-          <select id="status" name="status" defaultValue={status} className="input">
-            <option value="">All</option>
-            {STATUS_STAGES[list].map((stage) => (
-              <option key={stage} value={stage}>
-                {STATUS_LABEL[stage]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label" htmlFor="kind">
-            Type
-          </label>
-          <select id="kind" name="kind" defaultValue={kind} className="input">
-            <option value="">All</option>
-            {KIND_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {KIND_LABEL[option]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label" htmlFor="priority">
-            Priority
-          </label>
-          <select
-            id="priority"
-            name="priority"
-            defaultValue={priority}
-            className="input"
-          >
-            <option value="">All</option>
-            {PRIORITY_OPTIONS.map((option) => (
-              <option key={option} value={option} className="capitalize">
-                {option}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex gap-2">
-          <button type="submit" className="btn-primary">
-            Apply
-          </button>
+        <select
+          name="status"
+          defaultValue={status}
+          aria-label="Status"
+          className="input w-[130px]"
+        >
+          <option value="">Any status</option>
+          {STATUS_STAGES[list].map((stage) => (
+            <option key={stage} value={stage}>
+              {STATUS_LABEL[stage]}
+            </option>
+          ))}
+        </select>
+        <select
+          name="kind"
+          defaultValue={kind}
+          aria-label="Type"
+          className="input w-[130px]"
+        >
+          <option value="">Any type</option>
+          {KIND_OPTIONS.map((option) => (
+            <option key={option} value={option}>
+              {KIND_LABEL[option]}
+            </option>
+          ))}
+        </select>
+        <select
+          name="priority"
+          defaultValue={priority}
+          aria-label="Priority"
+          className="input w-[120px]"
+        >
+          <option value="">Any priority</option>
+          {PRIORITY_OPTIONS.map((option) => (
+            <option key={option} value={option} className="capitalize">
+              {option}
+            </option>
+          ))}
+        </select>
+        <button type="submit" className="btn-ghost">
+          Apply
+        </button>
+        {q || status || kind || priority ? (
           <Link href={`/companies?list=${list}`} className="btn-ghost">
             Reset
           </Link>
-        </div>
+        ) : null}
       </form>
 
-      <div className="card mt-6 overflow-hidden">
+      <div className="card mt-5 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="th">Company</th>
+          <table className="min-w-full">
+            <thead>
+              <tr className="border-b border-zinc-200/80">
+                <th className="th pl-4">Company</th>
                 <th className="th">Type</th>
                 <th className="th">Status</th>
                 <th className="th">Priority</th>
-                <th className="th">Contacts</th>
+                <th className="th text-right">Contacts</th>
                 <th className="th">Last contact</th>
-                <th className="th">Next action</th>
+                <th className="th pr-4">Next action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {companies.map((company) => (
-                <tr key={company.id} className="hover:bg-slate-50/70">
-                  <td className="td">
-                    <Link
-                      href={`/companies/${company.id}`}
-                      className="font-medium text-slate-900 hover:text-emerald-700"
-                    >
-                      {company.name}
-                    </Link>
-                    {company.website ? (
-                      <p className="mt-0.5 text-xs text-slate-400">
-                        {host(company.website)}
-                      </p>
-                    ) : null}
+                <tr
+                  key={company.id}
+                  className="border-b border-zinc-100 transition-colors last:border-0 hover:bg-zinc-50/70"
+                >
+                  <td className="td pl-4">
+                    <div className="flex items-center gap-2.5">
+                      <CompanyAvatar name={company.name} />
+                      <div className="min-w-0">
+                        <Link
+                          href={`/companies/${company.id}`}
+                          className="block truncate font-medium text-zinc-900 transition-colors hover:text-zinc-600"
+                        >
+                          {company.name}
+                        </Link>
+                        {company.website ? (
+                          <p className="truncate text-[12px] text-zinc-500">
+                            {host(company.website)}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
                   </td>
                   <td className="td">
                     <KindBadge kind={company.kind} />
                   </td>
                   <td className="td">
-                    <StatusPill status={company.status} />
+                    <StatusDot status={company.status} />
                   </td>
                   <td className="td capitalize">{company.priority ?? "—"}</td>
-                  <td className="td">{company.contacts?.[0]?.count ?? 0}</td>
-                  <td className="td">{company.last_contact ?? "—"}</td>
-                  <td className="td max-w-[220px] truncate">
+                  <td className="td text-right tabular-nums">
+                    {company.contacts?.[0]?.count ?? 0}
+                  </td>
+                  <td className="td tabular-nums">
+                    {company.last_contact ?? "—"}
+                  </td>
+                  <td className="td max-w-[240px] truncate pr-4">
                     {company.next_action ?? "—"}
                   </td>
                 </tr>
@@ -171,9 +183,14 @@ export default async function CompaniesPage({
           </table>
         </div>
         {companies.length === 0 ? (
-          <p className="px-4 py-10 text-center text-sm text-slate-400">
-            No companies match. Adjust the filters or add one.
-          </p>
+          <div className="px-4 py-16 text-center">
+            <p className="text-[13px] font-medium text-zinc-700">
+              No companies found
+            </p>
+            <p className="mt-1 text-[13px] text-zinc-500">
+              Adjust the filters, or add the first one.
+            </p>
+          </div>
         ) : null}
       </div>
     </div>

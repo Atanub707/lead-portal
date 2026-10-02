@@ -28,78 +28,116 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-[1100px] px-8 py-8">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+        <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
           Dashboard
         </h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-[13px] text-zinc-500">
           Two pipelines, one shared database.
         </p>
       </header>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        {pipelines.map(({ list, counts, recent }) => {
+        {pipelines.map(({ list, counts, recent }, index) => {
           const total = Object.values(counts).reduce((a, b) => a + b, 0);
+          const activeStages = STATUS_STAGES[list].filter(
+            (s) => s !== "new" && s !== "won" && s !== "lost"
+          );
+          const active = activeStages.reduce(
+            (sum, stage) => sum + (counts[stage] ?? 0),
+            0
+          );
+          const won = counts.won ?? 0;
+
+          const stats: [string, number][] = [
+            ["Total", total],
+            ["Active", active],
+            ["Won", won],
+          ];
+
           return (
-            <section key={list} className="card p-5">
+            <section
+              key={list}
+              className={`card animate-rise animate-rise-${index + 1} p-5`}
+            >
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-slate-900">
+                <h2 className="text-[13px] font-semibold text-zinc-900">
                   {LIST_LABEL[list]}
                 </h2>
                 <Link
                   href={`/companies?list=${list}`}
-                  className="text-xs font-medium text-emerald-600 hover:text-emerald-700"
+                  className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900"
                 >
                   Open →
                 </Link>
               </div>
 
-              <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
-                {total}
-                <span className="ml-2 text-sm font-normal text-slate-500">
-                  companies
-                </span>
-              </p>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {STATUS_STAGES[list].map((stage) => (
-                  <span
-                    key={stage}
-                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600"
-                  >
-                    {STATUS_LABEL[stage]}
-                    <span className="font-semibold text-slate-800">
-                      {counts[stage] ?? 0}
-                    </span>
-                  </span>
+              <div className="mt-4 grid grid-cols-3 gap-4 border-b border-zinc-100 pb-4">
+                {stats.map(([label, value]) => (
+                  <div key={label}>
+                    <p className="text-[22px] font-semibold tracking-tight text-zinc-900 tabular-nums">
+                      {value}
+                    </p>
+                    <p className="mt-0.5 text-xs text-zinc-500">{label}</p>
+                  </div>
                 ))}
               </div>
 
-              <div className="mt-5 border-t border-slate-100 pt-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <div className="mt-4 space-y-2.5">
+                {STATUS_STAGES[list].map((stage) => {
+                  const count = counts[stage] ?? 0;
+                  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                  return (
+                    <div key={stage} className="flex items-center gap-3">
+                      <span className="w-20 shrink-0 text-[12px] text-zinc-500">
+                        {STATUS_LABEL[stage]}
+                      </span>
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100">
+                        <div
+                          className="h-full rounded-full bg-zinc-900"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="w-6 shrink-0 text-right text-[12px] tabular-nums text-zinc-700">
+                        {count}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-5 border-t border-zinc-100 pt-4">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">
                   Recent activity
                 </p>
                 {recent.length === 0 ? (
-                  <p className="mt-2 text-sm text-slate-400">
+                  <p className="mt-2 text-[13px] text-zinc-500">
                     No activity yet.
                   </p>
                 ) : (
-                  <ul className="mt-2 space-y-2">
+                  <ul className="mt-3 space-y-3">
                     {recent.map((item) => (
-                      <li key={item.id} className="flex items-start gap-2">
-                        <span className="mt-0.5 w-20 shrink-0 text-xs text-slate-400">
-                          {item.occurred_on}
-                        </span>
-                        <span className="text-sm text-slate-600">
+                      <li key={item.id} className="flex gap-3">
+                        <span
+                          className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-300"
+                          aria-hidden="true"
+                        />
+                        <div className="min-w-0">
                           <Link
                             href={`/companies/${item.org_id}`}
-                            className="font-medium text-slate-800 hover:text-emerald-700"
+                            className="text-[13px] font-medium text-zinc-800 transition-colors hover:text-zinc-950"
                           >
                             {item.organizations?.name ?? "Company"}
-                          </Link>{" "}
-                          — {item.summary}
-                        </span>
+                          </Link>
+                          <p className="truncate text-[12px] text-zinc-500">
+                            {item.summary}
+                            {item.channel ? ` · ${item.channel}` : ""}
+                          </p>
+                          <p className="text-[11px] text-zinc-400">
+                            {item.occurred_on}
+                          </p>
+                        </div>
                       </li>
                     ))}
                   </ul>

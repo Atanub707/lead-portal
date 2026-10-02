@@ -90,29 +90,32 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
+    <div className="flex min-h-dvh items-center justify-center bg-[#f7f7f8] px-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+          <span className="mx-auto mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-[13px] font-bold text-white">
+            L
+          </span>
+          <h1 className="text-lg font-semibold tracking-tight text-zinc-900">
             Lead Portal
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-0.5 text-[13px] text-zinc-500">
             POS sales &amp; compliance services
           </p>
         </div>
 
-        <div className="card p-6">
-          <div className="mb-5 grid grid-cols-2 rounded-lg bg-slate-100 p-1 text-sm font-medium">
+        <div className="card p-5">
+          <div className="mb-5 grid grid-cols-2 rounded-md bg-zinc-100 p-0.5 text-[13px] font-medium">
             <button
               type="button"
               onClick={() => {
                 setMode("password");
                 setError("");
               }}
-              className={`rounded-md px-3 py-1.5 transition-colors ${
+              className={`rounded-[5px] px-3 py-1.5 transition-colors ${
                 mode === "password"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white text-zinc-900 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+                  : "text-zinc-500 hover:text-zinc-800"
               }`}
             >
               Password
@@ -123,10 +126,10 @@ export default function LoginPage() {
                 setMode("magic");
                 setError("");
               }}
-              className={`rounded-md px-3 py-1.5 transition-colors ${
+              className={`rounded-[5px] px-3 py-1.5 transition-colors ${
                 mode === "magic"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white text-zinc-900 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+                  : "text-zinc-500 hover:text-zinc-800"
               }`}
             >
               Magic link
@@ -168,7 +171,7 @@ export default function LoginPage() {
               </div>
 
               {error ? (
-                <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                <p className="rounded-md bg-rose-50 px-3 py-2 text-[13px] text-rose-700">
                   {error}
                 </p>
               ) : null}
@@ -190,17 +193,17 @@ export default function LoginPage() {
                 {busy === "signup" ? "Creating…" : "Create account"}
               </button>
 
-              <p className="text-center text-xs text-slate-400">
-                No confirmation email needed — the first account becomes the
-                owner, everyone else joins as editor.
+              <p className="text-center text-[12px] text-zinc-500">
+                The first account becomes the owner; everyone else joins as
+                editor.
               </p>
             </form>
           ) : magicSent ? (
             <div className="text-center">
-              <p className="text-sm font-medium text-slate-900">
+              <p className="text-[13px] font-medium text-zinc-900">
                 Check your inbox
               </p>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-[13px] text-zinc-500">
                 We sent a magic link to <strong>{email}</strong>. Open it on
                 this device to sign in.
               </p>
@@ -230,7 +233,7 @@ export default function LoginPage() {
               </div>
 
               {error ? (
-                <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                <p className="rounded-md bg-rose-50 px-3 py-2 text-[13px] text-rose-700">
                   {error}
                 </p>
               ) : null}
@@ -243,7 +246,7 @@ export default function LoginPage() {
                 {busy === "magic" ? "Sending…" : "Send magic link"}
               </button>
 
-              <p className="text-center text-xs text-slate-400">
+              <p className="text-center text-[12px] text-zinc-500">
                 Magic links are rate-limited by Supabase&apos;s built-in email —
                 use a password instead if you hit the limit.
               </p>

@@ -19,28 +19,27 @@ export default async function NewCompanyPage({
   const list = parseList(sp.list);
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-8">
+    <div className="mx-auto max-w-xl px-8 py-8">
       <Link
         href={`/companies?list=${list}`}
-        className="text-sm text-slate-500 hover:text-slate-700"
+        className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900"
       >
-        ← Back to {LIST_LABEL[list]}
+        ← {LIST_LABEL[list]}
       </Link>
 
-      <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
+      <h1 className="mt-3 text-xl font-semibold tracking-tight text-zinc-900">
         Add company
       </h1>
-      <p className="mt-1 text-sm text-slate-500">
-        Goes into the {LIST_LABEL[list]}. You can add contacts and log
-        interactions right after.
+      <p className="mt-1 text-[13px] text-zinc-500">
+        Goes into the {LIST_LABEL[list]}. Contacts and interactions come next.
       </p>
 
-      <form action={createOrganization} className="card mt-6 space-y-4 p-6">
+      <form action={createOrganization} className="card mt-5 space-y-4 p-5">
         <input type="hidden" name="list" value={list} />
 
         <div>
           <label className="label" htmlFor="name">
-            Company name *
+            Company name
           </label>
           <input id="name" name="name" required className="input" />
         </div>
@@ -89,7 +88,12 @@ export default async function NewCompanyPage({
             <label className="label" htmlFor="priority">
               Priority
             </label>
-            <select id="priority" name="priority" defaultValue="" className="input">
+            <select
+              id="priority"
+              name="priority"
+              defaultValue=""
+              className="input"
+            >
               <option value="">—</option>
               {PRIORITY_OPTIONS.map((option) => (
                 <option key={option} value={option} className="capitalize">
@@ -114,7 +118,7 @@ export default async function NewCompanyPage({
           <textarea id="notes" name="notes" rows={4} className="input" />
         </div>
 
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex justify-end gap-2 pt-1">
           <Link href={`/companies?list=${list}`} className="btn-ghost">
             Cancel
           </Link>

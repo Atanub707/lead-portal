@@ -1,0 +1,14 @@
+{
+  "builds": [
+    {
+      "date": "2026-10-02",
+      "surface": "app-shell",
+      "direction": "attio-blend",
+      "references": ["attio", "pipedrive-insights", "lightfield", "twenty"],
+      "type": "inter",
+      "palette": "pixel-derived, contrast-checked",
+      "stamp": "mock=attio-blend type=inter contract=contrast-checked stamp=2026-10-02",
+      "status": "pending-review"
+    }
+  ]
+}

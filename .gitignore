@@ -41,6 +41,9 @@ yarn-error.log*
 *.p8
 *service-account*.json
 
+# local design references (Mobbin screenshots — not redistributed)
+.tastemaker/references/
+
 # vercel
 .vercel
 
