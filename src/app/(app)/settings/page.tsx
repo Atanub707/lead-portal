@@ -11,15 +11,16 @@ export default async function SettingsPage() {
   const isOwner = profile?.role === "owner";
 
   return (
-    <div className="mx-auto max-w-3xl px-8 py-8">
-      <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
-        Settings
-      </h1>
-      <p className="mt-1 text-[13px] text-zinc-500">
-        Users and roles for this workspace.
-      </p>
+    <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
+      <div className="max-w-3xl">
+        <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
+          Settings
+        </h1>
+        <p className="mt-1 text-[13px] text-zinc-500">
+          Users and roles for this workspace.
+        </p>
 
-      <section className="card mt-5 animate-rise animate-rise-1 p-5">
+        <section className="card mt-6 animate-rise animate-rise-1 p-5">
         <h2 className="text-[13px] font-semibold text-zinc-900">Users</h2>
         <p className="mt-1 text-[12px] text-zinc-500">
           The first account is the <strong>owner</strong>. Editors can add and
@@ -82,7 +83,8 @@ export default async function SettingsPage() {
             );
           })}
         </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }

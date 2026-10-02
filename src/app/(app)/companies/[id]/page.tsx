@@ -51,7 +51,7 @@ export default async function CompanyPage({
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <div className="mx-auto max-w-[1200px] px-8 py-8">
+    <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
       <Link
         href={`/companies?list=${company.list}`}
         className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900"
@@ -59,47 +59,42 @@ export default async function CompanyPage({
         ← {LIST_LABEL[company.list]}
       </Link>
 
-      <header className="mt-3 flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <CompanyAvatar name={company.name} />
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
-              {company.name}
-            </h1>
-            <div className="mt-1.5 flex flex-wrap items-center gap-3">
-              <KindBadge kind={company.kind} />
-              <StatusDot status={company.status} />
-              {company.priority ? (
-                <span className="text-[12px] capitalize text-zinc-500">
-                  Priority: {company.priority}
-                </span>
-              ) : null}
-            </div>
-            <div className="mt-2 flex flex-wrap gap-4 text-[13px]">
-              {company.website ? (
-                <a
-                  className="inline-flex items-center gap-1 text-zinc-500 transition-colors hover:text-zinc-900"
-                  href={company.website}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Website
-                  <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                </a>
-              ) : null}
-              {company.linkedin_url ? (
-                <a
-                  className="inline-flex items-center gap-1 text-zinc-500 transition-colors hover:text-zinc-900"
-                  href={company.linkedin_url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  LinkedIn
-                  <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                </a>
-              ) : null}
-            </div>
-          </div>
+      <header className="mt-3">
+        <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
+          {company.name}
+        </h1>
+        <div className="mt-1.5 flex flex-wrap items-center gap-3">
+          <KindBadge kind={company.kind} />
+          <StatusDot status={company.status} />
+          {company.priority ? (
+            <span className="text-[12px] capitalize text-zinc-500">
+              Priority: {company.priority}
+            </span>
+          ) : null}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-4 text-[13px]">
+          {company.website ? (
+            <a
+              className="inline-flex items-center gap-1 text-zinc-500 transition-colors hover:text-zinc-900"
+              href={company.website}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Website
+              <ExternalLink className="h-3 w-3" aria-hidden="true" />
+            </a>
+          ) : null}
+          {company.linkedin_url ? (
+            <a
+              className="inline-flex items-center gap-1 text-zinc-500 transition-colors hover:text-zinc-900"
+              href={company.linkedin_url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              LinkedIn
+              <ExternalLink className="h-3 w-3" aria-hidden="true" />
+            </a>
+          ) : null}
         </div>
       </header>
 

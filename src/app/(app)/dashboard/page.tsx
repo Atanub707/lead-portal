@@ -28,7 +28,7 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-[1100px] px-8 py-8">
+    <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
       <header>
         <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
           Dashboard

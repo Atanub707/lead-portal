@@ -19,22 +19,24 @@ export default async function NewCompanyPage({
   const list = parseList(sp.list);
 
   return (
-    <div className="mx-auto max-w-xl px-8 py-8">
-      <Link
-        href={`/companies?list=${list}`}
-        className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900"
-      >
-        ← {LIST_LABEL[list]}
-      </Link>
+    <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
+      <div className="max-w-xl">
+        <Link
+          href={`/companies?list=${list}`}
+          className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900"
+        >
+          ← {LIST_LABEL[list]}
+        </Link>
 
-      <h1 className="mt-3 text-xl font-semibold tracking-tight text-zinc-900">
-        Add company
-      </h1>
-      <p className="mt-1 text-[13px] text-zinc-500">
-        Goes into the {LIST_LABEL[list]}. Contacts and interactions come next.
-      </p>
+        <h1 className="mt-3 text-xl font-semibold tracking-tight text-zinc-900">
+          Add company
+        </h1>
+        <p className="mt-1 text-[13px] text-zinc-500">
+          Goes into the {LIST_LABEL[list]}. Contacts and interactions come
+          next.
+        </p>
 
-      <form action={createOrganization} className="card mt-5 space-y-4 p-5">
+        <form action={createOrganization} className="card mt-6 space-y-4 p-5">
         <input type="hidden" name="list" value={list} />
 
         <div>
@@ -126,7 +128,8 @@ export default async function NewCompanyPage({
             Create company
           </button>
         </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }

@@ -38,7 +38,7 @@ export default async function CompaniesPage({
   const companies = await getCompanies({ list, q, status, kind, priority });
 
   return (
-    <div className="mx-auto max-w-[1200px] px-8 py-8">
+    <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
@@ -56,7 +56,7 @@ export default async function CompaniesPage({
 
       <form
         method="get"
-        className="mt-5 flex flex-wrap items-center gap-2"
+        className="mt-6 flex flex-wrap items-center gap-2"
         aria-label="Filters"
       >
         <input type="hidden" name="list" value={list} />
