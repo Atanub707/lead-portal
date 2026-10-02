@@ -332,7 +332,7 @@ export async function POST(req: Request) {
 
   const { data: existingContacts } = await supabase
     .from("contacts")
-    .select("name, linkedin_url")
+    .select("name, linkedin_url, email")
     .eq("org_id", orgId);
 
   const seenNames = new Set(
@@ -367,12 +367,25 @@ export async function POST(req: Request) {
     if (!error) contactsAdded = toAdd.length;
   }
 
+  // Summarise the record as it stands AFTER saving — not just this run's findings,
+  // so the report can never claim something is missing when the record already has it.
+  const finalLinkedin = linkedin ?? existing?.linkedin_url ?? null;
+  const existingRows = existingContacts ?? [];
+  const finalContactCount = existingRows.length + contactsAdded;
+  const finalEmails = [
+    ...new Set(
+      [
+        ...existingRows.map((contact) => contact.email),
+        ...toAdd.map((contact) => contact.email),
+        ...(existing?.emails ?? []),
+        ...generalEmails,
+      ].filter((value): value is string => Boolean(value))
+    ),
+  ];
   const stillMissing: string[] = [];
-  if (!linkedin) stillMissing.push("LinkedIn company URL");
-  if (contacts.length === 0) stillMissing.push("team members");
-  if (emails.length === 0 && contacts.every((contact) => !contact.email)) {
-    stillMissing.push("email addresses");
-  }
+  if (!finalLinkedin) stillMissing.push("LinkedIn company URL");
+  if (finalContactCount === 0) stillMissing.push("team members");
+  if (finalEmails.length === 0) stillMissing.push("email addresses");
 
   return Response.json({
     ok: true,
@@ -382,7 +395,10 @@ export async function POST(req: Request) {
     contactsAdded,
     contactsSkipped: contacts.length - toAdd.length,
     linkedinProfilesFound,
-    linkedinUrl: linkedin,
+    linkedinUrl: finalLinkedin,
+    warning: research.needs_js
+      ? "This site renders its content with JavaScript, so details may be missing. Add TINYFISH_API_KEY (free) for a full render."
+      : undefined,
     stillMissing,
   });
 }

@@ -14,6 +14,7 @@ interface PasteResult {
   contactsSkipped: number;
   linkedinProfilesFound: number;
   linkedinUrl: string | null;
+  warning?: string;
   stillMissing: string[];
 }
 
@@ -189,6 +190,12 @@ export function PasteUrl({ list }: { list: OrgList }) {
                   <p className="text-[12px] text-zinc-500">
                     Still missing: {result.stillMissing.join(", ")}. You can add
                     them by hand on the company page.
+                  </p>
+                ) : null}
+
+                {result.warning ? (
+                  <p className="rounded-md bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+                    {result.warning}
                   </p>
                 ) : null}
 

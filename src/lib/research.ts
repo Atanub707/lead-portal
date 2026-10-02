@@ -112,6 +112,23 @@ interface SiteLinks {
   socials: string[];
 }
 
+function decodeCloudflareEmails(html: string): string[] {
+  const out: string[] = [];
+  const re = /(?:data-cfemail=["']|email-protection#)([0-9a-f]{4,})/gi;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(html))) {
+    const hex = match[1].toLowerCase();
+    if (hex.length % 2 !== 0) continue;
+    const key = parseInt(hex.slice(0, 2), 16);
+    let email = "";
+    for (let i = 2; i < hex.length; i += 2) {
+      email += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16) ^ key);
+    }
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) out.push(email);
+  }
+  return out;
+}
+
 function collectLinks(html: string, base: URL): SiteLinks {
   const sets = {
     linkedin_company: new Set<string>(),
@@ -155,6 +172,9 @@ function collectLinks(html: string, base: URL): SiteLinks {
   for (const email of text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) ?? []) {
     if (!/\.(png|jpe?g|webp|svg|gif|ico)$/i.test(email)) sets.emails.add(email);
   }
+
+  // Cloudflare "Email Address Obfuscation" hides addresses as XOR'd hex.
+  for (const email of decodeCloudflareEmails(html)) sets.emails.add(email);
 
   return {
     linkedin_company: [...sets.linkedin_company].slice(0, 5),
@@ -512,6 +532,7 @@ export interface WebsiteResearch {
   links: SiteLinks;
   pages: { url: string; title: string | null; excerpt: string }[];
   notes?: string;
+  needs_js?: boolean;
 }
 
 export async function researchWebsite(rawUrl: string): Promise<WebsiteResearch> {
@@ -549,7 +570,9 @@ async function researchWebsiteDirect(url: URL, rawUrl: string): Promise<WebsiteR
   ];
   mergeLinks(collectLinks(html, base));
 
-  for (const sub of findSubpages(html, base)) {
+  const subpages = findSubpages(html, base);
+
+  for (const sub of subpages) {
     try {
       const { html: subHtml, finalUrl: subFinal } = await fetchHtml(sub);
       pages.push({
@@ -563,6 +586,15 @@ async function researchWebsiteDirect(url: URL, rawUrl: string): Promise<WebsiteR
     }
   }
 
+  const readable = pages.reduce((sum, page) => sum + page.excerpt.length, 0);
+  const anchors = (html.match(/<a\s[^>]*href=/gi) ?? []).length;
+  const needs_js =
+    readable < 800 ||
+    (subpages.length === 0 &&
+      allLinks.linkedin_company.length === 0 &&
+      allLinks.socials.length === 0 &&
+      anchors < 25);
+
   return {
     requested_url: rawUrl,
     final_url: finalUrl,
@@ -571,6 +603,7 @@ async function researchWebsiteDirect(url: URL, rawUrl: string): Promise<WebsiteR
     site_name: metaTag(html, "og:site_name"),
     links: allLinks,
     pages,
+    needs_js,
   };
 }
 
