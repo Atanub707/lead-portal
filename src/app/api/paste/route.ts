@@ -1,4 +1,4 @@
-import { generateObject } from "ai";
+import { generateObject, generateText } from "ai";
 import { z } from "zod";
 import { NO_AI_KEY_MESSAGE, pickModel } from "@/lib/ai";
 import { researchWebsite } from "@/lib/research";
@@ -42,6 +42,44 @@ Rules:
 - Use ONLY facts present in the research. Never invent people, emails, or URLs.
 - contacts: only real people named on the site (team/about/leadership pages), prefer founders and senior people. Set title/linkedin_url/email to "" when not present.
 - Use "" for unknown single values and [] for unknown lists.`;
+
+const JSON_SHAPE = `Return a single JSON object with exactly these keys:
+{
+  "name": string,
+  "description": string (1-2 sentences, "" if unknown),
+  "linkedin_company_url": string ("" if unknown),
+  "emails": string[] ([] if none),
+  "kind": "lead" | "partner" | "competitor" | "other",
+  "contacts": [{ "name": string, "title": string, "linkedin_url": string, "email": string }] (max 12, [] if none)
+}
+Return ONLY the JSON object — no markdown fences, no commentary.`;
+
+function parseJsonObject(text: string): unknown {
+  const cleaned = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/```\s*$/, "")
+    .trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    // fall through to brace slicing
+  }
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    try {
+      return JSON.parse(cleaned.slice(start, end + 1));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function errorMessage(err: unknown) {
+  return err instanceof Error ? err.message : String(err);
+}
 
 function sanitize(query: string) {
   return query.replace(/[%(),]/g, " ").trim();
@@ -113,20 +151,59 @@ export async function POST(req: Request) {
     })),
   };
 
-  let extracted: z.infer<typeof ExtractSchema>;
+  const userPrompt = `Here is the website research (JSON):\n\n${JSON.stringify(
+    digest
+  )}`;
+
+  // Plain-text generation first: no response_format, the request shape OpenCode Go
+  // handles most reliably. generateObject (JSON mode) is the second chance.
+  let extracted: z.infer<typeof ExtractSchema> | null = null;
+  const failures: string[] = [];
+
   try {
-    const { object } = await generateObject({
+    const { text } = await generateText({
       model,
-      schema: ExtractSchema,
-      system: EXTRACT_SYSTEM,
-      prompt: `Extract the company profile and people from this website research (JSON):\n\n${JSON.stringify(
-        digest
-      )}`,
+      system: `${EXTRACT_SYSTEM}\n\n${JSON_SHAPE}`,
+      prompt: userPrompt,
     });
-    extracted = object;
-  } catch {
+    const parsed = parseJsonObject(text);
+    if (parsed) {
+      const result = ExtractSchema.safeParse(parsed);
+      if (result.success) {
+        extracted = result.data;
+      } else {
+        failures.push(
+          `parse: ${result.error.issues[0]?.message ?? "schema mismatch"}`
+        );
+      }
+    } else {
+      failures.push("parse: no JSON object in the model output");
+    }
+  } catch (err) {
+    failures.push(`text: ${errorMessage(err)}`);
+  }
+
+  if (!extracted) {
+    try {
+      const { object } = await generateObject({
+        model,
+        schema: ExtractSchema,
+        system: EXTRACT_SYSTEM,
+        prompt: userPrompt,
+      });
+      extracted = object;
+    } catch (err) {
+      failures.push(`object: ${errorMessage(err)}`);
+    }
+  }
+
+  if (!extracted) {
+    console.error("[paste] extraction failed:", failures.join(" | "));
     return Response.json(
-      { error: "The AI couldn't extract data from that site. Please try again." },
+      {
+        error: "The AI couldn't extract data from that site. Please try again.",
+        detail: failures.join(" | ").slice(0, 300),
+      },
       { status: 502 }
     );
   }

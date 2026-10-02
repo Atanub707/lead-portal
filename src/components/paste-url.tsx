@@ -23,6 +23,7 @@ export function PasteUrl({ list }: { list: OrgList }) {
   const [target, setTarget] = useState<OrgList>(list);
   const [status, setStatus] = useState<"idle" | "loading" | "done">("idle");
   const [error, setError] = useState("");
+  const [errorDetail, setErrorDetail] = useState("");
   const [result, setResult] = useState<PasteResult | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -31,6 +32,7 @@ export function PasteUrl({ list }: { list: OrgList }) {
     setTarget(list);
     setStatus("idle");
     setError("");
+    setErrorDetail("");
     setResult(null);
     setOpen(true);
   }
@@ -56,6 +58,7 @@ export function PasteUrl({ list }: { list: OrgList }) {
     if (!value || status === "loading") return;
     setStatus("loading");
     setError("");
+    setErrorDetail("");
     try {
       const res = await fetch("/api/paste", {
         method: "POST",
@@ -63,10 +66,13 @@ export function PasteUrl({ list }: { list: OrgList }) {
         body: JSON.stringify({ url: value, list: target }),
       });
       const json = (await res.json().catch(() => null)) as
-        | (PasteResult & { error?: string })
+        | (PasteResult & { error?: string; detail?: string })
         | null;
       if (!res.ok) {
-        throw new Error(json?.error ?? `Request failed (${res.status})`);
+        setError(json?.error ?? `Request failed (${res.status})`);
+        setErrorDetail(json?.detail ?? "");
+        setStatus("idle");
+        return;
       }
       setResult(json);
       setStatus("done");
@@ -191,6 +197,7 @@ export function PasteUrl({ list }: { list: OrgList }) {
                       setUrl("");
                       setStatus("idle");
                       setError("");
+                      setErrorDetail("");
                       setResult(null);
                       inputRef.current?.focus();
                     }}
@@ -262,12 +269,17 @@ export function PasteUrl({ list }: { list: OrgList }) {
                 </p>
 
                 {error ? (
-                  <p
+                  <div
                     role="alert"
-                    className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-700"
+                    className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2"
                   >
-                    {error}
-                  </p>
+                    <p className="text-[12px] text-rose-700">{error}</p>
+                    {errorDetail ? (
+                      <p className="mt-0.5 break-words text-[11px] text-rose-500">
+                        {errorDetail}
+                      </p>
+                    ) : null}
+                  </div>
                 ) : null}
 
                 <button
