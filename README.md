@@ -83,12 +83,13 @@ files (members + interaction logs). Safe to re-run — existing companies are sk
 > (a few per hour). For reliable delivery connect custom SMTP
 > (free tiers: Resend, Brevo) in **Authentication → SMTP**.
 
-## AI assistant (chat intake)
+## AI assistant ("Add with AI")
 
-The **AI Assistant** page accepts pasted research — links, notes, member lists.
-Say which list ("add to POS" / "add to compliance") and it documents the company
-into the database with duplicate-checking, using your own permissions. Manual
-entry stays available on every screen.
+Each pipeline page has an **Add with AI** button next to "Add company". It opens a
+chat panel where you paste research — links, notes, member lists — and the assistant
+documents the company into that pipeline (it defaults to the pipeline you opened it
+from) with duplicate-checking, using your own permissions. Manual entry stays on
+every screen.
 
 Enable it with an OpenCode subscription key (one model, fixed: **DeepSeek V4.1 Flash**):
 

@@ -253,11 +253,18 @@ export async function POST(req: Request) {
     );
   }
 
-  const { messages } = await req.json();
+  const { messages, defaultList } = await req.json();
+
+  const listHint =
+    defaultList === "pos" || defaultList === "compliance"
+      ? `\n\nCONTEXT: The user opened this chat from the ${
+          defaultList === "pos" ? "POS" : "Compliance"
+        } pipeline page. If they do not specify which list a company belongs to, default to "${defaultList}" instead of asking.`
+      : "";
 
   const result = streamText({
     model,
-    system: SYSTEM_PROMPT,
+    system: SYSTEM_PROMPT + listHint,
     messages: await convertToModelMessages(messages),
     tools: buildTools(supabase),
     stopWhen: stepCountIs(6),

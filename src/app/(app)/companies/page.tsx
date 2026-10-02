@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { AddWithAI } from "@/components/ai-chat";
 import { CompanyAvatar, KindBadge, StatusDot } from "@/components/badges";
 import { getCompanies } from "@/lib/data";
 import {
@@ -110,9 +111,12 @@ export default async function CompaniesPage({
             {count} {count === 1 ? "company" : "companies"}
           </p>
         </div>
-        <Link href={`/companies/new?list=${list}`} className="btn-primary">
-          + Add company
-        </Link>
+        <div className="flex items-center gap-2">
+          <AddWithAI list={list} />
+          <Link href={`/companies/new?list=${list}`} className="btn-primary">
+            + Add company
+          </Link>
+        </div>
       </header>
 
       <form

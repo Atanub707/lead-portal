@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   Settings,
   ShieldCheck,
-  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -67,14 +66,6 @@ export function SidebarNav({
         label="Dashboard"
         icon={LayoutDashboard}
         active={pathname === "/dashboard"}
-        collapsed={collapsed}
-        onNavigate={onNavigate}
-      />
-      <NavItem
-        href="/assistant"
-        label="AI Assistant"
-        icon={Sparkles}
-        active={pathname.startsWith("/assistant")}
         collapsed={collapsed}
         onNavigate={onNavigate}
       />
