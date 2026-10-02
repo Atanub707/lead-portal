@@ -10,9 +10,10 @@ import { openai } from "@ai-sdk/openai";
 import { groq } from "@ai-sdk/groq";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { z } from "zod";
+import { researchWebsite, runApifyLinkedIn } from "@/lib/research";
 import { createClient } from "@/lib/supabase/server";
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 // OpenCode Go subscription — key from https://opencode.ai/auth (subscribe to Go).
 // Per the OpenCode docs, Go uses the /zen/go/v1 endpoint path and expects clients
@@ -65,16 +66,52 @@ Rules:
 4. Parse pasted member details into contacts (name required; title / LinkedIn / email / phone when present).
 5. After finishing, reply with a short summary: what was created or updated, in which list, how many contacts were added, and the record path (e.g. /companies/123).
 6. Keep replies short and operational — no filler.
-7. You can also update companies (status, priority, next action, notes) and log interactions when the user reports them.`;
+7. You can also update companies (status, priority, next action, notes) and log interactions when the user reports them.
+8. WEBSITE RESEARCH: If the user gives only a website URL (or asks you to research a company), call researchWebsite FIRST and use its result to fill the record — name, description, website, LinkedIn company URL, emails — and to add contacts for any people it surfaced (published team members, LinkedIn profile links). Read the page excerpts to pull member names and titles.
+9. Never invent LinkedIn URLs, emails, or people — only use what the tools return. After saving, briefly tell the user what is still missing so they can paste it.
+
+REPORTING AFTER RESEARCH: end with a compact summary — what was created, which contacts were added with their titles, and a short "still missing" line (e.g. personal LinkedIn profiles not found).`;
+
+const LINKEDIN_RULE = `\n10. LINKEDIN RESEARCH: The researchLinkedInCompany tool is available. After researchWebsite (or when the user asks for members), call it with the company name or LinkedIn company URL to discover employees. Prefer founders/owners and senior people; add at most 10 as contacts, each with their LinkedIn URL when returned.`;
 
 function sanitize(query: string) {
   return query.replace(/[%(),]/g, " ").trim();
 }
 
 function buildTools(
-  supabase: Awaited<ReturnType<typeof createClient>>
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  apifyEnabled: boolean
 ): ToolSet {
   return {
+    researchWebsite: tool({
+      description:
+        "Fetch a company's public website (plus its /about, /team, /contact subpages) and return structured research: company name, description, LinkedIn company URL, LinkedIn profile URLs found on the site, emails, social links, and page text excerpts. Use this whenever the user gives only a website URL or asks you to research a company.",
+      inputSchema: z.object({ url: z.string().min(4) }),
+      execute: async ({ url }) => {
+        try {
+          return await researchWebsite(url);
+        } catch (err) {
+          return {
+            error:
+              err instanceof Error
+                ? `Could not fetch that website: ${err.message}`
+                : "Could not fetch that website",
+          };
+        }
+      },
+    }),
+
+    ...(apifyEnabled
+      ? {
+          researchLinkedInCompany: tool({
+            description:
+              "Search LinkedIn (via Apify) for employees of a company. Pass a company name or a LinkedIn company URL as the query. Returns up to 15 people with name, title, LinkedIn profile URL, and location. Use after researchWebsite, or when the user asks to find the owner/members of an organization.",
+            inputSchema: z.object({ query: z.string().min(2) }),
+            execute: async ({ query }) => runApifyLinkedIn(query),
+          }),
+        }
+      : {}),
+
     findCompany: tool({
       description:
         "Search existing companies by name or website domain. Always call this before creating a company to avoid duplicates.",
@@ -255,6 +292,8 @@ export async function POST(req: Request) {
 
   const { messages, defaultList } = await req.json();
 
+  const apifyEnabled = Boolean(process.env.APIFY_API_TOKEN);
+
   const listHint =
     defaultList === "pos" || defaultList === "compliance"
       ? `\n\nCONTEXT: The user opened this chat from the ${
@@ -264,10 +303,10 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model,
-    system: SYSTEM_PROMPT + listHint,
+    system: SYSTEM_PROMPT + (apifyEnabled ? LINKEDIN_RULE : "") + listHint,
     messages: await convertToModelMessages(messages),
-    tools: buildTools(supabase),
-    stopWhen: stepCountIs(6),
+    tools: buildTools(supabase, apifyEnabled),
+    stopWhen: stepCountIs(8),
   });
 
   return result.toUIMessageStreamResponse();

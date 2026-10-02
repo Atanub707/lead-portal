@@ -72,6 +72,21 @@ Pipeline stages:
 - **No email reminders yet** — next action + last contact are tracked for manual review.
 - **Free tier** — the Supabase project pauses after ~1 week of inactivity; data is safe and restore is one click.
 
+## Research pipeline ("Add with AI")
+
+- **Website research** (`src/lib/research.ts` → `researchWebsite`): server-side fetch of a
+  public site plus up to 3 subpages (/about, /team, /contact). SSRF-guarded (public hosts
+  only — redirects re-validated; size/time caps). Extracts title/description/LinkedIn
+  URLs/emails/socials plus page text excerpts so the model can pull member names/titles.
+- **LinkedIn research** (`runApifyLinkedIn`): runs an Apify actor synchronously (default
+  `harvestapi/linkedin-company-employees`, cookie-free) and returns up to 15 people
+  (name / title / LinkedIn URL / location). Actor + input configurable via
+  `APIFY_LINKEDIN_ACTOR_ID` / `APIFY_LINKEDIN_ACTOR_INPUT` (with a `{{query}}` placeholder).
+  Only exposed when `APIFY_API_TOKEN` is set. Direct LinkedIn scraping is deliberately not
+  implemented — it is the blocked/banned surface; Apify is the supported route.
+- Chat route: `maxDuration = 60s` (Apify runs can take up to ~45s); the model is
+  instructed to never invent LinkedIn URLs, emails, or people.
+
 ## Future upgrades
 
 1. AI enrichment on add (paste URL → industry, size, description, contact suggestions)

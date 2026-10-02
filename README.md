@@ -91,6 +91,27 @@ documents the company into that pipeline (it defaults to the pipeline you opened
 from) with duplicate-checking, using your own permissions. Manual entry stays on
 every screen.
 
+### Website & LinkedIn research
+
+Paste just a website URL and the assistant will:
+
+1. **Fetch the site** (plus /about, /team, /contact) — extracting the company name,
+   description, LinkedIn company URL, emails, and any team members published on the site
+2. **Discover LinkedIn employees via Apify** (optional) — creates contacts with names,
+   titles, and profile URLs; prefers founders and senior people
+
+To enable LinkedIn research, connect a free Apify account:
+
+1. [apify.com](https://apify.com) → sign up (free plan includes $5/month credit)
+2. Apify Console → **Settings → Integrations** → copy the **API token**
+3. Add `APIFY_API_TOKEN=...` to `.env.local` and Vercel
+4. Optional: swap the actor with `APIFY_LINKEDIN_ACTOR_ID` (default:
+   `harvestapi/linkedin-company-employees`) and its input via `APIFY_LINKEDIN_ACTOR_INPUT`
+
+Without Apify, website research still works and LinkedIn profiles stay manual.
+Direct LinkedIn scraping is intentionally not implemented — LinkedIn blocks automation;
+Apify actors are the supported route.
+
 Enable it with an OpenCode subscription key (one model, fixed: **DeepSeek V4.1 Flash**):
 
 1. Sign in at [opencode.ai/auth](https://opencode.ai/auth) → subscribe to **OpenCode Go** →
