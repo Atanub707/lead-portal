@@ -316,10 +316,10 @@ export async function runApifyLinkedIn(
       .map((item) => ({
         name:
           pickString(item, ["name", "fullName"]) ??
-          [pickString(item, ["firstName"]), pickString(item, ["lastName"])]
+          ([pickString(item, ["firstName"]), pickString(item, ["lastName"])]
             .filter(Boolean)
             .join(" ") ||
-          null,
+            null),
         title: pickString(item, [
           "headline",
           "position",
