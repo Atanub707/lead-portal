@@ -90,15 +90,17 @@ Say which list ("add to POS" / "add to compliance") and it documents the company
 into the database with duplicate-checking, using your own permissions. Manual
 entry stays available on every screen.
 
-Enable it with one free API key (Google Gemini has a free tier):
+Enable it with one API key:
 
-1. Get a key at [aistudio.google.com](https://aistudio.google.com) → **Get API key**
+1. Create a key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys) (note: a
+   ChatGPT subscription does **not** include API access — API billing is separate)
 2. Add it to `.env.local` (and to Vercel → Environment Variables for production):
-   `GOOGLE_GENERATIVE_AI_API_KEY=...`
+   `OPENAI_API_KEY=...`
 3. Restart the dev server
 
-Alternatives: `OPENAI_API_KEY` or `GROQ_API_KEY` also work (the first key found wins);
-`AI_MODEL` overrides the default model per provider.
+Alternatives: `GOOGLE_GENERATIVE_AI_API_KEY` (free tier at aistudio.google.com) or
+`GROQ_API_KEY` (free tier) also work — the first key found wins; `AI_MODEL` overrides
+the default model per provider.
 
 ## Deploy to Vercel (free)
 
