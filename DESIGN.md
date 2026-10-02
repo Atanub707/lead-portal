@@ -83,12 +83,26 @@ Pipeline stages:
   otherwise falls back to a built-in SSRF-guarded fetcher (public hosts only — redirects
   re-validated; size/time caps). Extracts title/description/LinkedIn URLs/emails/socials
   plus page text excerpts.
-- **AI extraction** (`src/lib/ai.ts` → `pickModel`): one structured call
-  (`generateObject` + zod schema) turns the research into company fields + contacts;
-  the model is instructed to never invent URLs, emails, or people.
+- **AI extraction** (`src/lib/ai.ts` → `pickModel`): plain-text generation with a strict
+  JSON shape is primary (avoids DeepSeek/OpenCode-Go `response_format` quirks), tolerant
+  parse + zod validation; `generateObject` is the fallback. The model is instructed to
+  never invent URLs, emails, or people.
+- **Personal LinkedIn discovery (free):** during each paste, contacts without a LinkedIn
+  URL get one TinyFish Search each (`site:linkedin.com/in "Name" "Company"`); only
+  confident name+company matches are saved (`findLinkedInProfile`). A per-contact
+  **Find LinkedIn** button on the company page does the same on demand.
 - **LinkedIn employee rosters are manual** — direct scraping is the blocked/banned
   surface, and the paid Apify actor was removed (2026-10) in favor of the free
-  company-URL lookup. The old integration is recoverable from git history if needed.
+  company/profile-URL lookups. The old integration is recoverable from git history.
+- **Enrichment cost order:** website + company LinkedIn + personal profile URLs are all
+  free (TinyFish, or the built-in fetcher). Paid tools (Apify deep-dive, email
+  verification) come only after a person is known and worth it; personal emails are
+  manual — no safe public source exists.
+- **Laya ([convaiinnovations/laya](https://huggingface.co/convaiinnovations/laya)) has
+  no role here:** it is a ~400M-param non-autoregressive *classifier* (calibrated
+  choice/score/yes-no decisions, ~33 ms/pass, Apache-2.0) — not a web or enrichment
+  tool. The only place it fits is high-volume bulk-intake classification (see Future
+  upgrades), and it needs its own GPU host.
 
 ## Future upgrades
 

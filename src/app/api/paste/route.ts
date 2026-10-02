@@ -1,7 +1,7 @@
 import { generateObject, generateText } from "ai";
 import { z } from "zod";
 import { NO_AI_KEY_MESSAGE, pickModel } from "@/lib/ai";
-import { researchWebsite } from "@/lib/research";
+import { findLinkedInProfile, researchWebsite, tinyfishEnabled } from "@/lib/research";
 import { createClient } from "@/lib/supabase/server";
 import { LIST_LABEL, parseList, type OrgList } from "@/lib/types";
 
@@ -240,6 +240,22 @@ export async function POST(req: Request) {
     )
     .slice(0, 12);
 
+  // Free personal LinkedIn discovery (TinyFish Search) for people the site didn't link.
+  let linkedinProfilesFound = 0;
+  if (tinyfishEnabled()) {
+    const needProfiles = contacts.filter((contact) => !contact.linkedin_url);
+    const found = await Promise.all(
+      needProfiles.map((contact) => findLinkedInProfile(contact.name, name))
+    );
+    needProfiles.forEach((contact, index) => {
+      const profile = found[index];
+      if (profile) {
+        contact.linkedin_url = profile;
+        linkedinProfilesFound += 1;
+      }
+    });
+  }
+
   const q = sanitize(name);
   const domain = hostOf(website);
   const { data: matches } = await supabase
@@ -349,6 +365,7 @@ export async function POST(req: Request) {
     listLabel: LIST_LABEL[list],
     contactsAdded,
     contactsSkipped: contacts.length - toAdd.length,
+    linkedinProfilesFound,
     linkedinUrl: linkedin,
     stillMissing,
   });

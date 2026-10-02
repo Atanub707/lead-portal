@@ -96,7 +96,9 @@ The assistant does the whole job in one shot:
    to a built-in fetcher otherwise
 2. **Extracts the company** — name, description, LinkedIn company URL, emails, and the
    people published on the site (team/about pages)
-3. **Saves everything** — creates the company in the selected pipeline (or updates it
+3. **Finds personal LinkedIn profiles** — free TinyFish Search per person when the site
+   doesn't link them; only confident name + company matches are saved
+4. **Saves everything** — creates the company in the selected pipeline (or updates it
    when it already exists) and adds the contacts it found; duplicates are skipped
 
 It finishes with a short summary: record link, contacts added, whether the LinkedIn
@@ -107,6 +109,8 @@ company URL was found, and what's still missing so you can fill it by hand.
 Employee scraping is intentionally not automated (LinkedIn blocks bots, and paid actors
 aren't worth it for this use case). The pipeline record keeps the company's LinkedIn
 URL — the research step finds it — and people are added manually on the company page.
+Each contact without a LinkedIn URL also has a **Find LinkedIn** button: one free search
+on demand, matched against their name + company. No confident match = nothing is saved.
 
 **Costs:** all research is free — TinyFish Fetch/Search are free on every plan
 (limits around 1,000 fetched URLs/day and 500 searches/hour) and the built-in fallback

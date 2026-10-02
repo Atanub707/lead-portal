@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "./supabase/admin";
 import { createClient } from "./supabase/server";
+import { findLinkedInProfile, tinyfishEnabled } from "./research";
 import type { OrgKind, OrgList, PipelineStage, UserRole } from "./types";
 import { KIND_OPTIONS, PRIORITY_OPTIONS, STATUS_LABEL } from "./types";
 
@@ -160,6 +161,55 @@ export async function deleteContact(formData: FormData) {
   const { error } = await supabase.from("contacts").delete().eq("id", id);
   if (error) throw new Error(error.message);
   revalidateAll(orgId);
+}
+
+export async function findContactLinkedIn(
+  contactId: number,
+  orgId: number
+): Promise<{ ok: boolean; message?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Not signed in" };
+
+  if (!tinyfishEnabled()) {
+    return {
+      ok: false,
+      message: "Add a free TINYFISH_API_KEY to enable this",
+    };
+  }
+
+  const [{ data: contact }, { data: org }] = await Promise.all([
+    supabase
+      .from("contacts")
+      .select("name")
+      .eq("id", contactId)
+      .maybeSingle(),
+    supabase
+      .from("organizations")
+      .select("name")
+      .eq("id", orgId)
+      .maybeSingle(),
+  ]);
+  if (!contact || !org) return { ok: false, message: "Contact not found" };
+
+  const found = await findLinkedInProfile(contact.name, org.name);
+  if (!found) {
+    return {
+      ok: false,
+      message: "No confident match found — add it manually",
+    };
+  }
+
+  const { error } = await supabase
+    .from("contacts")
+    .update({ linkedin_url: found })
+    .eq("id", contactId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidateAll(orgId);
+  return { ok: true };
 }
 
 // ─── Interactions ────────────────────────────────────────────────────────────

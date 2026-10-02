@@ -12,6 +12,7 @@ interface PasteResult {
   listLabel: string;
   contactsAdded: number;
   contactsSkipped: number;
+  linkedinProfilesFound: number;
   linkedinUrl: string | null;
   stillMissing: string[];
 }
@@ -171,6 +172,12 @@ export function PasteUrl({ list }: { list: OrgList }) {
                       {result.contactsSkipped} already on file
                     </span>
                   ) : null}
+                  {result.linkedinProfilesFound > 0 ? (
+                    <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[11px] text-zinc-600 tabular-nums">
+                      +{result.linkedinProfilesFound} LinkedIn{" "}
+                      {result.linkedinProfilesFound === 1 ? "profile" : "profiles"}
+                    </span>
+                  ) : null}
                   <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[11px] text-zinc-600">
                     {result.linkedinUrl
                       ? "LinkedIn company URL found"
@@ -265,7 +272,8 @@ export function PasteUrl({ list }: { list: OrgList }) {
                 <p className="text-[11px] leading-relaxed text-zinc-500">
                   The assistant fetches the site (plus /about, /team, /contact),
                   extracts the company, LinkedIn URL, emails and published team
-                  members, then saves everything — duplicates are skipped.
+                  members — and finds each person&apos;s LinkedIn profile (free)
+                  — then saves everything. Duplicates are skipped.
                 </p>
 
                 {error ? (

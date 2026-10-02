@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ExternalLink, Plus } from "lucide-react";
 import { CompanyAvatar, KindBadge, StatusDot } from "@/components/badges";
 import { ConfirmSubmit } from "@/components/confirm-submit";
+import { FindLinkedInButton } from "@/components/find-linkedin-button";
 import {
   addContact,
   addInteraction,
@@ -294,6 +295,14 @@ export default async function CompanyPage({
                           </span>
                         ) : null}
                       </div>
+                      {!contact.linkedin_url ? (
+                        <div className="mt-1">
+                          <FindLinkedInButton
+                            contactId={contact.id}
+                            orgId={company.id}
+                          />
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   {isOwner ? (

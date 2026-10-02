@@ -312,44 +312,117 @@ async function tinyfishFetch(urls: string[]): Promise<TinyfishPage[]> {
   return json.results ?? [];
 }
 
-async function tinyfishSearchLinkedInCompany(
-  name: string,
-  domain: string
-): Promise<string[]> {
+interface TinyfishSearchResult {
+  title?: string;
+  snippet?: string;
+  url?: string;
+}
+
+async function tinyfishSearch(
+  query: string,
+  purpose: string
+): Promise<TinyfishSearchResult[]> {
   const key = tinyfishKey();
   if (!key) return [];
-  const query = name
-    ? `site:linkedin.com/company "${name}"`
-    : `site:linkedin.com/company ${domain}`;
   const url = new URL(TINYFISH_SEARCH_URL);
   url.searchParams.set("query", query);
-  url.searchParams.set(
-    "purpose",
-    `Find the official LinkedIn company page for ${name || domain}`
-  );
+  url.searchParams.set("purpose", purpose);
   try {
     const res = await fetch(url, {
       headers: { "X-API-Key": key, "User-Agent": USER_AGENT },
       signal: AbortSignal.timeout(TINYFISH_TIMEOUT_MS),
     });
     if (!res.ok) return [];
-    const json = (await res.json()) as { results?: { url?: string }[] };
-    return (json.results ?? [])
-      .map((r) => r.url ?? "")
-      .filter((u) => /linkedin\.com\/company\//i.test(u))
-      .map((u) => {
-        try {
-          const parsed = new URL(u);
-          return parsed.origin + parsed.pathname.replace(/\/$/, "");
-        } catch {
-          return "";
-        }
-      })
-      .filter(Boolean)
-      .slice(0, 2);
+    const json = (await res.json()) as { results?: TinyfishSearchResult[] };
+    return json.results ?? [];
   } catch {
     return [];
   }
+}
+
+function normaliseLinkedInUrl(
+  raw: string | undefined,
+  kind: "in" | "company"
+): string | null {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    const host = url.hostname.toLowerCase();
+    if (host !== "linkedin.com" && !host.endsWith(".linkedin.com")) return null;
+    const match = url.pathname.match(new RegExp(`^/${kind}/([^/]+)`));
+    if (!match) return null;
+    return `https://www.linkedin.com/${kind}/${match[1]}`;
+  } catch {
+    return null;
+  }
+}
+
+export function tinyfishEnabled(): boolean {
+  return tinyfishKey() !== null;
+}
+
+async function tinyfishSearchLinkedInCompany(
+  name: string,
+  domain: string
+): Promise<string[]> {
+  const query = name
+    ? `site:linkedin.com/company "${name}"`
+    : `site:linkedin.com/company ${domain}`;
+  const results = await tinyfishSearch(
+    query,
+    `Find the official LinkedIn company page for ${name || domain}`
+  );
+  const found: string[] = [];
+  for (const result of results) {
+    const clean = normaliseLinkedInUrl(result.url, "company");
+    if (clean && !found.includes(clean)) found.push(clean);
+    if (found.length >= 2) break;
+  }
+  return found;
+}
+
+export async function findLinkedInProfile(
+  name: string,
+  company?: string | null
+): Promise<string | null> {
+  const cleanName = name.trim();
+  const parts = cleanName
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((part) => part.length >= 2);
+  if (parts.length === 0) return null;
+
+  const companyName = company?.trim() ?? "";
+  const query = companyName
+    ? `site:linkedin.com/in "${cleanName}" "${companyName}"`
+    : `site:linkedin.com/in "${cleanName}"`;
+  const results = await tinyfishSearch(
+    query,
+    `Find the personal LinkedIn profile of ${cleanName}${
+      companyName ? ` at ${companyName}` : ""
+    }`
+  );
+
+  for (const result of results.slice(0, 6)) {
+    const candidate = normaliseLinkedInUrl(result.url, "in");
+    if (!candidate) continue;
+    const haystack = `${result.title ?? ""} ${result.snippet ?? ""}`.toLowerCase();
+    if (!parts.every((part) => haystack.includes(part))) continue;
+    if (companyName) {
+      const companyWords = companyName
+        .toLowerCase()
+        .split(/[^\p{L}\p{N}]+/u)
+        .filter((word) => word.length > 2);
+      if (
+        companyWords.length > 0 &&
+        !companyWords.some((word) => haystack.includes(word))
+      ) {
+        continue;
+      }
+    }
+    return candidate;
+  }
+  return null;
 }
 
 function deriveSiteName(title: string | null | undefined, fallback: string): string {
