@@ -42,3 +42,4 @@ No gradients · no emoji · no `transition-all` · zinc-scale neutrals only · s
 ## Decision log
 
 - 2026-10-02 — build: Attio blend across shell/table/detail; Pipedrive-style stage bars on dashboard. Status: **KEPT** (user approved, 2026-10-02).
+- 2026-10-02 — build 2 (shell): fixed collapsible sidebar (icon rail, persisted, ⌘B), mobile drawer; standard pagination (10/20/50, count left, pager right, size change resets page 1). Motion audit MEDIUMs accepted: `transition-colors` only (no movement); entrance animations globally disabled under `prefers-reduced-motion`.

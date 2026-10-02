@@ -14,22 +14,32 @@ export async function getCompanies(opts: {
   kind?: string;
   priority?: string;
   q?: string;
-}): Promise<Organization[]> {
+  page?: number;
+  per?: number;
+}): Promise<{ rows: Organization[]; count: number }> {
   const supabase = await createClient();
+  const per = opts.per && opts.per > 0 ? opts.per : 20;
+  const page = opts.page && opts.page > 0 ? opts.page : 1;
+  const from = (page - 1) * per;
+
   let query = supabase
     .from("organizations")
-    .select("*, contacts(count)")
+    .select("*, contacts(count)", { count: "exact" })
     .eq("list", opts.list)
-    .order("name");
+    .order("name")
+    .range(from, from + per - 1);
 
   if (opts.status) query = query.eq("status", opts.status);
   if (opts.kind) query = query.eq("kind", opts.kind);
   if (opts.priority) query = query.eq("priority", opts.priority);
   if (opts.q) query = query.ilike("name", `%${opts.q}%`);
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as Organization[];
+  return {
+    rows: (data ?? []) as unknown as Organization[],
+    count: count ?? 0,
+  };
 }
 
 export async function getStatusCounts(

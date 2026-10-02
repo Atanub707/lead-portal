@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { CompanyAvatar, KindBadge, StatusDot } from "@/components/badges";
 import { getCompanies } from "@/lib/data";
 import {
@@ -15,12 +15,29 @@ import {
 
 export const dynamic = "force-dynamic";
 
+const PAGE_SIZES = [10, 20, 50];
+const DEFAULT_PER = 20;
+
 function host(url: string) {
   try {
     return new URL(url).host;
   } catch {
     return url;
   }
+}
+
+function pageItems(current: number, total: number): (number | "…")[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const items: (number | "…")[] = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  if (start > 2) items.push("…");
+  for (let p = start; p <= end; p += 1) items.push(p);
+  if (end < total - 1) items.push("…");
+  items.push(total);
+  return items;
 }
 
 export default async function CompaniesPage({
@@ -35,7 +52,52 @@ export default async function CompaniesPage({
   const kind = str(sp.kind);
   const priority = str(sp.priority);
 
-  const companies = await getCompanies({ list, q, status, kind, priority });
+  const perRaw = Number(str(sp.per));
+  const per = PAGE_SIZES.includes(perRaw) ? perRaw : DEFAULT_PER;
+  const pageRaw = Number(str(sp.page));
+  const requestedPage =
+    Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
+
+  let result = await getCompanies({
+    list,
+    q,
+    status,
+    kind,
+    priority,
+    page: requestedPage,
+    per,
+  });
+
+  const totalPages = Math.max(1, Math.ceil(result.count / per));
+  if (requestedPage > totalPages && result.count > 0) {
+    result = await getCompanies({
+      list,
+      q,
+      status,
+      kind,
+      priority,
+      page: totalPages,
+      per,
+    });
+  }
+
+  const companies = result.rows;
+  const count = result.count;
+  const current = Math.min(requestedPage, totalPages);
+  const fromRow = count === 0 ? 0 : (current - 1) * per + 1;
+  const toRow = Math.min(current * per, count);
+
+  function href(next: { page?: number; per?: number }) {
+    const params = new URLSearchParams();
+    params.set("list", list);
+    if (q) params.set("q", q);
+    if (status) params.set("status", status);
+    if (kind) params.set("kind", kind);
+    if (priority) params.set("priority", priority);
+    params.set("per", String(next.per ?? per));
+    params.set("page", String(next.page ?? current));
+    return `/companies?${params.toString()}`;
+  }
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
@@ -44,9 +106,8 @@ export default async function CompaniesPage({
           <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
             {LIST_LABEL[list]}
           </h1>
-          <p className="mt-1 text-[13px] text-zinc-500">
-            {companies.length}{" "}
-            {companies.length === 1 ? "company" : "companies"}
+          <p className="mt-1 text-[13px] text-zinc-500 tabular-nums">
+            {count} {count === 1 ? "company" : "companies"}
           </p>
         </div>
         <Link href={`/companies/new?list=${list}`} className="btn-primary">
@@ -60,6 +121,7 @@ export default async function CompaniesPage({
         aria-label="Filters"
       >
         <input type="hidden" name="list" value={list} />
+        <input type="hidden" name="per" value={String(per)} />
         <div className="relative min-w-[200px] flex-1">
           <Search
             className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400"
@@ -117,7 +179,7 @@ export default async function CompaniesPage({
           Apply
         </button>
         {q || status || kind || priority ? (
-          <Link href={`/companies?list=${list}`} className="btn-ghost">
+          <Link href={`/companies?list=${list}&per=${per}`} className="btn-ghost">
             Reset
           </Link>
         ) : null}
@@ -182,8 +244,9 @@ export default async function CompaniesPage({
             </tbody>
           </table>
         </div>
-        {companies.length === 0 ? (
-          <div className="px-4 py-16 text-center">
+
+        {count === 0 ? (
+          <div className="border-t border-zinc-100 px-4 py-16 text-center">
             <p className="text-[13px] font-medium text-zinc-700">
               No companies found
             </p>
@@ -191,7 +254,99 @@ export default async function CompaniesPage({
               Adjust the filters, or add the first one.
             </p>
           </div>
-        ) : null}
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200/80 px-4 py-2.5">
+            <p className="text-[12px] text-zinc-500 tabular-nums">
+              Showing {fromRow}–{toRow} of {count}
+            </p>
+
+            <div className="flex flex-wrap items-center gap-5">
+              <div className="flex items-center gap-0.5">
+                <span className="mr-1 text-[12px] text-zinc-500">Rows</span>
+                {PAGE_SIZES.map((size) => (
+                  <Link
+                    key={size}
+                    href={href({ per: size, page: 1 })}
+                    aria-label={`${size} rows per page`}
+                    className={`flex h-8 min-w-8 items-center justify-center rounded-md px-1.5 text-[12px] tabular-nums transition-colors ${
+                      size === per
+                        ? "bg-zinc-100 font-medium text-zinc-900"
+                        : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+                    }`}
+                  >
+                    {size}
+                  </Link>
+                ))}
+              </div>
+
+              {totalPages > 1 ? (
+                <nav className="flex items-center gap-1" aria-label="Pagination">
+                  {current > 1 ? (
+                    <Link
+                      href={href({ page: current - 1 })}
+                      aria-label="Previous page"
+                      className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
+                    >
+                      <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-100 text-zinc-300"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </span>
+                  )}
+
+                  {pageItems(current, totalPages).map((item, index) =>
+                    item === "…" ? (
+                      <span
+                        key={`ellipsis-${index}`}
+                        className="px-1 text-[12px] text-zinc-400"
+                      >
+                        …
+                      </span>
+                    ) : item === current ? (
+                      <span
+                        key={item}
+                        aria-current="page"
+                        className="flex h-8 min-w-8 items-center justify-center rounded-md bg-zinc-900 px-1.5 text-[12px] font-medium text-white tabular-nums"
+                      >
+                        {item}
+                      </span>
+                    ) : (
+                      <Link
+                        key={item}
+                        href={href({ page: item })}
+                        aria-label={`Page ${item}`}
+                        className="flex h-8 min-w-8 items-center justify-center rounded-md border border-zinc-200 bg-white px-1.5 text-[12px] text-zinc-600 tabular-nums transition-colors hover:bg-zinc-50 hover:text-zinc-900"
+                      >
+                        {item}
+                      </Link>
+                    )
+                  )}
+
+                  {current < totalPages ? (
+                    <Link
+                      href={href({ page: current + 1 })}
+                      aria-label="Next page"
+                      className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
+                    >
+                      <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-100 text-zinc-300"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </span>
+                  )}
+                </nav>
+              ) : null}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
