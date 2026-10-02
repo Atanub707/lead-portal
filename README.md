@@ -116,5 +116,7 @@ npx supabase db push
   Your data is safe; restore takes one click in the dashboard.
 - **Magic-link email limits** — Supabase's built-in email sender is rate-limited.
   Fine for a 2-person team; connect custom SMTP later if needed.
-- **Keep `.env.local` secret** — it is git-ignored. Never commit keys.
+- **Keep `.env.local` secret** — it is git-ignored. Never commit keys. The full
+  policy and incident checklist: [`SECURITY.md`](./SECURITY.md); a pre-commit hook
+  and a CI scan block credential leaks automatically.
 - Architecture details: see [`DESIGN.md`](./DESIGN.md).

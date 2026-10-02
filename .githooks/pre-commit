@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Pre-commit guard: blocks credentials and real .env files from being committed.
+# Installed automatically via `npm install` (package.json "prepare" sets core.hooksPath).
+# Policy: see SECURITY.md — do not bypass with --no-verify.
+
+set -uo pipefail
+
+fail=0
+
+# 1) Real env files must never be committed (placeholders belong in .env.example)
+staged_files=$(git diff --cached --name-only --diff-filter=ACM)
+while IFS= read -r file; do
+  [ -z "$file" ] && continue
+  base=$(basename "$file")
+  case "$base" in
+    .env.example) ;; # allowed: placeholders only
+    .env | .env.*)
+      echo "✖ BLOCKED: real environment file staged ($file)."
+      echo "  Credentials belong in .env.local (git-ignored) — never in git."
+      fail=1
+      ;;
+  esac
+done <<< "$staged_files"
+
+# 2) Credential patterns in staged content (.env.example excluded — placeholders live there)
+patterns='eyJhbGciOi[A-Za-z0-9_-]{10,}|service_role[_-]?key[[:space:]]*=[[:space:]]*[A-Za-z0-9._-]{20,}|sk_live_[0-9a-zA-Z]{10,}|sk_test_[0-9a-zA-Z]{10,}|sk-proj-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----'
+if matches=$(git diff --cached -U0 --diff-filter=ACM -- . ':(exclude).env.example' | grep -nE "^\+.*($patterns)"); then
+  echo "✖ BLOCKED: possible credential detected in staged changes:"
+  echo "$matches" | head -10 | sed 's/^/    /'
+  echo "  If this is a placeholder, rephrase it (e.g. YOUR-KEY-HERE)."
+  fail=1
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo ""
+  echo "Commit refused. Read SECURITY.md for the secret-handling policy."
+  exit 1
+fi
+
+exit 0
