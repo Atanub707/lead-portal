@@ -521,6 +521,21 @@ export async function inviteUser(
 }
 
 export async function removeUser(formData: FormData) {
+  try {
+    return await removeUserInner(formData);
+  } catch (err) {
+    const digest =
+      err && typeof err === "object" && "digest" in err
+        ? String((err as { digest?: unknown }).digest ?? "")
+        : "";
+    if (!digest.startsWith("NEXT_")) {
+      console.error("[removeUser] failed:", err);
+    }
+    throw err;
+  }
+}
+
+async function removeUserInner(formData: FormData) {
   const supabase = await assertOwner();
   const userId = field(formData, "user_id");
   if (!userId) redirect(`/settings?remove_error=${encodeURIComponent("Missing user")}`);

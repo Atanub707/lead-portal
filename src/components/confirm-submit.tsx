@@ -58,7 +58,6 @@ export function ConfirmSubmit({
               <button
                 type="submit"
                 autoFocus
-                onClick={() => setOpen(false)}
                 className="inline-flex h-8 items-center justify-center rounded-md bg-rose-600 px-3 text-[12px] font-medium text-white transition-colors hover:bg-rose-700"
               >
                 {confirmLabel}
