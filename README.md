@@ -90,11 +90,13 @@ Say which list ("add to POS" / "add to compliance") and it documents the company
 into the database with duplicate-checking, using your own permissions. Manual
 entry stays available on every screen.
 
-Enable it with an OpenCode Go / Zen key (one model, fixed: **DeepSeek V4.1 Flash**):
+Enable it with an OpenCode subscription key (one model, fixed: **DeepSeek V4.1 Flash**):
 
-1. Sign in at [opencode.ai/auth](https://opencode.ai/auth) → **Create API key**
+1. Sign in at [opencode.ai/auth](https://opencode.ai/auth) → subscribe to **OpenCode Go** →
+   **Create API key**
 2. Add it to `.env.local` (and to Vercel → Environment Variables for production):
-   `OPENCODE_API_KEY=...`
+   `OPENCODE_API_KEY=...` — the assistant calls the Go endpoint
+   (`https://opencode.ai/zen/go/v1`) with this single model
 3. Restart the dev server
 
 Fallbacks (used only when `OPENCODE_API_KEY` is empty): `OPENAI_API_KEY`,

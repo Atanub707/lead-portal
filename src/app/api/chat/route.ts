@@ -14,19 +14,28 @@ import { createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 30;
 
-// OpenCode Go / Zen — subscription gateway (key: https://opencode.ai/auth).
-// Per the OpenCode docs this endpoint is OpenAI-compatible; one model only.
+// OpenCode Go subscription — key from https://opencode.ai/auth (subscribe to Go).
+// Per the OpenCode docs, Go uses the /zen/go/v1 endpoint path and expects clients
+// to identify themselves with a user agent + a stable session ID header.
 const OPENCODE_MODEL = "deepseek-v4.1-flash";
+const OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1";
 
-const opencode = createOpenAICompatible({
-  name: "opencode",
-  baseURL: "https://opencode.ai/zen/v1",
-  apiKey: process.env.OPENCODE_API_KEY ?? "",
-});
+function openCodeGoModel(sessionId: string) {
+  const provider = createOpenAICompatible({
+    name: "opencode-go",
+    baseURL: OPENCODE_GO_BASE_URL,
+    apiKey: process.env.OPENCODE_API_KEY ?? "",
+    headers: {
+      "User-Agent": "lead-portal/1.0",
+      "x-opencode-session": sessionId,
+    },
+  });
+  return provider(OPENCODE_MODEL);
+}
 
-function pickModel() {
+function pickModel(sessionId: string) {
   if (process.env.OPENCODE_API_KEY) {
-    return opencode(OPENCODE_MODEL);
+    return openCodeGoModel(sessionId);
   }
   if (process.env.OPENAI_API_KEY) {
     return openai(process.env.AI_MODEL ?? "gpt-4o-mini");
@@ -233,12 +242,12 @@ export async function POST(req: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const model = pickModel();
+  const model = pickModel(user.id);
   if (!model) {
     return Response.json(
       {
         error:
-          "No AI key configured. Add OPENCODE_API_KEY (OpenCode Go — https://opencode.ai/auth) to .env.local (and Vercel), then restart. OpenAI / Google / Groq keys also work as fallbacks.",
+          "No AI key configured. Add OPENCODE_API_KEY (OpenCode Go subscription — https://opencode.ai/auth) to .env.local (and Vercel), then restart. OpenAI / Google / Groq keys also work as fallbacks.",
       },
       { status: 503 }
     );
