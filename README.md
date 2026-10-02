@@ -27,10 +27,10 @@ Next.js + Supabase. Deployable to Vercel for free.
 
 ### 3. Collect your keys
 
-**Settings → API** — copy:
+**Settings → API Keys** — copy:
 - Project URL
-- `anon` public key
-- `service_role` key (secret)
+- **Publishable** key (new projects) — legacy projects: the `anon` public key
+- **Secret** key (new projects: `sb_secret_…`) — legacy projects: `service_role` key
 
 ### 4. Local environment
 

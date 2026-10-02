@@ -16,13 +16,16 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = join(__dirname, "..", "..");
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_URL =
+  process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SERVICE_KEY =
+  process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!SUPABASE_URL || !SERVICE_KEY) {
   console.error(
-    "Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY.\n" +
-      "Run with: node --env-file=.env.local scripts/import-csv.mjs"
+    "Missing Supabase credentials.\n" +
+      "Add NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY to .env.local, then run:\n" +
+      "  node --env-file=.env.local scripts/import-csv.mjs"
   );
   process.exit(1);
 }
