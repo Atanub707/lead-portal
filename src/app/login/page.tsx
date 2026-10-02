@@ -48,6 +48,7 @@ export default function LoginPage() {
         email,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
+          shouldCreateUser: false,
         },
       });
       if (error) {
@@ -217,8 +218,7 @@ export default function LoginPage() {
               </button>
 
               <p className="text-center text-[12px] text-zinc-500">
-                Magic links are rate-limited by Supabase&apos;s built-in email —
-                use a password instead if you hit the limit.
+                Works for existing accounts only — new members join by invitation.
               </p>
             </form>
           )}
