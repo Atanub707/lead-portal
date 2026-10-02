@@ -74,10 +74,13 @@ Pipeline stages:
 
 ## Research pipeline ("Add with AI")
 
-- **Website research** (`src/lib/research.ts` → `researchWebsite`): server-side fetch of a
-  public site plus up to 3 subpages (/about, /team, /contact). SSRF-guarded (public hosts
-  only — redirects re-validated; size/time caps). Extracts title/description/LinkedIn
-  URLs/emails/socials plus page text excerpts so the model can pull member names/titles.
+- **Website research** (`src/lib/research.ts` → `researchWebsite`): fetches a public site
+  plus up to 3 subpages (/about, /team, /contact). Prefers TinyFish Fetch when
+  `TINYFISH_API_KEY` is set (free — JS-rendered pages, clean markdown) with a TinyFish
+  Search fallback for the LinkedIn company URL when it is not linked on the site;
+  otherwise falls back to a built-in SSRF-guarded fetcher (public hosts only — redirects
+  re-validated; size/time caps). Extracts title/description/LinkedIn URLs/emails/socials
+  plus page text excerpts so the model can pull member names/titles.
 - **LinkedIn research** (`runApifyLinkedIn`): runs an Apify actor synchronously (default
   `harvestapi/linkedin-company-employees`, cookie-free) and returns up to 15 people
   (name / title / LinkedIn URL / location). Actor + input configurable via

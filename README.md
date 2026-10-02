@@ -96,9 +96,17 @@ every screen.
 Paste just a website URL and the assistant will:
 
 1. **Fetch the site** (plus /about, /team, /contact) — extracting the company name,
-   description, LinkedIn company URL, emails, and any team members published on the site
+   description, LinkedIn company URL, emails, and any team members published on the site.
+   With TinyFish connected it also renders JavaScript-heavy sites and can recover the
+   LinkedIn company page via search when the site doesn't link it.
 2. **Discover LinkedIn employees via Apify** (optional) — creates contacts with names,
    titles, and profile URLs; prefers founders and senior people
+
+**Website rendering & search — free, optional:** create a key at
+[agent.tinyfish.ai](https://agent.tinyfish.ai) → **API Keys**, then add
+`TINYFISH_API_KEY=...` to `.env.local` and Vercel. TinyFish Fetch + Search are free on
+every plan (no wallet needed). Without a key the portal falls back to a built-in
+fetcher and skips the search fallback — everything still works.
 
 To enable LinkedIn research, connect a free Apify account:
 
@@ -116,7 +124,9 @@ Apify actors are the supported route.
 
 - **Website research is free** — it only ever fetches the exact domain you pasted
   (plus up to 3 subpages of that same domain), is capped at 10 fetches per conversation,
-  and private/local addresses are blocked.
+  and private/local addresses are blocked. TinyFish (when configured) is also free:
+  Fetch handles up to 1,000 URLs/day and the search fallback only ever looks up the
+  company's own LinkedIn page — never people.
 - **LinkedIn research costs Apify credit** — each run starts around $0.02 plus a small
   per-profile fee (roughly $0.05–$0.12 per company lookup; see the actor page for current
   pricing, ~40–100 lookups on the free $5 credit). It runs **only when you explicitly ask**

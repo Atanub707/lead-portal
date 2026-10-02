@@ -1,5 +1,7 @@
 // Server-side research helpers for the "Add with AI" assistant.
 // 1) researchWebsite — free: fetches a public website and extracts company data.
+//    Uses TinyFish (optional TINYFISH_API_KEY) for JS-rendered fetch + LinkedIn
+//    company URL search, and falls back to a built-in fetcher when not configured.
 // 2) runApifyLinkedIn — optional: runs an Apify actor to discover LinkedIn employees.
 
 const FETCH_TIMEOUT_MS = 8000;
@@ -7,6 +9,12 @@ const MAX_HTML_BYTES = 800_000;
 const MAX_SUBPAGES = 3;
 const EXCERPT_CHARS = 2500;
 const USER_AGENT = "lead-portal/1.0 (+internal lead research)";
+
+// TinyFish (https://tinyfish.ai) — Fetch and Search are free on every plan.
+// Create a key at https://agent.tinyfish.ai and set TINYFISH_API_KEY to enable.
+const TINYFISH_FETCH_URL = "https://api.fetch.tinyfish.ai";
+const TINYFISH_SEARCH_URL = "https://api.search.tinyfish.ai";
+const TINYFISH_TIMEOUT_MS = 20000;
 
 function isPublicHttpUrl(value: string): URL | null {
   try {
@@ -189,6 +197,240 @@ function findSubpages(html: string, base: URL): URL[] {
   return found.slice(0, MAX_SUBPAGES);
 }
 
+function mergeSiteLinks(target: SiteLinks, links: SiteLinks) {
+  target.linkedin_company = [
+    ...new Set([...target.linkedin_company, ...links.linkedin_company]),
+  ].slice(0, 5);
+  target.linkedin_people = [
+    ...new Set([...target.linkedin_people, ...links.linkedin_people]),
+  ].slice(0, 15);
+  target.emails = [...new Set([...target.emails, ...links.emails])].slice(0, 10);
+  target.socials = [...new Set([...target.socials, ...links.socials])].slice(0, 8);
+}
+
+function collectLinksFromText(text: string): SiteLinks {
+  const sets = {
+    linkedin_company: new Set<string>(),
+    linkedin_people: new Set<string>(),
+    emails: new Set<string>(),
+    socials: new Set<string>(),
+  };
+
+  const urlRe = /https?:\/\/[^\s)\]"'<>]+/gi;
+  let match: RegExpExecArray | null;
+  while ((match = urlRe.exec(text))) {
+    let url: URL;
+    try {
+      url = new URL(match[0].replace(/[.,;:]+$/, ""));
+    } catch {
+      continue;
+    }
+    const host = url.hostname.toLowerCase();
+    const clean = url.origin + url.pathname.replace(/\/$/, "");
+    if (host.endsWith("linkedin.com")) {
+      if (url.pathname.startsWith("/company/")) sets.linkedin_company.add(clean);
+      else if (url.pathname.startsWith("/in/")) sets.linkedin_people.add(clean);
+    } else if (
+      host.endsWith("instagram.com") ||
+      host.endsWith("twitter.com") ||
+      host.endsWith("x.com") ||
+      host.endsWith("facebook.com")
+    ) {
+      sets.socials.add(clean);
+    }
+  }
+
+  for (const email of text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) ?? []) {
+    if (!/\.(png|jpe?g|webp|svg|gif|ico)$/i.test(email)) sets.emails.add(email);
+  }
+
+  return {
+    linkedin_company: [...sets.linkedin_company].slice(0, 5),
+    linkedin_people: [...sets.linkedin_people].slice(0, 15),
+    emails: [...sets.emails].slice(0, 10),
+    socials: [...sets.socials].slice(0, 8),
+  };
+}
+
+function findSubpagesFromMarkdown(text: string, base: URL): URL[] {
+  const wanted = /(about|team|contact|company|careers|people|leadership)/i;
+  const found = new Map<string, URL>();
+  const baseClean = base.origin + base.pathname.replace(/\/$/, "");
+
+  const linkRe = /\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = linkRe.exec(text))) {
+    let url: URL;
+    try {
+      url = new URL(match[1]);
+    } catch {
+      continue;
+    }
+    if (url.hostname !== base.hostname) continue;
+    const clean = url.origin + url.pathname.replace(/\/$/, "");
+    if (clean === baseClean) continue;
+    if (!wanted.test(url.pathname)) continue;
+    found.set(clean, url);
+  }
+
+  const list = [...found.values()];
+  list.sort((a, b) => {
+    const rank = (u: URL) =>
+      /about/i.test(u.pathname) ? 0 : /team|people|leadership/i.test(u.pathname) ? 1 : 2;
+    return rank(a) - rank(b);
+  });
+  return list.slice(0, MAX_SUBPAGES);
+}
+
+interface TinyfishPage {
+  url: string;
+  final_url?: string;
+  title?: string;
+  description?: string;
+  text?: string;
+}
+
+function tinyfishKey(): string | null {
+  const key = process.env.TINYFISH_API_KEY?.trim();
+  return key ? key : null;
+}
+
+async function tinyfishFetch(urls: string[]): Promise<TinyfishPage[]> {
+  const key = tinyfishKey();
+  if (!key) throw new Error("TinyFish is not configured");
+  const res = await fetch(TINYFISH_FETCH_URL, {
+    method: "POST",
+    headers: {
+      "X-API-Key": key,
+      "Content-Type": "application/json",
+      "User-Agent": USER_AGENT,
+    },
+    body: JSON.stringify({ urls: urls.slice(0, 10), format: "markdown" }),
+    signal: AbortSignal.timeout(TINYFISH_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`TinyFish fetch HTTP ${res.status}`);
+  const json = (await res.json()) as { results?: TinyfishPage[] };
+  return json.results ?? [];
+}
+
+async function tinyfishSearchLinkedInCompany(
+  name: string,
+  domain: string
+): Promise<string[]> {
+  const key = tinyfishKey();
+  if (!key) return [];
+  const query = name
+    ? `site:linkedin.com/company "${name}"`
+    : `site:linkedin.com/company ${domain}`;
+  const url = new URL(TINYFISH_SEARCH_URL);
+  url.searchParams.set("query", query);
+  url.searchParams.set(
+    "purpose",
+    `Find the official LinkedIn company page for ${name || domain}`
+  );
+  try {
+    const res = await fetch(url, {
+      headers: { "X-API-Key": key, "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(TINYFISH_TIMEOUT_MS),
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { results?: { url?: string }[] };
+    return (json.results ?? [])
+      .map((r) => r.url ?? "")
+      .filter((u) => /linkedin\.com\/company\//i.test(u))
+      .map((u) => {
+        try {
+          const parsed = new URL(u);
+          return parsed.origin + parsed.pathname.replace(/\/$/, "");
+        } catch {
+          return "";
+        }
+      })
+      .filter(Boolean)
+      .slice(0, 2);
+  } catch {
+    return [];
+  }
+}
+
+function deriveSiteName(title: string | null | undefined, fallback: string): string {
+  if (!title) return fallback;
+  const clean = title.split(/\s*[|·]\s*|\s+[—–]\s+/)[0]?.trim();
+  return clean || fallback;
+}
+
+async function researchWebsiteTinyfish(
+  url: URL,
+  rawUrl: string
+): Promise<WebsiteResearch> {
+  const first = await tinyfishFetch([url.toString()]);
+  const home = first[0];
+  if (!home?.text) throw new Error("TinyFish returned no content");
+
+  const finalUrl = home.final_url ?? home.url ?? url.toString();
+  const base = new URL(finalUrl);
+  const allLinks: SiteLinks = {
+    linkedin_company: [],
+    linkedin_people: [],
+    emails: [],
+    socials: [],
+  };
+  const mergeLinks = (links: SiteLinks) => mergeSiteLinks(allLinks, links);
+
+  const pages: WebsiteResearch["pages"] = [
+    {
+      url: finalUrl,
+      title: home.title ?? null,
+      excerpt: home.text.slice(0, EXCERPT_CHARS),
+    },
+  ];
+  mergeLinks(collectLinksFromText(home.text));
+
+  const discovered = findSubpagesFromMarkdown(home.text, base);
+  const candidates = discovered.length
+    ? discovered
+    : (["/about", "/team", "/contact"] as const).map((p) => new URL(p, base));
+
+  try {
+    const subs = await tinyfishFetch(candidates.map((c) => c.toString()));
+    for (const page of subs) {
+      if (!page.text) continue;
+      pages.push({
+        url: page.final_url ?? page.url,
+        title: page.title ?? null,
+        excerpt: page.text.slice(0, EXCERPT_CHARS),
+      });
+      mergeLinks(collectLinksFromText(page.text));
+    }
+  } catch {
+    // Subpage failures are non-fatal.
+  }
+
+  let notes = "Fetched with TinyFish (renders JavaScript-heavy pages).";
+  if (allLinks.linkedin_company.length === 0) {
+    const found = await tinyfishSearchLinkedInCompany(
+      deriveSiteName(home.title, ""),
+      base.hostname
+    );
+    if (found.length) {
+      allLinks.linkedin_company = found;
+      notes +=
+        " LinkedIn company URL recovered via TinyFish Search (it is not linked on the site).";
+    }
+  }
+
+  return {
+    requested_url: rawUrl,
+    final_url: finalUrl,
+    title: home.title ?? null,
+    description: home.description ?? null,
+    site_name: home.title ? deriveSiteName(home.title, base.hostname) : null,
+    links: allLinks,
+    pages,
+    notes,
+  };
+}
+
 export interface WebsiteResearch {
   requested_url: string;
   final_url: string;
@@ -204,6 +446,17 @@ export async function researchWebsite(rawUrl: string): Promise<WebsiteResearch> 
   const url = isPublicHttpUrl(rawUrl);
   if (!url) throw new Error("Not a valid public http(s) URL");
 
+  if (tinyfishKey()) {
+    try {
+      return await researchWebsiteTinyfish(url, rawUrl);
+    } catch {
+      // TinyFish unavailable — fall back to the built-in fetcher below.
+    }
+  }
+  return researchWebsiteDirect(url, rawUrl);
+}
+
+async function researchWebsiteDirect(url: URL, rawUrl: string): Promise<WebsiteResearch> {
   const { html, finalUrl } = await fetchHtml(url);
   const base = new URL(finalUrl);
   const allLinks: SiteLinks = {
@@ -213,16 +466,7 @@ export async function researchWebsite(rawUrl: string): Promise<WebsiteResearch> 
     socials: [],
   };
 
-  const mergeLinks = (links: SiteLinks) => {
-    allLinks.linkedin_company = [
-      ...new Set([...allLinks.linkedin_company, ...links.linkedin_company]),
-    ].slice(0, 5);
-    allLinks.linkedin_people = [
-      ...new Set([...allLinks.linkedin_people, ...links.linkedin_people]),
-    ].slice(0, 15);
-    allLinks.emails = [...new Set([...allLinks.emails, ...links.emails])].slice(0, 10);
-    allLinks.socials = [...new Set([...allLinks.socials, ...links.socials])].slice(0, 8);
-  };
+  const mergeLinks = (links: SiteLinks) => mergeSiteLinks(allLinks, links);
 
   const pages: WebsiteResearch["pages"] = [
     {
