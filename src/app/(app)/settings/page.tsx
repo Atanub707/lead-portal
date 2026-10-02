@@ -1,5 +1,6 @@
 import { ConfirmSubmit } from "@/components/confirm-submit";
-import { inviteUser, removeUser, updateUserRole } from "@/lib/actions";
+import { InviteForm } from "@/components/invite-form";
+import { removeUser, updateUserRole } from "@/lib/actions";
 import { getCurrentProfile, getProfiles } from "@/lib/data";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -33,8 +34,6 @@ export default async function SettingsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const invited = typeof sp.invited === "string" ? sp.invited : "";
-  const inviteError = typeof sp.invite_error === "string" ? sp.invite_error : "";
   const removeError = typeof sp.remove_error === "string" ? sp.remove_error : "";
 
   const [profile, users, authMeta] = await Promise.all([
@@ -54,23 +53,6 @@ export default async function SettingsPage({
           Invite-only workspace. Partners join when the owner invites them.
         </p>
 
-        {invited ? (
-          <p
-            role="status"
-            className="mt-5 rounded-md bg-emerald-50 px-3 py-2 text-[13px] text-emerald-800"
-          >
-            Invitation sent to <strong>{invited}</strong>. They will get an
-            email with a link to set their password.
-          </p>
-        ) : null}
-        {inviteError ? (
-          <p
-            role="alert"
-            className="mt-5 rounded-md bg-rose-50 px-3 py-2 text-[13px] text-rose-700"
-          >
-            Invitation failed: {inviteError}
-          </p>
-        ) : null}
         {removeError ? (
           <p
             role="alert"
@@ -86,28 +68,16 @@ export default async function SettingsPage({
               Invite a partner
             </h2>
             <p className="mt-1 text-[12px] text-zinc-500">
-              They receive an email with a link where they set their password.
-              Invitations are the only way to join — public sign-up is disabled.
-              Invited partners join as <strong>editor</strong>; change roles
-              below anytime.
+              Create a single-use invite link and send it to them yourself
+              (WhatsApp, Slack, email — whatever is easiest). Opening it signs
+              them in and asks them to set a password. Invited partners join as{" "}
+              <strong>editor</strong>; change roles below anytime.
             </p>
-            <form action={inviteUser} className="mt-3 flex flex-wrap items-center gap-2">
-              <input
-                name="email"
-                type="email"
-                required
-                placeholder="partner@company.com"
-                aria-label="Partner email"
-                className="input max-w-sm"
-              />
-              <button type="submit" className="btn-primary">
-                Send invitation
-              </button>
-            </form>
+            <InviteForm />
             <p className="mt-2 text-[11px] text-zinc-400">
-              Note: Supabase&apos;s built-in email sender is rate-limited (a few
-              per hour). For reliable delivery, connect custom SMTP (free tiers:
-              Resend, Brevo) in Supabase → Authentication → SMTP.
+              Links expire in 24 hours by default. No email is sent — share the
+              link directly, so Supabase&apos;s email rate limits never block an
+              invite.
             </p>
           </section>
         ) : null}

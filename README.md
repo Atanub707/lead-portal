@@ -75,15 +75,17 @@ files (members + interaction logs). Safe to re-run — existing companies are sk
 1. Supabase → **Authentication → Sign In / Providers** → turn **OFF**
    "Allow new users to sign up" → Save. From now on nobody can self-create an
    account — partners join only by invitation.
-2. In the portal: **Settings → Invite a partner** → enter their email → Send.
-   They receive an email with a link, set their password on the Welcome screen,
-   and land in the app as an **editor**.
+2. In the portal: **Settings → Invite a partner** → enter their email →
+   **Create invite link** → **Copy**. Send the link to them however you like
+   (WhatsApp, Slack, email). Opening it signs them in and asks them to set a
+   password, then lands them in the app as an **editor**. No email is sent and
+   nothing is rate-limited; links are single-use and expire in 24 hours by default.
 3. Manage roles or remove users anytime in **Settings** — owner only. Editors can
    add/edit pipeline data; the database (RLS) blocks deletes and role changes.
 
-> Invite emails use Supabase's built-in sender, which is rate-limited
-> (a few per hour). For reliable delivery connect custom SMTP
-> (free tiers: Resend, Brevo) in **Authentication → SMTP**.
+> Prefer automatic invite emails? That needs custom SMTP (free tiers: Resend,
+> Brevo) in **Authentication → SMTP** — but the copyable link works without it
+> and never hits Supabase's built-in email rate limits.
 
 ## AI assistant ("Paste URL with AI")
 

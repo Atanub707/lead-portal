@@ -323,33 +323,71 @@ async function currentSiteUrl() {
   return `${proto}://${host}`;
 }
 
-export async function inviteUser(formData: FormData) {
-  await assertOwner();
+export interface InviteResult {
+  ok: boolean;
+  link?: string;
+  note?: string;
+  error?: string;
+}
 
-  const email = field(formData, "email");
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    redirect(`/settings?invite_error=${encodeURIComponent("Enter a valid email address")}`);
+export async function inviteUser(emailInput: string): Promise<InviteResult> {
+  const email = emailInput.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, error: "Enter a valid email address" };
   }
 
-  let errorMessage: string | null = null;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in" };
+
+  const { data: me } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (me?.role !== "owner") {
+    return { ok: false, error: "Only the owner can invite people" };
+  }
+
+  const base = await currentSiteUrl();
+
   try {
     const admin = createAdminClient();
-    const base = await currentSiteUrl();
-    const { error } = await admin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${base}/auth/callback?next=/welcome`,
-    });
-    if (error) errorMessage = error.message;
+    // New email → invite (creates the account). Existing account → magic link (re-invite).
+    for (const type of ["invite", "magiclink"] as const) {
+      const { data, error } = await admin.auth.admin.generateLink({
+        type,
+        email,
+        options: { redirectTo: `${base}/auth/callback?next=/welcome` },
+      });
+      const properties = data?.properties;
+      if (!error && properties?.hashed_token) {
+        const link = `${base}/auth/callback?token_hash=${encodeURIComponent(
+          properties.hashed_token
+        )}&type=${properties.verification_type ?? type}&next=/welcome`;
+        revalidatePath("/settings");
+        return {
+          ok: true,
+          link,
+          note:
+            properties.verification_type === "magiclink"
+              ? "This email already has an account — the link signs them straight in."
+              : "New account created (pending). The link is single-use and expires in 24 hours by default.",
+        };
+      }
+    }
+    return {
+      ok: false,
+      error: "Supabase could not create a link for this email",
+    };
   } catch (err) {
-    errorMessage =
-      err instanceof Error ? err.message : "Invitation could not be sent";
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Invite failed",
+    };
   }
-
-  revalidatePath("/settings");
-
-  if (errorMessage) {
-    redirect(`/settings?invite_error=${encodeURIComponent(errorMessage)}`);
-  }
-  redirect(`/settings?invited=${encodeURIComponent(email)}`);
 }
 
 export async function removeUser(formData: FormData) {
