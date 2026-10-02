@@ -114,8 +114,11 @@ npx supabase db push
 
 - **Free tier pausing** — a free Supabase project pauses after ~1 week of inactivity.
   Your data is safe; restore takes one click in the dashboard.
-- **Magic-link email limits** — Supabase's built-in email sender is rate-limited.
-  Fine for a 2-person team; connect custom SMTP later if needed.
+- **Email limits** — Supabase's built-in email sender is rate-limited (a few per hour).
+  Use the **Password** tab on the login page to avoid email entirely; for magic links,
+  connect custom SMTP (free tiers: Resend, Brevo) in Supabase → Authentication → SMTP.
+  For password sign-up, turn **off** "Confirm email" in
+  Authentication → Sign In / Providers → Email (re-enable it once both accounts exist).
 - **Keep `.env.local` secret** — it is git-ignored. Never commit keys. The full
   policy and incident checklist: [`SECURITY.md`](./SECURITY.md); a pre-commit hook
   and a CI scan block credential leaks automatically.
