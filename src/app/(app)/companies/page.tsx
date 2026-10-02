@@ -1,15 +1,20 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Mail,
+  Search,
+} from "lucide-react";
+import { BookmarkToggle } from "@/components/bookmark-toggle";
+import { FollowUpControl } from "@/components/follow-up-control";
 import { PasteUrl } from "@/components/paste-url";
-import { CompanyAvatar, KindBadge, StatusDot } from "@/components/badges";
+import { CompanyAvatar, KindBadge } from "@/components/badges";
 import { getCompanies } from "@/lib/data";
 import {
   KIND_LABEL,
   KIND_OPTIONS,
   LIST_LABEL,
-  PRIORITY_OPTIONS,
-  STATUS_LABEL,
-  STATUS_STAGES,
   parseList,
   str,
 } from "@/lib/types";
@@ -49,9 +54,9 @@ export default async function CompaniesPage({
   const sp = await searchParams;
   const list = parseList(sp.list);
   const q = str(sp.q);
-  const status = str(sp.status);
   const kind = str(sp.kind);
-  const priority = str(sp.priority);
+  const follow = str(sp.follow);
+  const starred = str(sp.starred) === "1";
 
   const perRaw = Number(str(sp.per));
   const per = PAGE_SIZES.includes(perRaw) ? perRaw : DEFAULT_PER;
@@ -62,9 +67,9 @@ export default async function CompaniesPage({
   let result = await getCompanies({
     list,
     q,
-    status,
     kind,
-    priority,
+    follow,
+    starred,
     page: requestedPage,
     per,
   });
@@ -74,9 +79,9 @@ export default async function CompaniesPage({
     result = await getCompanies({
       list,
       q,
-      status,
       kind,
-      priority,
+      follow,
+      starred,
       page: totalPages,
       per,
     });
@@ -92,9 +97,9 @@ export default async function CompaniesPage({
     const params = new URLSearchParams();
     params.set("list", list);
     if (q) params.set("q", q);
-    if (status) params.set("status", status);
     if (kind) params.set("kind", kind);
-    if (priority) params.set("priority", priority);
+    if (follow) params.set("follow", follow);
+    if (starred) params.set("starred", "1");
     params.set("per", String(next.per ?? per));
     params.set("page", String(next.page ?? current));
     return `/companies?${params.toString()}`;
@@ -141,19 +146,6 @@ export default async function CompaniesPage({
           />
         </div>
         <select
-          name="status"
-          defaultValue={status}
-          aria-label="Status"
-          className="input w-[130px]"
-        >
-          <option value="">Any status</option>
-          {STATUS_STAGES[list].map((stage) => (
-            <option key={stage} value={stage}>
-              {STATUS_LABEL[stage]}
-            </option>
-          ))}
-        </select>
-        <select
           name="kind"
           defaultValue={kind}
           aria-label="Type"
@@ -167,22 +159,29 @@ export default async function CompaniesPage({
           ))}
         </select>
         <select
-          name="priority"
-          defaultValue={priority}
-          aria-label="Priority"
-          className="input w-[120px]"
+          name="follow"
+          defaultValue={follow}
+          aria-label="Follow-up"
+          className="input w-[140px]"
         >
-          <option value="">Any priority</option>
-          {PRIORITY_OPTIONS.map((option) => (
-            <option key={option} value={option} className="capitalize">
-              {option}
-            </option>
-          ))}
+          <option value="">Any follow-up</option>
+          <option value="overdue">Overdue</option>
+          <option value="soon">Due this week</option>
+          <option value="none">No follow-up</option>
+        </select>
+        <select
+          name="starred"
+          defaultValue={starred ? "1" : ""}
+          aria-label="Bookmarks"
+          className="input w-[130px]"
+        >
+          <option value="">All companies</option>
+          <option value="1">Starred only</option>
         </select>
         <button type="submit" className="btn-ghost">
           Apply
         </button>
-        {q || status || kind || priority ? (
+        {q || kind || follow || starred ? (
           <Link href={`/companies?list=${list}&per=${per}`} className="btn-ghost">
             Reset
           </Link>
@@ -194,13 +193,14 @@ export default async function CompaniesPage({
           <table className="min-w-full">
             <thead>
               <tr className="border-b border-zinc-200/80">
-                <th className="th pl-4">Company</th>
+                <th className="th w-10 pl-2">
+                  <span className="sr-only">Bookmark</span>
+                </th>
+                <th className="th pl-2">Company</th>
                 <th className="th">Type</th>
-                <th className="th">Status</th>
-                <th className="th">Priority</th>
-                <th className="th text-right">Contacts</th>
-                <th className="th">Last contact</th>
-                <th className="th pr-4">Next action</th>
+                <th className="th">Reach</th>
+                <th className="th">Follow-up</th>
+                <th className="th pr-4 text-right">Email</th>
               </tr>
             </thead>
             <tbody>
@@ -209,7 +209,13 @@ export default async function CompaniesPage({
                   key={company.id}
                   className="border-b border-zinc-100 transition-colors last:border-0 hover:bg-zinc-50/70"
                 >
-                  <td className="td pl-4">
+                  <td className="td pl-2">
+                    <BookmarkToggle
+                      orgId={company.id}
+                      bookmarked={company.bookmarked}
+                    />
+                  </td>
+                  <td className="td pl-2">
                     <div className="flex items-center gap-2.5">
                       <CompanyAvatar name={company.name} />
                       <div className="min-w-0">
@@ -220,9 +226,20 @@ export default async function CompaniesPage({
                           {company.name}
                         </Link>
                         {company.website ? (
-                          <p className="truncate text-[12px] text-zinc-500">
-                            {host(company.website)}
-                          </p>
+                          <a
+                            href={company.website}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex max-w-[240px] items-center gap-1 text-[12px] text-zinc-500 transition-colors hover:text-zinc-900"
+                          >
+                            <span className="truncate">
+                              {host(company.website)}
+                            </span>
+                            <ExternalLink
+                              className="h-3 w-3 shrink-0"
+                              aria-hidden="true"
+                            />
+                          </a>
                         ) : null}
                       </div>
                     </div>
@@ -231,17 +248,57 @@ export default async function CompaniesPage({
                     <KindBadge kind={company.kind} />
                   </td>
                   <td className="td">
-                    <StatusDot status={company.status} />
+                    <span className="text-[12px] text-zinc-600 tabular-nums">
+                      {company.people_count === 0 &&
+                      company.email_count === 0 ? (
+                        <span className="text-zinc-300">—</span>
+                      ) : (
+                        [
+                          company.people_count > 0
+                            ? `${company.people_count} ${
+                                company.people_count === 1
+                                  ? "person"
+                                  : "people"
+                              }`
+                            : null,
+                          company.email_count > 0
+                            ? `${company.email_count} ${
+                                company.email_count === 1 ? "email" : "emails"
+                              }`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")
+                      )}
+                    </span>
                   </td>
-                  <td className="td capitalize">{company.priority ?? "—"}</td>
-                  <td className="td text-right tabular-nums">
-                    {company.contacts?.[0]?.count ?? 0}
+                  <td className="td">
+                    <FollowUpControl
+                      orgId={company.id}
+                      date={company.follow_up_on}
+                      note={company.follow_up_note}
+                    />
                   </td>
-                  <td className="td tabular-nums">
-                    {company.last_contact ?? "—"}
-                  </td>
-                  <td className="td max-w-[240px] truncate pr-4">
-                    {company.next_action ?? "—"}
+                  <td className="td pr-4 text-right">
+                    {company.first_email ? (
+                      <a
+                        href={`mailto:${company.first_email}`}
+                        title={company.first_email}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
+                      >
+                        <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+                        <span className="sr-only">
+                          Email {company.first_email}
+                        </span>
+                      </a>
+                    ) : (
+                      <span
+                        className="text-[12px] text-zinc-300"
+                        aria-hidden="true"
+                      >
+                        —
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}

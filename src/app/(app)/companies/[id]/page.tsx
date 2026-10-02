@@ -498,6 +498,33 @@ export default async function CompanyPage({
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label" htmlFor="follow_up_on">
+                    Follow-up date
+                  </label>
+                  <input
+                    id="follow_up_on"
+                    name="follow_up_on"
+                    type="date"
+                    defaultValue={company.follow_up_on ?? ""}
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="follow_up_note">
+                    Follow-up note
+                  </label>
+                  <input
+                    id="follow_up_note"
+                    name="follow_up_note"
+                    defaultValue={company.follow_up_note ?? ""}
+                    placeholder="What to do"
+                    className="input"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="label" htmlFor="last_contact">
                   Last contact

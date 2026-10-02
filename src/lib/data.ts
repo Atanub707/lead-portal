@@ -8,38 +8,93 @@ import type {
   Profile,
 } from "./types";
 
+export interface CompanyRow extends Organization {
+  people_count: number;
+  email_count: number;
+  first_email: string | null;
+}
+
 export async function getCompanies(opts: {
   list: OrgList;
-  status?: string;
-  kind?: string;
-  priority?: string;
   q?: string;
+  kind?: string;
+  follow?: string;
+  starred?: boolean;
   page?: number;
   per?: number;
-}): Promise<{ rows: Organization[]; count: number }> {
+}): Promise<{ rows: CompanyRow[]; count: number }> {
   const supabase = await createClient();
   const per = opts.per && opts.per > 0 ? opts.per : 20;
   const page = opts.page && opts.page > 0 ? opts.page : 1;
   const from = (page - 1) * per;
 
+  const today = new Date().toISOString().slice(0, 10);
+  const dueSoon = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+
   let query = supabase
     .from("organizations")
-    .select("*, contacts(count)", { count: "exact" })
+    .select("*", { count: "exact" })
     .eq("list", opts.list)
     .order("name")
     .range(from, from + per - 1);
 
-  if (opts.status) query = query.eq("status", opts.status);
   if (opts.kind) query = query.eq("kind", opts.kind);
-  if (opts.priority) query = query.eq("priority", opts.priority);
   if (opts.q) query = query.ilike("name", `%${opts.q}%`);
+  if (opts.starred) query = query.eq("bookmarked", true);
+  if (opts.follow === "overdue") query = query.lt("follow_up_on", today);
+  if (opts.follow === "soon") {
+    query = query.gte("follow_up_on", today).lte("follow_up_on", dueSoon);
+  }
+  if (opts.follow === "none") query = query.is("follow_up_on", null);
 
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
-  return {
-    rows: (data ?? []) as unknown as Organization[],
-    count: count ?? 0,
-  };
+
+  const rows = (data ?? []) as Organization[];
+  const stats = new Map<
+    number,
+    { people: number; emails: number; firstEmail: string | null }
+  >();
+  const ids = rows.map((row) => row.id);
+
+  if (ids.length > 0) {
+    const { data: contactRows } = await supabase
+      .from("contacts")
+      .select("org_id, email")
+      .in("org_id", ids);
+    for (const contact of contactRows ?? []) {
+      const entry = stats.get(contact.org_id) ?? {
+        people: 0,
+        emails: 0,
+        firstEmail: null,
+      };
+      entry.people += 1;
+      if (contact.email) {
+        entry.emails += 1;
+        if (!entry.firstEmail) entry.firstEmail = contact.email;
+      }
+      stats.set(contact.org_id, entry);
+    }
+  }
+
+  const enriched: CompanyRow[] = rows.map((row) => {
+    const entry = stats.get(row.id) ?? {
+      people: 0,
+      emails: 0,
+      firstEmail: null,
+    };
+    const orgEmails = row.emails ?? [];
+    return {
+      ...row,
+      people_count: entry.people,
+      email_count: entry.emails + orgEmails.length,
+      first_email: entry.firstEmail ?? orgEmails[0] ?? null,
+    };
+  });
+
+  return { rows: enriched, count: count ?? 0 };
 }
 
 export async function getStatusCounts(

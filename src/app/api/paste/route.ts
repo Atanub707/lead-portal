@@ -97,6 +97,21 @@ function hostOf(url: string) {
   }
 }
 
+function cleanWebsite(raw: string): string {
+  try {
+    const url = new URL(raw);
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^(utm_|fbclid|gclid)/i.test(key) || key === "ref" || key === "source") {
+        url.searchParams.delete(key);
+      }
+    }
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return raw;
+  }
+}
+
 export async function POST(req: Request) {
   const supabase = await createClient();
   const {
@@ -213,7 +228,7 @@ export async function POST(req: Request) {
     research.site_name ||
     hostOf(research.final_url) ||
     "Unknown company";
-  const website = research.final_url;
+  const website = cleanWebsite(research.final_url);
   const linkedin =
     (extracted.linkedin_company_url.trim() ||
       research.links.linkedin_company[0] ||
@@ -256,11 +271,16 @@ export async function POST(req: Request) {
     });
   }
 
+  const usedEmails = new Set(
+    contacts.map((contact) => contact.email).filter(Boolean)
+  );
+  const generalEmails = emails.filter((email) => !usedEmails.has(email));
+
   const q = sanitize(name);
   const domain = hostOf(website);
   const { data: matches } = await supabase
     .from("organizations")
-    .select("id, name, website, linkedin_url")
+    .select("id, name, website, linkedin_url, emails")
     .or(`name.ilike.%${q}%,website.ilike.%${domain}%`)
     .limit(1);
   const existing = matches?.[0] ?? null;
@@ -270,9 +290,14 @@ export async function POST(req: Request) {
   let orgName: string;
 
   if (existing) {
-    const patch: Record<string, string> = {};
+    const patch: Record<string, string | string[]> = {};
     if (!existing.website && website) patch.website = website;
     if (!existing.linkedin_url && linkedin) patch.linkedin_url = linkedin;
+    if (generalEmails.length > 0) {
+      const current = (existing.emails ?? []) as string[];
+      const merged = [...new Set([...current, ...generalEmails])];
+      if (merged.length !== current.length) patch.emails = merged;
+    }
     if (Object.keys(patch).length > 0) {
       await supabase.from("organizations").update(patch).eq("id", existing.id);
     }
@@ -280,16 +305,6 @@ export async function POST(req: Request) {
     orgName = existing.name;
     created = false;
   } else {
-    const usedEmails = new Set(
-      contacts.map((contact) => contact.email).filter(Boolean)
-    );
-    const generalEmails = emails.filter((email) => !usedEmails.has(email));
-    const noteLines: string[] = [];
-    if (extracted.description.trim()) noteLines.push(extracted.description.trim());
-    if (generalEmails.length > 0) {
-      noteLines.push(`Emails: ${generalEmails.join(", ")}`);
-    }
-
     const { data: inserted, error } = await supabase
       .from("organizations")
       .insert({
@@ -299,7 +314,8 @@ export async function POST(req: Request) {
         linkedin_url: linkedin,
         kind: extracted.kind,
         status: "new",
-        notes: noteLines.join("\n\n") || null,
+        notes: extracted.description.trim() || null,
+        emails: generalEmails,
       })
       .select("id, name")
       .single();

@@ -23,8 +23,11 @@ export interface Organization {
   next_action: string | null;
   last_contact: string | null;
   notes: string | null;
+  emails: string[];
+  bookmarked: boolean;
+  follow_up_on: string | null;
+  follow_up_note: string | null;
   created_at: string;
-  contacts?: { count: number }[];
 }
 
 export interface Contact {

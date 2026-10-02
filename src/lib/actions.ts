@@ -112,12 +112,60 @@ export async function updateOrganization(formData: FormData) {
           : null,
       next_action: field(formData, "next_action"),
       last_contact: field(formData, "last_contact"),
+      follow_up_on: field(formData, "follow_up_on"),
+      follow_up_note: field(formData, "follow_up_note"),
       notes: field(formData, "notes"),
     })
     .eq("id", id);
 
   if (error) throw new Error(error.message);
   revalidateAll(id);
+}
+
+export async function toggleBookmark(
+  orgId: number,
+  bookmarked: boolean
+): Promise<{ ok: boolean }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false };
+
+  const { error } = await supabase
+    .from("organizations")
+    .update({ bookmarked })
+    .eq("id", orgId);
+  if (error) return { ok: false };
+
+  revalidateAll(orgId);
+  return { ok: true };
+}
+
+export async function setFollowUp(
+  orgId: number,
+  date: string | null,
+  note: string | null
+): Promise<{ ok: boolean; message?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Not signed in" };
+
+  const cleanDate =
+    date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
+  const { error } = await supabase
+    .from("organizations")
+    .update({
+      follow_up_on: cleanDate,
+      follow_up_note: cleanDate ? note?.trim() || null : null,
+    })
+    .eq("id", orgId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidateAll(orgId);
+  return { ok: true };
 }
 
 export async function deleteOrganization(formData: FormData) {

@@ -72,9 +72,22 @@ Pipeline stages:
 - **No email reminders yet** — next action + last contact are tracked for manual review.
 - **Free tier** — the Supabase project pauses after ~1 week of inactivity; data is safe and restore is one click.
 
-## Research pipeline ("Paste URL with AI")
+## Companies table (action-first)
 
-- **Flow** (`src/app/api/paste/route.ts`): one POST does research → AI extraction →
+Columns: ★ bookmark toggle · Company (name → record, domain → external link) ·
+Type (AI-assigned) · Reach ("N people · M emails" — contacts + emails found by
+research) · Follow-up (dated chip: overdue / today / upcoming, set via mini-dialog
+with an optional note) · Email (mailto to the first address found).
+
+Filters: search, Type, Follow-up state (overdue / due this week / none), Starred only.
+Removed from the table but kept on the detail page: status, priority, next action,
+last contact. Status still powers the dashboard stage counts.
+
+Fields added in `20261002010000_actions.sql`: `bookmarked`, `follow_up_on`,
+`follow_up_note`, `emails text[]` (general emails from research, separate from
+per-contact emails).
+
+## Research pipeline ("Paste URL with AI")- **Flow** (`src/app/api/paste/route.ts`): one POST does research → AI extraction →
   duplicate-checked writes (company + contacts) and returns a summary. No chat.
 - **Website research** (`src/lib/research.ts` → `researchWebsite`): fetches a public site
   plus up to 3 subpages (/about, /team, /contact). Prefers TinyFish Fetch when

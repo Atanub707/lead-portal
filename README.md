@@ -8,6 +8,8 @@ Next.js + Supabase. Deployable to Vercel for free.
 - Magic-link sign-in (no passwords) via Supabase Auth
 - Two pipelines — **POS** and **Compliance** — one shared database, kept separate
 - Companies, contacts (members), and append-only interaction logs
+- Action-first pipeline table: ★ bookmarks, **follow-ups** (overdue/today/upcoming),
+  reach counts (people + emails found), one-click **Email** — with overdue/starred filters
 - Roles: first user becomes **Owner** (delete + manage users); everyone else is an **Editor** (add/edit only) — enforced by database Row-Level Security
 - CSV importer for the existing workspace lists
 
