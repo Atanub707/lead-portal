@@ -8,17 +8,31 @@ import {
 import { google } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
 import { groq } from "@ai-sdk/groq";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 30;
 
+// OpenCode Go / Zen — subscription gateway (key: https://opencode.ai/auth).
+// Per the OpenCode docs this endpoint is OpenAI-compatible; one model only.
+const OPENCODE_MODEL = "deepseek-v4.1-flash";
+
+const opencode = createOpenAICompatible({
+  name: "opencode",
+  baseURL: "https://opencode.ai/zen/v1",
+  apiKey: process.env.OPENCODE_API_KEY ?? "",
+});
+
 function pickModel() {
-  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-    return google(process.env.AI_MODEL ?? "gemini-2.5-flash");
+  if (process.env.OPENCODE_API_KEY) {
+    return opencode(OPENCODE_MODEL);
   }
   if (process.env.OPENAI_API_KEY) {
     return openai(process.env.AI_MODEL ?? "gpt-4o-mini");
+  }
+  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    return google(process.env.AI_MODEL ?? "gemini-2.5-flash");
   }
   if (process.env.GROQ_API_KEY) {
     return groq(process.env.AI_MODEL ?? "llama-3.3-70b-versatile");
@@ -224,7 +238,7 @@ export async function POST(req: Request) {
     return Response.json(
       {
         error:
-          "No AI key configured. Add GOOGLE_GENERATIVE_AI_API_KEY (free tier at aistudio.google.com), OPENAI_API_KEY, or GROQ_API_KEY to .env.local (and Vercel), then restart.",
+          "No AI key configured. Add OPENCODE_API_KEY (OpenCode Go — https://opencode.ai/auth) to .env.local (and Vercel), then restart. OpenAI / Google / Groq keys also work as fallbacks.",
       },
       { status: 503 }
     );

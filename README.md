@@ -90,17 +90,16 @@ Say which list ("add to POS" / "add to compliance") and it documents the company
 into the database with duplicate-checking, using your own permissions. Manual
 entry stays available on every screen.
 
-Enable it with one API key:
+Enable it with an OpenCode Go / Zen key (one model, fixed: **DeepSeek V4.1 Flash**):
 
-1. Create a key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys) (note: a
-   ChatGPT subscription does **not** include API access — API billing is separate)
+1. Sign in at [opencode.ai/auth](https://opencode.ai/auth) → **Create API key**
 2. Add it to `.env.local` (and to Vercel → Environment Variables for production):
-   `OPENAI_API_KEY=...`
+   `OPENCODE_API_KEY=...`
 3. Restart the dev server
 
-Alternatives: `GOOGLE_GENERATIVE_AI_API_KEY` (free tier at aistudio.google.com) or
-`GROQ_API_KEY` (free tier) also work — the first key found wins; `AI_MODEL` overrides
-the default model per provider.
+Fallbacks (used only when `OPENCODE_API_KEY` is empty): `OPENAI_API_KEY`,
+`GOOGLE_GENERATIVE_AI_API_KEY`, or `GROQ_API_KEY` — `AI_MODEL` overrides those
+fallback models.
 
 ## Deploy to Vercel (free)
 
