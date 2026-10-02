@@ -20,9 +20,18 @@ export default async function AppLayout({
   }
 
   const [{ data: profile }, pipelines] = await Promise.all([
-    supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("role, onboarded")
+      .eq("id", user.id)
+      .maybeSingle(),
     getPipelines(),
   ]);
+
+  // Invited users finish the welcome screen (set a password) before entering the app.
+  if (profile && profile.onboarded === false) {
+    redirect("/welcome");
+  }
 
   return (
     <Shell

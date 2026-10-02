@@ -586,6 +586,24 @@ export async function updateUserRole(
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
+export async function completeOnboarding(): Promise<{ ok: boolean }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false };
+
+  try {
+    const admin = createAdminClient();
+    await admin.from("profiles").update({ onboarded: true }).eq("id", user.id);
+  } catch {
+    return { ok: false };
+  }
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
