@@ -54,9 +54,10 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3005> → **Password tab → Create account** → **you become the
-owner** (the first account is auto-assigned the owner role). This is the *only*
-public sign-up — afterwards you disable sign-ups entirely (next step).
+Create your admin account in Supabase → **Authentication → Users → Add user →
+Create new user** (your email + a strong password, enable **Auto Confirm User**).
+You become the **owner** automatically (first account). Then sign in at
+<http://localhost:3005> with that email and password.
 
 ### 7. Import your existing lists
 
