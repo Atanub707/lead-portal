@@ -79,3 +79,14 @@ Pipeline stages:
 3. Reminders/digest emails ("follow-ups due this week")
 4. CSV export, duplicate detection
 5. Trust-center watcher for compliance leads (new SOC 2 / ISO badges)
+6. **Bulk intake with Laya classification** (planned — trigger: when batch lists arrive,
+   e.g. hundreds of companies at once):
+   - Flow: paste/upload raw list → **Laya** pre-classifies each item with typed questions
+     (`list`: pos/compliance, `kind`, `priority`, `is_company`) → review grid → import to Supabase.
+   - Why Laya ([convaiinnovations/laya](https://huggingface.co/convaiinnovations/laya), Apache-2.0,
+     ~400M params): non-generative decision model, ~33 ms per forward pass, 100+ languages,
+     calibrated probabilities, nothing to hallucinate. Cheap first pass; the LLM assistant
+     (DeepSeek via OpenCode Go) handles only extraction/enrichment.
+   - Infra note: Laya is Python and ~400 MB — **cannot run on Vercel serverless**. Needs its own
+     always-on host running `laya-serve` (small VPS/container) behind an internal API route.
+   - Not needed at current volume — the Go/DeepSeek assistant covers single-lead entry end-to-end.
