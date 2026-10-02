@@ -1,11 +1,13 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { createOrganization } from "@/lib/actions";
+import { getPipelines } from "@/lib/data";
 import {
   KIND_LABEL,
   KIND_OPTIONS,
-  LIST_LABEL,
   PRIORITY_OPTIONS,
   parseList,
+  pipelineName,
 } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +19,9 @@ export default async function NewCompanyPage({
 }) {
   const sp = await searchParams;
   const list = parseList(sp.list);
+  const pipelines = await getPipelines();
+  if (!pipelines.some((pipeline) => pipeline.id === list)) notFound();
+  const listName = pipelineName(pipelines, list);
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
@@ -25,15 +30,14 @@ export default async function NewCompanyPage({
           href={`/companies?list=${list}`}
           className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900"
         >
-          ← {LIST_LABEL[list]}
+          ← {listName}
         </Link>
 
         <h1 className="mt-3 text-xl font-semibold tracking-tight text-zinc-900">
           Add company
         </h1>
         <p className="mt-1 text-[13px] text-zinc-500">
-          Goes into the {LIST_LABEL[list]}. Contacts and interactions come
-          next.
+          Goes into the {listName}. Contacts and interactions come next.
         </p>
 
         <form action={createOrganization} className="card mt-6 space-y-4 p-5">

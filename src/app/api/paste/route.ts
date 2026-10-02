@@ -3,7 +3,7 @@ import { z } from "zod";
 import { NO_AI_KEY_MESSAGE, pickModel } from "@/lib/ai";
 import { findLinkedInProfile, researchWebsite, tinyfishEnabled } from "@/lib/research";
 import { createClient } from "@/lib/supabase/server";
-import { LIST_LABEL, parseList, type OrgList } from "@/lib/types";
+import { parseList, type OrgList } from "@/lib/types";
 
 export const maxDuration = 60;
 
@@ -131,6 +131,15 @@ export async function POST(req: Request) {
     return Response.json({ error: "Paste a website URL first." }, { status: 400 });
   }
 
+  const { data: pipeline } = await supabase
+    .from("pipelines")
+    .select("id, name")
+    .eq("id", list)
+    .maybeSingle();
+  if (!pipeline) {
+    return Response.json({ error: "Unknown pipeline." }, { status: 400 });
+  }
+
   const model = pickModel(user.id);
   if (!model) {
     return Response.json({ error: NO_AI_KEY_MESSAGE }, { status: 503 });
@@ -169,6 +178,10 @@ export async function POST(req: Request) {
   const userPrompt = `Here is the website research (JSON):\n\n${JSON.stringify(
     digest
   )}`;
+  const pipelineHint =
+    list === "pos" || list === "compliance"
+      ? ""
+      : `\nThe user selected the "${pipeline.name}" pipeline — classify kind as "lead" unless the research clearly shows a partner or competitor relationship.`;
 
   // Plain-text generation first: no response_format, the request shape OpenCode Go
   // handles most reliably. generateObject (JSON mode) is the second chance.
@@ -178,7 +191,7 @@ export async function POST(req: Request) {
   try {
     const { text } = await generateText({
       model,
-      system: `${EXTRACT_SYSTEM}\n\n${JSON_SHAPE}`,
+      system: `${EXTRACT_SYSTEM}${pipelineHint}\n\n${JSON_SHAPE}`,
       prompt: userPrompt,
     });
     const parsed = parseJsonObject(text);
@@ -203,7 +216,7 @@ export async function POST(req: Request) {
       const { object } = await generateObject({
         model,
         schema: ExtractSchema,
-        system: EXTRACT_SYSTEM,
+        system: `${EXTRACT_SYSTEM}${pipelineHint}`,
         prompt: userPrompt,
       });
       extracted = object;
@@ -391,7 +404,7 @@ export async function POST(req: Request) {
     ok: true,
     created,
     company: { id: orgId, name: orgName, list },
-    listLabel: LIST_LABEL[list],
+    listLabel: pipeline.name,
     contactsAdded,
     contactsSkipped: contacts.length - toAdd.length,
     linkedinProfilesFound,

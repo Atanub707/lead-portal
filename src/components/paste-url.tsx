@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Globe, Loader2, Sparkles, X } from "lucide-react";
-import { LIST_LABEL, type OrgList } from "@/lib/types";
+import { FALLBACK_PIPELINES, type OrgList, type Pipeline } from "@/lib/types";
 
 interface PasteResult {
   created: boolean;
@@ -18,8 +18,15 @@ interface PasteResult {
   stillMissing: string[];
 }
 
-export function PasteUrl({ list }: { list: OrgList }) {
+export function PasteUrl({
+  list,
+  pipelines,
+}: {
+  list: OrgList;
+  pipelines: Pipeline[];
+}) {
   const router = useRouter();
+  const listOptions = pipelines.length > 0 ? pipelines : FALLBACK_PIPELINES;
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
   const [target, setTarget] = useState<OrgList>(list);
@@ -135,7 +142,10 @@ export function PasteUrl({ list }: { list: OrgList }) {
                 />
                 <div aria-live="polite">
                   <p className="text-[13px] font-medium text-zinc-800">
-                    Researching and adding to {LIST_LABEL[target]}…
+                    Researching and adding to{" "}
+                    {listOptions.find((pipeline) => pipeline.id === target)
+                      ?.name ?? target}
+                    …
                   </p>
                   <p className="mt-1 text-[12px] text-zinc-500">
                     Fetching pages, extracting company data and people, saving
@@ -271,8 +281,11 @@ export function PasteUrl({ list }: { list: OrgList }) {
                     }
                     className="input"
                   >
-                    <option value="pos">{LIST_LABEL.pos}</option>
-                    <option value="compliance">{LIST_LABEL.compliance}</option>
+                    {listOptions.map((pipeline) => (
+                      <option key={pipeline.id} value={pipeline.id}>
+                        {pipeline.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

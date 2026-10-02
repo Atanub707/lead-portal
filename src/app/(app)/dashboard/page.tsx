@@ -1,31 +1,22 @@
 import Link from "next/link";
-import { getRecentInteractions, getStatusCounts } from "@/lib/data";
 import {
-  LIST_LABEL,
-  STATUS_LABEL,
-  STATUS_STAGES,
-  type InteractionWithOrg,
-  type OrgList,
-} from "@/lib/types";
+  getPipelines,
+  getRecentInteractions,
+  getStatusCounts,
+} from "@/lib/data";
+import { STATUS_LABEL } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [posCounts, compCounts, posRecent, compRecent] = await Promise.all([
-    getStatusCounts("pos"),
-    getStatusCounts("compliance"),
-    getRecentInteractions("pos", 5),
-    getRecentInteractions("compliance", 5),
-  ]);
-
-  const pipelines: {
-    list: OrgList;
-    counts: Record<string, number>;
-    recent: InteractionWithOrg[];
-  }[] = [
-    { list: "pos", counts: posCounts, recent: posRecent },
-    { list: "compliance", counts: compCounts, recent: compRecent },
-  ];
+  const pipelines = await getPipelines();
+  const data = await Promise.all(
+    pipelines.map(async (pipeline) => ({
+      pipeline,
+      counts: await getStatusCounts(pipeline.id),
+      recent: await getRecentInteractions(pipeline.id, 5),
+    }))
+  );
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
@@ -34,14 +25,16 @@ export default async function DashboardPage() {
           Dashboard
         </h1>
         <p className="mt-1 text-[13px] text-zinc-500">
-          Two pipelines, one shared database.
+          {pipelines.length}{" "}
+          {pipelines.length === 1 ? "pipeline" : "pipelines"}, one shared
+          database.
         </p>
       </header>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        {pipelines.map(({ list, counts, recent }, index) => {
+        {data.map(({ pipeline, counts, recent }, index) => {
           const total = Object.values(counts).reduce((a, b) => a + b, 0);
-          const activeStages = STATUS_STAGES[list].filter(
+          const activeStages = pipeline.stages.filter(
             (s) => s !== "new" && s !== "won" && s !== "lost"
           );
           const active = activeStages.reduce(
@@ -58,15 +51,15 @@ export default async function DashboardPage() {
 
           return (
             <section
-              key={list}
+              key={pipeline.id}
               className={`card animate-rise animate-rise-${index + 1} p-5`}
             >
               <div className="flex items-center justify-between">
                 <h2 className="text-[13px] font-semibold text-zinc-900">
-                  {LIST_LABEL[list]}
+                  {pipeline.name}
                 </h2>
                 <Link
-                  href={`/companies?list=${list}`}
+                  href={`/companies?list=${pipeline.id}`}
                   className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900"
                 >
                   Open →
@@ -85,7 +78,7 @@ export default async function DashboardPage() {
               </div>
 
               <div className="mt-4 space-y-2.5">
-                {STATUS_STAGES[list].map((stage) => {
+                {pipeline.stages.map((stage) => {
                   const count = counts[stage] ?? 0;
                   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
                   return (

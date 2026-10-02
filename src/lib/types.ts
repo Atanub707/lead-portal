@@ -1,4 +1,4 @@
-export type OrgList = "pos" | "compliance";
+export type OrgList = string;
 export type OrgKind = "lead" | "partner" | "competitor" | "other";
 export type PipelineStage =
   | "new"
@@ -10,6 +10,71 @@ export type PipelineStage =
   | "lost";
 export type UserRole = "owner" | "editor";
 export type Priority = "high" | "medium" | "low";
+
+export interface Pipeline {
+  id: string;
+  name: string;
+  icon: string;
+  stages: PipelineStage[];
+  sort_order: number;
+}
+
+export const DEFAULT_STAGES: PipelineStage[] = [
+  "new",
+  "contacted",
+  "proposal",
+  "won",
+  "lost",
+];
+
+export const PIPELINE_ICONS = [
+  "layers",
+  "store",
+  "shield-check",
+  "rocket",
+  "briefcase",
+  "building-2",
+  "users",
+  "shopping-cart",
+  "bar-chart-3",
+  "globe",
+  "heart",
+  "landmark",
+  "package",
+  "utensils",
+  "car",
+  "house",
+  "zap",
+] as const;
+
+// Used when the pipelines table is unreachable (e.g. before the migration applies).
+export const FALLBACK_PIPELINES: Pipeline[] = [
+  {
+    id: "pos",
+    name: "POS Pipeline",
+    icon: "store",
+    stages: ["new", "contacted", "demo", "proposal", "won", "lost"],
+    sort_order: 0,
+  },
+  {
+    id: "compliance",
+    name: "Compliance Pipeline",
+    icon: "shield-check",
+    stages: ["new", "contacted", "scoping", "proposal", "won", "lost"],
+    sort_order: 1,
+  },
+];
+
+export function pipelineName(pipelines: Pipeline[], id: string): string {
+  return pipelines.find((pipeline) => pipeline.id === id)?.name ?? id;
+}
+
+export function pipelineStages(
+  pipelines: Pipeline[],
+  id: string
+): PipelineStage[] {
+  return pipelines.find((pipeline) => pipeline.id === id)?.stages ?? DEFAULT_STAGES;
+}
 
 export interface Organization {
   id: number;
@@ -66,21 +131,6 @@ export interface Profile {
   created_at: string;
 }
 
-export const LIST_LABEL: Record<OrgList, string> = {
-  pos: "POS Pipeline",
-  compliance: "Compliance Pipeline",
-};
-
-export const LIST_SHORT: Record<OrgList, string> = {
-  pos: "POS",
-  compliance: "Compliance",
-};
-
-export const STATUS_STAGES: Record<OrgList, PipelineStage[]> = {
-  pos: ["new", "contacted", "demo", "proposal", "won", "lost"],
-  compliance: ["new", "contacted", "scoping", "proposal", "won", "lost"],
-};
-
 export const STATUS_LABEL: Record<PipelineStage, string> = {
   new: "New",
   contacted: "Contacted",
@@ -105,7 +155,11 @@ export const PRIORITY_OPTIONS: Priority[] = ["high", "medium", "low"];
 export const CHANNELS = ["Email", "LinkedIn", "Call", "Meeting", "Other"];
 
 export function parseList(value: string | string[] | undefined): OrgList {
-  return value === "compliance" ? "compliance" : "pos";
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (Array.isArray(value) && typeof value[0] === "string" && value[0].trim()) {
+    return value[0].trim();
+  }
+  return "pos";
 }
 
 export function str(value: string | string[] | undefined): string {

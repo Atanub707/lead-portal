@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
@@ -13,12 +14,12 @@ import { FollowUpControl } from "@/components/follow-up-control";
 import { PasteUrl } from "@/components/paste-url";
 import { CompanyAvatar, KindBadge } from "@/components/badges";
 import { deleteOrganization } from "@/lib/actions";
-import { getCompanies, getCurrentProfile } from "@/lib/data";
+import { getCompanies, getCurrentProfile, getPipelines } from "@/lib/data";
 import {
   KIND_LABEL,
   KIND_OPTIONS,
-  LIST_LABEL,
   parseList,
+  pipelineName,
   str,
 } from "@/lib/types";
 
@@ -69,6 +70,8 @@ export default async function CompaniesPage({
 
   const profile = await getCurrentProfile();
   const isOwner = profile?.role === "owner";
+  const pipelines = await getPipelines();
+  if (!pipelines.some((pipeline) => pipeline.id === list)) notFound();
 
   let result = await getCompanies({
     list,
@@ -116,14 +119,14 @@ export default async function CompaniesPage({
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
-            {LIST_LABEL[list]}
+            {pipelineName(pipelines, list)}
           </h1>
           <p className="mt-1 text-[13px] text-zinc-500 tabular-nums">
             {count} {count === 1 ? "company" : "companies"}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <PasteUrl list={list} />
+          <PasteUrl list={list} pipelines={pipelines} />
           <Link href={`/companies/new?list=${list}`} className="btn-primary">
             + Add company
           </Link>

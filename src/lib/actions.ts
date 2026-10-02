@@ -7,7 +7,7 @@ import { createAdminClient } from "./supabase/admin";
 import { createClient } from "./supabase/server";
 import { findLinkedInProfile, tinyfishEnabled } from "./research";
 import type { OrgKind, OrgList, PipelineStage, UserRole } from "./types";
-import { KIND_OPTIONS, PRIORITY_OPTIONS, STATUS_LABEL } from "./types";
+import { KIND_OPTIONS, PIPELINE_ICONS, PRIORITY_OPTIONS, STATUS_LABEL } from "./types";
 
 function field(formData: FormData, key: string): string | null {
   const value = formData.get(key);
@@ -52,9 +52,14 @@ export async function createOrganization(formData: FormData) {
   const name = field(formData, "name");
   if (!name) throw new Error("Company name is required");
 
-  const list = (field(formData, "list") === "compliance"
-    ? "compliance"
-    : "pos") as OrgList;
+  const list = (field(formData, "list") ?? "pos") as OrgList;
+  const { data: pipeline } = await supabase
+    .from("pipelines")
+    .select("id")
+    .eq("id", list)
+    .maybeSingle();
+  if (!pipeline) throw new Error("Unknown pipeline");
+
   const kind = field(formData, "kind");
   const priority = field(formData, "priority");
 
@@ -179,6 +184,61 @@ export async function deleteOrganization(formData: FormData) {
 
   const next = field(formData, "next");
   redirect(next && next.startsWith("/") ? next : "/companies");
+}
+
+// ─── Pipelines ───────────────────────────────────────────────────────────────
+
+function slugify(name: string) {
+  return (
+    name
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "pipeline"
+  );
+}
+
+export async function createPipeline(formData: FormData) {
+  const supabase = await assertOwner();
+
+  const name = field(formData, "name");
+  if (!name) throw new Error("Pipeline name is required");
+
+  const iconRaw = field(formData, "icon") ?? "layers";
+  const icon = (PIPELINE_ICONS as readonly string[]).includes(iconRaw)
+    ? iconRaw
+    : "layers";
+
+  const base = slugify(name);
+  let id = base;
+  let suffix = 1;
+  for (;;) {
+    const { data: clash } = await supabase
+      .from("pipelines")
+      .select("id")
+      .eq("id", id)
+      .maybeSingle();
+    if (!clash) break;
+    suffix += 1;
+    id = `${base}-${suffix}`;
+  }
+
+  const { data: last } = await supabase
+    .from("pipelines")
+    .select("sort_order")
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const sort_order = ((last?.sort_order as number | undefined) ?? -1) + 1;
+
+  const { error } = await supabase
+    .from("pipelines")
+    .insert({ id, name, icon, sort_order });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/", "layout");
+  redirect(`/companies?list=${id}`);
 }
 
 // ─── Contacts ────────────────────────────────────────────────────────────────

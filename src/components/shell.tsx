@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { SidebarNav } from "@/components/sidebar-nav";
+import type { Pipeline } from "@/lib/types";
 import { signOut } from "@/lib/actions";
 
 const STORAGE_KEY = "tl-sidebar-collapsed";
@@ -74,11 +75,13 @@ export function Shell({
   isOwner,
   email,
   role,
+  pipelines,
   children,
 }: {
   isOwner: boolean;
   email: string;
   role: string;
+  pipelines: Pipeline[];
   children: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -176,7 +179,7 @@ export function Shell({
           </button>
         ) : null}
 
-        <SidebarNav isOwner={isOwner} collapsed={collapsed} />
+        <SidebarNav isOwner={isOwner} pipelines={pipelines} collapsed={collapsed} />
 
         <div className="shrink-0 border-t border-zinc-200/80">
           <UserBlock email={email} role={role} collapsed={collapsed} />
@@ -223,6 +226,7 @@ export function Shell({
             </div>
             <SidebarNav
               isOwner={isOwner}
+              pipelines={pipelines}
               onNavigate={() => setMobileOpen(false)}
             />
             <div className="shrink-0 border-t border-zinc-200/80">

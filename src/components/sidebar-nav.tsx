@@ -2,13 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import {
-  Building2,
-  LayoutDashboard,
-  Settings,
-  ShieldCheck,
-  type LucideIcon,
-} from "lucide-react";
+import { LayoutDashboard, Settings, type LucideIcon } from "lucide-react";
+import { NewPipelineButton } from "@/components/new-pipeline-dialog";
+import { pipelineIcon } from "@/components/pipeline-icon";
+import type { Pipeline } from "@/lib/types";
 
 function NavItem({
   href,
@@ -47,16 +44,18 @@ function NavItem({
 
 export function SidebarNav({
   isOwner,
+  pipelines,
   collapsed = false,
   onNavigate,
 }: {
   isOwner: boolean;
+  pipelines: Pipeline[];
   collapsed?: boolean;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const list = searchParams.get("list") ?? "pos";
+  const list = searchParams.get("list") ?? pipelines[0]?.id ?? "pos";
   const inCompanies = pathname.startsWith("/companies");
 
   return (
@@ -77,22 +76,20 @@ export function SidebarNav({
           Pipelines
         </p>
       )}
-      <NavItem
-        href="/companies?list=pos"
-        label="POS"
-        icon={Building2}
-        active={inCompanies && list !== "compliance"}
-        collapsed={collapsed}
-        onNavigate={onNavigate}
-      />
-      <NavItem
-        href="/companies?list=compliance"
-        label="Compliance"
-        icon={ShieldCheck}
-        active={inCompanies && list === "compliance"}
-        collapsed={collapsed}
-        onNavigate={onNavigate}
-      />
+
+      {pipelines.map((pipeline) => (
+        <NavItem
+          key={pipeline.id}
+          href={`/companies?list=${pipeline.id}`}
+          label={pipeline.name.replace(/\s+Pipeline$/i, "")}
+          icon={pipelineIcon(pipeline.icon)}
+          active={inCompanies && list === pipeline.id}
+          collapsed={collapsed}
+          onNavigate={onNavigate}
+        />
+      ))}
+
+      {isOwner ? <NewPipelineButton collapsed={collapsed} /> : null}
 
       {isOwner ? (
         <>

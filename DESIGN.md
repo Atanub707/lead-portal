@@ -72,6 +72,16 @@ Pipeline stages:
 - **No email reminders yet** — next action + last contact are tracked for manual review.
 - **Free tier** — the Supabase project pauses after ~1 week of inactivity; data is safe and restore is one click.
 
+## Pipelines (data-driven)
+
+`pipelines` (migration `20261002020000_pipelines.sql`) holds id (slug), name, icon,
+stages, sort_order. `organizations.list` is a text FK to it (the old `org_list` enum
+was dropped). Seeded: `pos` (demo stage) and `compliance` (scoping stage); new ones get
+the standard stages (new/contacted/proposal/won/lost). Owners create pipelines from the
+sidebar **+ New pipeline** dialog (name + lucide icon whitelist, owner-only RLS).
+Sidebar, dashboard, paste flow, and filters all read the table; `getPipelines()` falls
+back to the built-in two if the table is unreachable.
+
 ## Companies table (action-first)
 
 Columns: ★ bookmark toggle · Company (name → record, domain → external link) ·

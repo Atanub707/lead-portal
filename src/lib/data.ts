@@ -1,12 +1,28 @@
 import { createClient } from "./supabase/server";
-import type {
-  Contact,
-  Interaction,
-  InteractionWithOrg,
-  OrgList,
-  Organization,
-  Profile,
+import {
+  FALLBACK_PIPELINES,
+  type Contact,
+  type Interaction,
+  type InteractionWithOrg,
+  type OrgList,
+  type Organization,
+  type Pipeline,
+  type Profile,
 } from "./types";
+
+export async function getPipelines(): Promise<Pipeline[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("pipelines")
+    .select("*")
+    .order("sort_order")
+    .order("created_at");
+  if (error || !data || data.length === 0) return FALLBACK_PIPELINES;
+  return (data as Pipeline[]).map((pipeline) => ({
+    ...pipeline,
+    stages: pipeline.stages ?? [],
+  }));
+}
 
 export interface CompanyRow extends Organization {
   people_count: number;

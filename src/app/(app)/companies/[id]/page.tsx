@@ -17,15 +17,16 @@ import {
   getContacts,
   getCurrentProfile,
   getInteractions,
+  getPipelines,
 } from "@/lib/data";
 import {
   CHANNELS,
   KIND_LABEL,
   KIND_OPTIONS,
-  LIST_LABEL,
   PRIORITY_OPTIONS,
   STATUS_LABEL,
-  STATUS_STAGES,
+  pipelineName,
+  pipelineStages,
 } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -39,16 +40,20 @@ export default async function CompanyPage({
   const companyId = Number(id);
   if (!Number.isFinite(companyId)) notFound();
 
-  const [company, contacts, interactions, profile] = await Promise.all([
-    getCompany(companyId),
-    getContacts(companyId),
-    getInteractions(companyId),
-    getCurrentProfile(),
-  ]);
+  const [company, contacts, interactions, profile, pipelines] =
+    await Promise.all([
+      getCompany(companyId),
+      getContacts(companyId),
+      getInteractions(companyId),
+      getCurrentProfile(),
+      getPipelines(),
+    ]);
 
   if (!company) notFound();
 
   const isOwner = profile?.role === "owner";
+  const pipelineLabel = pipelineName(pipelines, company.list);
+  const stages = pipelineStages(pipelines, company.list);
   const today = new Date().toISOString().slice(0, 10);
 
   return (
@@ -57,7 +62,7 @@ export default async function CompanyPage({
         href={`/companies?list=${company.list}`}
         className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900"
       >
-        ← {LIST_LABEL[company.list]}
+        ← {pipelineLabel}
       </Link>
 
       <header className="mt-3">
@@ -478,7 +483,7 @@ export default async function CompanyPage({
                   defaultValue={company.status}
                   className="input"
                 >
-                  {STATUS_STAGES[company.list].map((stage) => (
+                  {stages.map((stage) => (
                     <option key={stage} value={stage}>
                       {STATUS_LABEL[stage]}
                     </option>
