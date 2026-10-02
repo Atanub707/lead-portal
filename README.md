@@ -112,6 +112,19 @@ Without Apify, website research still works and LinkedIn profiles stay manual.
 Direct LinkedIn scraping is intentionally not implemented — LinkedIn blocks automation;
 Apify actors are the supported route.
 
+**Cost & guardrails (so your free credit never drains by accident):**
+
+- **Website research is free** — it only ever fetches the exact domain you pasted
+  (plus up to 3 subpages of that same domain), is capped at 10 fetches per conversation,
+  and private/local addresses are blocked.
+- **LinkedIn research costs Apify credit** — each run starts around $0.02 plus a small
+  per-profile fee (roughly $0.05–$0.12 per company lookup; see the actor page for current
+  pricing, ~40–100 lookups on the free $5 credit). It runs **only when you explicitly ask**
+  ("find the members", "who is the owner"), never automatically, and is hard-capped at
+  **2 runs per conversation**.
+- **Set a hard stop anyway:** Apify Console → **Settings → Limits** → monthly usage limit
+  (e.g. $5). Even a bug can then never exceed it.
+
 Enable it with an OpenCode subscription key (one model, fixed: **DeepSeek V4.1 Flash**):
 
 1. Sign in at [opencode.ai/auth](https://opencode.ai/auth) → subscribe to **OpenCode Go** →

@@ -1,9 +1,14 @@
 import {
   convertToModelMessages,
+  getToolName,
+  isToolUIPart,
   stepCountIs,
   streamText,
   tool,
   type ToolSet,
+  type UIDataTypes,
+  type UIMessagePart,
+  type UITools,
 } from "ai";
 import { google } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
@@ -72,22 +77,49 @@ Rules:
 
 REPORTING AFTER RESEARCH: end with a compact summary — what was created, which contacts were added with their titles, and a short "still missing" line (e.g. personal LinkedIn profiles not found).`;
 
-const LINKEDIN_RULE = `\n10. LINKEDIN RESEARCH: The researchLinkedInCompany tool is available. After researchWebsite (or when the user asks for members), call it with the company name or LinkedIn company URL to discover employees. Prefer founders/owners and senior people; add at most 10 as contacts, each with their LinkedIn URL when returned.`;
+const LINKEDIN_RULE = `\n10. LINKEDIN RESEARCH (PAID — consumes Apify credit): The researchLinkedInCompany tool exists, but you must ONLY call it when the user EXPLICITLY asks to find people — e.g. "find the members", "who is the owner", "get their employees on LinkedIn". NEVER call it automatically after website research, and NEVER on every message. It is hard-capped at 2 runs per conversation. When it runs, prefer founders/owners and senior people; add at most 10 as contacts with LinkedIn URLs when returned.`;
+
+function countToolUses(messages: unknown, toolName: string): number {
+  if (!Array.isArray(messages)) return 0;
+  let count = 0;
+  for (const message of messages as { parts?: unknown[] }[]) {
+    for (const part of message.parts ?? []) {
+      const candidate = part as UIMessagePart<UIDataTypes, UITools>;
+      if (isToolUIPart(candidate) && getToolName(candidate) === toolName) {
+        count += 1;
+      }
+    }
+  }
+  return count;
+}
 
 function sanitize(query: string) {
   return query.replace(/[%(),]/g, " ").trim();
 }
 
+const MAX_WEBSITE_FETCHES_PER_CHAT = 10;
+const MAX_LINKEDIN_RUNS_PER_CHAT = 2;
+
 function buildTools(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  apifyEnabled: boolean
+  apifyEnabled: boolean,
+  used: { website: number; linkedin: number }
 ): ToolSet {
+  let websiteUses = used.website;
+  let linkedinUses = used.linkedin;
+
   return {
     researchWebsite: tool({
       description:
         "Fetch a company's public website (plus its /about, /team, /contact subpages) and return structured research: company name, description, LinkedIn company URL, LinkedIn profile URLs found on the site, emails, social links, and page text excerpts. Use this whenever the user gives only a website URL or asks you to research a company.",
       inputSchema: z.object({ url: z.string().min(4) }),
       execute: async ({ url }) => {
+        if (websiteUses >= MAX_WEBSITE_FETCHES_PER_CHAT) {
+          return {
+            error: `Website research limit reached for this conversation (${MAX_WEBSITE_FETCHES_PER_CHAT} fetches). Ask the user to open a new chat to continue.`,
+          };
+        }
+        websiteUses += 1;
         try {
           return await researchWebsite(url);
         } catch (err) {
@@ -105,9 +137,17 @@ function buildTools(
       ? {
           researchLinkedInCompany: tool({
             description:
-              "Search LinkedIn (via Apify) for employees of a company. Pass a company name or a LinkedIn company URL as the query. Returns up to 15 people with name, title, LinkedIn profile URL, and location. Use after researchWebsite, or when the user asks to find the owner/members of an organization.",
+              "Search LinkedIn (via Apify — costs credit) for employees of a company. Pass a company name or a LinkedIn company URL. Returns up to 15 people with name, title, LinkedIn profile URL, and location. ONLY call when the user explicitly asks to find people/owner/members — never automatically.",
             inputSchema: z.object({ query: z.string().min(2) }),
-            execute: async ({ query }) => runApifyLinkedIn(query),
+            execute: async ({ query }) => {
+              if (linkedinUses >= MAX_LINKEDIN_RUNS_PER_CHAT) {
+                return {
+                  error: `LinkedIn research is capped at ${MAX_LINKEDIN_RUNS_PER_CHAT} runs per conversation to protect your Apify credit. Ask the user to confirm before running more.`,
+                };
+              }
+              linkedinUses += 1;
+              return runApifyLinkedIn(query);
+            },
           }),
         }
       : {}),
@@ -305,7 +345,10 @@ export async function POST(req: Request) {
     model,
     system: SYSTEM_PROMPT + (apifyEnabled ? LINKEDIN_RULE : "") + listHint,
     messages: await convertToModelMessages(messages),
-    tools: buildTools(supabase, apifyEnabled),
+    tools: buildTools(supabase, apifyEnabled, {
+      website: countToolUses(messages, "researchWebsite"),
+      linkedin: countToolUses(messages, "researchLinkedInCompany"),
+    }),
     stopWhen: stepCountIs(8),
   });
 
