@@ -41,4 +41,4 @@ No gradients · no emoji · no `transition-all` · zinc-scale neutrals only · s
 
 ## Decision log
 
-- 2026-10-02 — build: Attio blend across shell/table/detail; Pipedrive-style stage bars on dashboard. Status: **pending review** (user to keep/reject).
+- 2026-10-02 — build: Attio blend across shell/table/detail; Pipedrive-style stage bars on dashboard. Status: **KEPT** (user approved, 2026-10-02).

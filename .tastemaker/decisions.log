@@ -1,0 +1,5 @@
+# Decisions log (append-only — never edit old lines)
+
+2026-10-02 | build | app-shell | direction | KEPT — user approved the Attio blend across shell, tables, dashboard KPIs and detail layout.
+2026-10-02 | build | app-shell | motion | KEPT — restrained app-shell track (entrance rise + 120ms color transitions); no scroll theatrics.
+2026-10-02 | build | app-shell | palette | KEPT — pixel-derived zinc system with contrast-checked contract (muted floor #71717A; zinc-400 banned for text).
