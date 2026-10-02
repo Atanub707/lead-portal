@@ -235,7 +235,7 @@ export async function POST(req: Request) {
       "").trim() || null;
   const emails = [
     ...new Set(
-      extracted.emails
+      [...extracted.emails, ...research.links.emails]
         .map((email) => email.trim().toLowerCase())
         .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     ),
@@ -396,9 +396,10 @@ export async function POST(req: Request) {
     contactsSkipped: contacts.length - toAdd.length,
     linkedinProfilesFound,
     linkedinUrl: finalLinkedin,
-    warning: research.needs_js
-      ? "This site renders its content with JavaScript, so details may be missing. Add TINYFISH_API_KEY (free) for a full render."
-      : undefined,
+    warning:
+      research.needs_js && stillMissing.length > 0
+        ? "This site renders with JavaScript, so some details may still be missing. Add TINYFISH_API_KEY (free) for a full render."
+        : undefined,
     stillMissing,
   });
 }

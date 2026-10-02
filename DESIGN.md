@@ -95,7 +95,10 @@ per-contact emails).
   Search fallback for the LinkedIn company URL when it is not linked on the site;
   otherwise falls back to a built-in SSRF-guarded fetcher (public hosts only — redirects
   re-validated; size/time caps). Extracts title/description/LinkedIn URLs/emails/socials
-  plus page text excerpts.
+  plus page text excerpts. The built-in fetcher also decodes Cloudflare-obfuscated
+  emails and, for JS-only (SPA) sites, mines the site's own script chunks (capped:
+  80 chunks / 6 MB / 8s each) for LinkedIn/social links and mailto addresses — this
+  recovers footers that only exist client-side, with no key required.
 - **AI extraction** (`src/lib/ai.ts` → `pickModel`): plain-text generation with a strict
   JSON shape is primary (avoids DeepSeek/OpenCode-Go `response_format` quirks), tolerant
   parse + zod validation; `generateObject` is the fallback. The model is instructed to

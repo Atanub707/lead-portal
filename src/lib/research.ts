@@ -15,6 +15,14 @@ const TINYFISH_FETCH_URL = "https://api.fetch.tinyfish.ai";
 const TINYFISH_SEARCH_URL = "https://api.search.tinyfish.ai";
 const TINYFISH_TIMEOUT_MS = 20000;
 
+// JS-shell sites render their footer (LinkedIn etc.) client-side. When the raw
+// HTML has none of it, mine the site's own script chunks for real links.
+const CHUNK_TIMEOUT_MS = 8000;
+const CHUNK_BYTES_EACH = 500_000;
+const CHUNK_BYTES_TOTAL = 6_000_000;
+const CHUNK_MAX = 80;
+const CHUNK_CONCURRENCY = 8;
+
 function isPublicHttpUrl(value: string): URL | null {
   try {
     const withProtocol = /^https?:\/\//i.test(value) ? value : `https://${value}`;
@@ -299,6 +307,138 @@ function findSubpagesFromMarkdown(text: string, base: URL): URL[] {
     return rank(a) - rank(b);
   });
   return list.slice(0, MAX_SUBPAGES);
+}
+
+async function fetchTextCapped(url: string, cap: number): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: "text/javascript,application/javascript,*/*",
+      },
+      redirect: "follow",
+      signal: AbortSignal.timeout(CHUNK_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    return (await res.text()).slice(0, cap);
+  } catch {
+    return null;
+  }
+}
+
+function extractLinksFromScriptText(scriptText: string): SiteLinks {
+  const sets = {
+    linkedin_company: new Set<string>(),
+    linkedin_people: new Set<string>(),
+    emails: new Set<string>(),
+    socials: new Set<string>(),
+  };
+
+  for (const match of scriptText.matchAll(
+    /https?:\/\/(?:[a-z]{2,3}\.)?linkedin\.com\/(company|in|school)\/[A-Za-z0-9_%.@-]+/gi
+  )) {
+    const clean = match[0].replace(/[.,;:]+$/, "");
+    if (match[1].toLowerCase() === "in") sets.linkedin_people.add(clean);
+    else sets.linkedin_company.add(clean);
+  }
+
+  const socialPatterns = [
+    /^https?:\/\/(?:www\.)?github\.com\/[A-Za-z0-9_.-]+/i,
+    /^https?:\/\/(?:www\.)?instagram\.com\/[A-Za-z0-9_.]+/i,
+    /^https?:\/\/(?:www\.)?(?:twitter|x)\.com\/[A-Za-z0-9_]+/i,
+    /^https?:\/\/(?:www\.)?facebook\.com\/[A-Za-z0-9_.]+/i,
+    /^https?:\/\/(?:www\.)?discord\.(?:gg|com\/invite)\/[A-Za-z0-9]+/i,
+    /^https?:\/\/(?:www\.)?t\.me\/[A-Za-z0-9_]+/i,
+    /^https?:\/\/(?:www\.)?youtube\.com\/(?:@|c\/|channel\/|user\/)[A-Za-z0-9_.-]+/i,
+  ];
+
+  // Only accept social links used as real anchors (href), never library mentions
+  // from comments or license headers.
+  for (const match of scriptText.matchAll(
+    /href["'\s:=]+["'`](https?:\/\/[^"'`\s\\]+)["'`]/gi
+  )) {
+    const raw = match[1].replace(/[.,;:]+$/, "");
+    if (!socialPatterns.some((pattern) => pattern.test(raw))) continue;
+    try {
+      const parsed = new URL(raw);
+      sets.socials.add(parsed.origin + parsed.pathname.replace(/\/$/, ""));
+    } catch {
+      // ignore malformed URLs
+    }
+  }
+
+  for (const match of scriptText.matchAll(
+    /mailto:([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/gi
+  )) {
+    sets.emails.add(match[1].toLowerCase());
+  }
+
+  return {
+    linkedin_company: [...sets.linkedin_company].slice(0, 5),
+    linkedin_people: [...sets.linkedin_people].slice(0, 15),
+    emails: [...sets.emails].slice(0, 10),
+    socials: [...sets.socials].slice(0, 8),
+  };
+}
+
+async function mineScriptChunks(html: string, base: URL): Promise<SiteLinks> {
+  const refs = new Set<string>();
+  const entryScripts = [...html.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)]
+    .map((match) => {
+      try {
+        return new URL(match[1], base).toString();
+      } catch {
+        return null;
+      }
+    })
+    .filter((value): value is string => Boolean(value));
+  for (const src of entryScripts) refs.add(src);
+
+  let budget = CHUNK_BYTES_TOTAL;
+  const texts: string[] = [];
+
+  for (const src of entryScripts) {
+    if (budget <= 0) break;
+    const text = await fetchTextCapped(src, CHUNK_BYTES_EACH);
+    if (!text) continue;
+    budget -= text.length;
+    texts.push(text);
+    for (const match of text.matchAll(
+      /["'`](\.?\/?assets\/[A-Za-z0-9._-]+\.js)["'`]/g
+    )) {
+      try {
+        refs.add(new URL(match[1].replace(/^\.\//, ""), `${base.origin}/`).toString());
+      } catch {
+        // ignore malformed refs
+      }
+    }
+  }
+
+  const candidates = [...refs]
+    .filter((ref) => !entryScripts.includes(ref))
+    .filter(
+      (ref) =>
+        !/vendor[-.]|jspdf|postfx|chemistrysandbox|labenvironment|three|monaco/i.test(
+          ref
+        )
+    )
+    .slice(0, CHUNK_MAX);
+
+  let cursor = 0;
+  async function worker() {
+    while (cursor < candidates.length) {
+      if (budget <= 0) return;
+      const text = await fetchTextCapped(candidates[cursor++], CHUNK_BYTES_EACH);
+      if (!text) continue;
+      budget -= text.length;
+      texts.push(text);
+    }
+  }
+  await Promise.all(
+    Array.from({ length: CHUNK_CONCURRENCY }, () => worker())
+  );
+
+  return extractLinksFromScriptText(texts.join("\n"));
 }
 
 interface TinyfishPage {
@@ -594,6 +734,19 @@ async function researchWebsiteDirect(url: URL, rawUrl: string): Promise<WebsiteR
       allLinks.linkedin_company.length === 0 &&
       allLinks.socials.length === 0 &&
       anchors < 25);
+
+  if (
+    needs_js &&
+    allLinks.linkedin_company.length === 0 &&
+    allLinks.socials.length === 0
+  ) {
+    try {
+      const mined = await mineScriptChunks(html, base);
+      mergeSiteLinks(allLinks, mined);
+    } catch {
+      // Chunk mining is best-effort — never fail the research because of it.
+    }
+  }
 
   return {
     requested_url: rawUrl,
