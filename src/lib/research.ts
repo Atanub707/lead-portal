@@ -521,10 +521,41 @@ export function tinyfishEnabled(): boolean {
   return tinyfishKey() !== null;
 }
 
-async function tinyfishSearchLinkedInCompany(
+function linkedInSlug(url: string): string | null {
+  try {
+    const parts = new URL(url).pathname.split("/").filter(Boolean);
+    return parts.length >= 2 ? parts[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+function normaliseToken(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+// A LinkedIn company URL is only trusted when its slug relates to the company
+// name or domain (e.g. /company/reinolab for reinolab.tech).
+export function verifyLinkedInCompany(
+  url: string,
   name: string,
   domain: string
-): Promise<string[]> {
+): boolean {
+  const slug = linkedInSlug(url);
+  if (!slug) return false;
+  const slugToken = normaliseToken(slug);
+  return [normaliseToken(name), normaliseToken(domain)]
+    .filter((token) => token.length >= 3)
+    .some(
+      (token) => slugToken.includes(token) || token.includes(slugToken)
+    );
+}
+
+export async function searchVerifiedLinkedInCompany(
+  name: string,
+  domain: string
+): Promise<string | null> {
+  if (!tinyfishKey()) return null;
   const query = name
     ? `site:linkedin.com/company "${name}"`
     : `site:linkedin.com/company ${domain}`;
@@ -532,13 +563,35 @@ async function tinyfishSearchLinkedInCompany(
     query,
     `Find the official LinkedIn company page for ${name || domain}`
   );
-  const found: string[] = [];
-  for (const result of results) {
+
+  const words = name
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word.length >= 3);
+
+  const scored: { url: string; score: number }[] = [];
+  for (const result of results.slice(0, 8)) {
     const clean = normaliseLinkedInUrl(result.url, "company");
-    if (clean && !found.includes(clean)) found.push(clean);
-    if (found.length >= 2) break;
+    if (!clean) continue;
+    if (!verifyLinkedInCompany(clean, name, domain)) continue;
+    const haystack = `${result.title ?? ""} ${
+      result.snippet ?? ""
+    }`.toLowerCase();
+    if (words.length > 0 && !words.every((word) => haystack.includes(word))) {
+      continue;
+    }
+    let score = 1;
+    if (
+      domain &&
+      haystack.includes(domain.replace(/^www\./, "").toLowerCase())
+    ) {
+      score += 2;
+    }
+    scored.push({ url: clean, score });
   }
-  return found;
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0]?.url ?? null;
 }
 
 export async function findLinkedInProfile(
@@ -640,14 +693,14 @@ async function researchWebsiteTinyfish(
 
   let notes = "Fetched with TinyFish (renders JavaScript-heavy pages).";
   if (allLinks.linkedin_company.length === 0) {
-    const found = await tinyfishSearchLinkedInCompany(
+    const found = await searchVerifiedLinkedInCompany(
       deriveSiteName(home.title, ""),
       base.hostname
     );
-    if (found.length) {
-      allLinks.linkedin_company = found;
+    if (found) {
+      allLinks.linkedin_company = [found];
       notes +=
-        " LinkedIn company URL recovered via TinyFish Search (it is not linked on the site).";
+        " LinkedIn company URL recovered via TinyFish Search (name/domain verified).";
     }
   }
 

@@ -14,6 +14,8 @@ interface PasteResult {
   contactsSkipped: number;
   linkedinProfilesFound: number;
   linkedinUrl: string | null;
+  linkedinSource: "site" | "search" | null;
+  unverifiedLinkedin: string | null;
   warning?: string;
   stillMissing: string[];
 }
@@ -191,7 +193,9 @@ export function PasteUrl({
                   ) : null}
                   <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[11px] text-zinc-600">
                     {result.linkedinUrl
-                      ? "LinkedIn company URL found"
+                      ? result.linkedinSource === "search"
+                        ? "LinkedIn found via search (verified)"
+                        : "LinkedIn found on their site"
                       : "No LinkedIn URL"}
                   </span>
                 </div>
@@ -200,6 +204,13 @@ export function PasteUrl({
                   <p className="text-[12px] text-zinc-500">
                     Still missing: {result.stillMissing.join(", ")}. You can add
                     them by hand on the company page.
+                  </p>
+                ) : null}
+
+                {result.unverifiedLinkedin ? (
+                  <p className="rounded-md bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+                    Found a LinkedIn link on the site that doesn&apos;t match
+                    this company — not saved: {result.unverifiedLinkedin}
                   </p>
                 ) : null}
 

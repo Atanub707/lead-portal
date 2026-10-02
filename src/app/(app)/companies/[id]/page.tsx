@@ -429,6 +429,13 @@ export default async function CompanyPage({
                   defaultValue={company.linkedin_url ?? ""}
                   className="input"
                 />
+                {company.linkedin_source ? (
+                  <p className="mt-1 text-[11px] text-zinc-400">
+                    {company.linkedin_source === "site"
+                      ? "Found on their website"
+                      : "Found via verified search — double-check it"}
+                  </p>
+                ) : null}
               </div>
 
               <div className="grid grid-cols-2 gap-3">

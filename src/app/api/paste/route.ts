@@ -1,7 +1,13 @@
 import { generateObject, generateText } from "ai";
 import { z } from "zod";
 import { NO_AI_KEY_MESSAGE, pickModel } from "@/lib/ai";
-import { findLinkedInProfile, researchWebsite, tinyfishEnabled } from "@/lib/research";
+import {
+  findLinkedInProfile,
+  researchWebsite,
+  searchVerifiedLinkedInCompany,
+  tinyfishEnabled,
+  verifyLinkedInCompany,
+} from "@/lib/research";
 import { createClient } from "@/lib/supabase/server";
 import { parseList, type OrgList } from "@/lib/types";
 
@@ -12,9 +18,6 @@ const ExtractSchema = z.object({
   description: z
     .string()
     .describe("One or two sentences on what the company does, taken from the site"),
-  linkedin_company_url: z
-    .string()
-    .describe("LinkedIn company page URL exactly as found; empty string if unknown"),
   emails: z.array(z.string()).describe("Public contact emails found on the site"),
   kind: z
     .enum(["lead", "partner", "competitor", "other"])
@@ -47,7 +50,6 @@ const JSON_SHAPE = `Return a single JSON object with exactly these keys:
 {
   "name": string,
   "description": string (1-2 sentences, "" if unknown),
-  "linkedin_company_url": string ("" if unknown),
   "emails": string[] ([] if none),
   "kind": "lead" | "partner" | "competitor" | "other",
   "contacts": [{ "name": string, "title": string, "linkedin_url": string, "email": string }] (max 12, [] if none)
@@ -242,10 +244,30 @@ export async function POST(req: Request) {
     hostOf(research.final_url) ||
     "Unknown company";
   const website = cleanWebsite(research.final_url);
-  const linkedin =
-    (extracted.linkedin_company_url.trim() ||
-      research.links.linkedin_company[0] ||
-      "").trim() || null;
+  const domain = hostOf(website);
+
+  // LinkedIn company URL — verified sources only, never the AI's guess:
+  // 1) a link on the company's own site, if the slug matches name/domain
+  // 2) a verified search result (name in snippet + matching slug)
+  // Unverified candidates are reported, not saved.
+  const siteCandidate = research.links.linkedin_company[0] ?? null;
+  let linkedin: string | null = null;
+  let linkedinSource: "site" | "search" | null = null;
+  let unverifiedLinkedin: string | null = null;
+
+  if (siteCandidate && verifyLinkedInCompany(siteCandidate, name, domain)) {
+    linkedin = siteCandidate;
+    linkedinSource = "site";
+  } else if (siteCandidate) {
+    unverifiedLinkedin = siteCandidate;
+  }
+  if (!linkedin && tinyfishEnabled()) {
+    const found = await searchVerifiedLinkedInCompany(name, domain);
+    if (found) {
+      linkedin = found;
+      linkedinSource = "search";
+    }
+  }
   const emails = [
     ...new Set(
       [...extracted.emails, ...research.links.emails]
@@ -290,7 +312,6 @@ export async function POST(req: Request) {
   const generalEmails = emails.filter((email) => !usedEmails.has(email));
 
   const q = sanitize(name);
-  const domain = hostOf(website);
   const { data: matches } = await supabase
     .from("organizations")
     .select("id, name, website, linkedin_url, emails")
@@ -305,7 +326,10 @@ export async function POST(req: Request) {
   if (existing) {
     const patch: Record<string, string | string[]> = {};
     if (!existing.website && website) patch.website = website;
-    if (!existing.linkedin_url && linkedin) patch.linkedin_url = linkedin;
+    if (!existing.linkedin_url && linkedin) {
+      patch.linkedin_url = linkedin;
+      patch.linkedin_source = linkedinSource as string;
+    }
     if (generalEmails.length > 0) {
       const current = (existing.emails ?? []) as string[];
       const merged = [...new Set([...current, ...generalEmails])];
@@ -325,6 +349,7 @@ export async function POST(req: Request) {
         name,
         website,
         linkedin_url: linkedin,
+        linkedin_source: linkedin ? linkedinSource : null,
         kind: extracted.kind,
         status: "new",
         notes: extracted.description.trim() || null,
@@ -409,6 +434,8 @@ export async function POST(req: Request) {
     contactsSkipped: contacts.length - toAdd.length,
     linkedinProfilesFound,
     linkedinUrl: finalLinkedin,
+    linkedinSource,
+    unverifiedLinkedin,
     warning:
       research.needs_js && stillMissing.length > 0
         ? "This site renders with JavaScript, so some details may still be missing. Add TINYFISH_API_KEY (free) for a full render."

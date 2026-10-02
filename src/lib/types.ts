@@ -82,6 +82,7 @@ export interface Organization {
   name: string;
   website: string | null;
   linkedin_url: string | null;
+  linkedin_source: string | null;
   kind: OrgKind;
   status: PipelineStage;
   priority: Priority | null;
