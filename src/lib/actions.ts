@@ -536,6 +536,7 @@ export async function removeUser(formData: FormData) {
   if (errorMessage) {
     redirect(`/settings?remove_error=${encodeURIComponent(errorMessage)}`);
   }
+  redirect("/settings?removed=1");
 }
 
 export async function updateUserRole(formData: FormData) {

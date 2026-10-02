@@ -35,6 +35,7 @@ export default async function SettingsPage({
 }) {
   const sp = await searchParams;
   const removeError = typeof sp.remove_error === "string" ? sp.remove_error : "";
+  const removed = typeof sp.removed === "string" ? sp.removed : "";
 
   const [profile, users, authMeta] = await Promise.all([
     getCurrentProfile(),
@@ -53,6 +54,14 @@ export default async function SettingsPage({
           Invite-only workspace. Partners join when the owner invites them.
         </p>
 
+        {removed ? (
+          <p
+            role="status"
+            className="mt-5 rounded-md bg-emerald-50 px-3 py-2 text-[13px] text-emerald-800"
+          >
+            User removed. They lose access immediately.
+          </p>
+        ) : null}
         {removeError ? (
           <p
             role="alert"
@@ -168,6 +177,7 @@ export default async function SettingsPage({
                           <input type="hidden" name="user_id" value={user.id} />
                           <ConfirmSubmit
                             message={`Remove ${user.email ?? "this user"}? They lose access immediately.`}
+                            confirmLabel="Remove"
                             className="text-[11px] text-zinc-400 transition-colors hover:text-rose-600"
                           >
                             Remove
