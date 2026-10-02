@@ -78,6 +78,11 @@ export async function POST(req: Request) {
     return Response.json({ error: "Paste a website URL first." }, { status: 400 });
   }
 
+  const model = pickModel(user.id);
+  if (!model) {
+    return Response.json({ error: NO_AI_KEY_MESSAGE }, { status: 503 });
+  }
+
   let research;
   try {
     research = await researchWebsite(url);
@@ -91,11 +96,6 @@ export async function POST(req: Request) {
       },
       { status: 422 }
     );
-  }
-
-  const model = pickModel(user.id);
-  if (!model) {
-    return Response.json({ error: NO_AI_KEY_MESSAGE }, { status: 503 });
   }
 
   const digest = {

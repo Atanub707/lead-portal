@@ -26,13 +26,17 @@ export function PasteUrl({ list }: { list: OrgList }) {
   const [result, setResult] = useState<PasteResult | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
+  function openModal() {
     setUrl("");
     setTarget(list);
     setStatus("idle");
     setError("");
     setResult(null);
+    setOpen(true);
+  }
+
+  useEffect(() => {
+    if (!open) return;
     inputRef.current?.focus();
 
     function onKey(event: KeyboardEvent) {
@@ -45,7 +49,7 @@ export function PasteUrl({ list }: { list: OrgList }) {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = previousOverflow;
     };
-  }, [open, list]);
+  }, [open]);
 
   async function go() {
     const value = url.trim();
@@ -75,7 +79,7 @@ export function PasteUrl({ list }: { list: OrgList }) {
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="btn-ghost">
+      <button onClick={openModal} className="btn-ghost">
         <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
         Paste URL with AI
       </button>

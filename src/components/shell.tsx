@@ -86,6 +86,7 @@ export function Shell({
 
   useEffect(() => {
     try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount; avoids a hydration mismatch
       setCollapsed(localStorage.getItem(STORAGE_KEY) === "1");
     } catch {
       // storage unavailable — keep default
