@@ -77,7 +77,10 @@ export function WelcomeForm() {
       </div>
 
       {error ? (
-        <p className="rounded-md bg-rose-50 px-3 py-2 text-[13px] text-rose-700">
+        <p
+          role="alert"
+          className="rounded-md bg-rose-50 px-3 py-2 text-[13px] text-rose-700"
+        >
           {error}
         </p>
       ) : null}

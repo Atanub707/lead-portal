@@ -167,7 +167,10 @@ export function ChatPanel() {
         </div>
 
         {error ? (
-          <p className="border-t border-zinc-100 bg-rose-50 px-5 py-2 text-[12px] text-rose-700">
+          <p
+            role="alert"
+            className="border-t border-zinc-100 bg-rose-50 px-5 py-2 text-[12px] text-rose-700"
+          >
             {error.message}
           </p>
         ) : null}

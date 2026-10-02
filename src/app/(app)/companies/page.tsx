@@ -267,6 +267,7 @@ export default async function CompaniesPage({
                   <Link
                     key={size}
                     href={href({ per: size, page: 1 })}
+                    scroll={false}
                     aria-label={`${size} rows per page`}
                     className={`flex h-8 min-w-8 items-center justify-center rounded-md px-1.5 text-[12px] tabular-nums transition-colors ${
                       size === per
@@ -284,6 +285,7 @@ export default async function CompaniesPage({
                   {current > 1 ? (
                     <Link
                       href={href({ page: current - 1 })}
+                      scroll={false}
                       aria-label="Previous page"
                       className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
                     >
@@ -318,6 +320,7 @@ export default async function CompaniesPage({
                       <Link
                         key={item}
                         href={href({ page: item })}
+                        scroll={false}
                         aria-label={`Page ${item}`}
                         className="flex h-8 min-w-8 items-center justify-center rounded-md border border-zinc-200 bg-white px-1.5 text-[12px] text-zinc-600 tabular-nums transition-colors hover:bg-zinc-50 hover:text-zinc-900"
                       >
@@ -329,6 +332,7 @@ export default async function CompaniesPage({
                   {current < totalPages ? (
                     <Link
                       href={href({ page: current + 1 })}
+                      scroll={false}
                       aria-label="Next page"
                       className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
                     >

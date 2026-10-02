@@ -13,7 +13,21 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+@layer base {
+  /* Tailwind v4 removed the default pointer cursor on buttons — restore it. */
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
 @layer components {
+  .btn-primary,
+  .btn-ghost,
+  .btn-danger {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/20;
+  }
+
   .card {
     @apply rounded-lg border border-zinc-200/80 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)];
   }

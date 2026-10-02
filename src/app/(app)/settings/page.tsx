@@ -55,18 +55,27 @@ export default async function SettingsPage({
         </p>
 
         {invited ? (
-          <p className="mt-5 rounded-md bg-emerald-50 px-3 py-2 text-[13px] text-emerald-800">
+          <p
+            role="status"
+            className="mt-5 rounded-md bg-emerald-50 px-3 py-2 text-[13px] text-emerald-800"
+          >
             Invitation sent to <strong>{invited}</strong>. They will get an
             email with a link to set their password.
           </p>
         ) : null}
         {inviteError ? (
-          <p className="mt-5 rounded-md bg-rose-50 px-3 py-2 text-[13px] text-rose-700">
+          <p
+            role="alert"
+            className="mt-5 rounded-md bg-rose-50 px-3 py-2 text-[13px] text-rose-700"
+          >
             Invitation failed: {inviteError}
           </p>
         ) : null}
         {removeError ? (
-          <p className="mt-5 rounded-md bg-rose-50 px-3 py-2 text-[13px] text-rose-700">
+          <p
+            role="alert"
+            className="mt-5 rounded-md bg-rose-50 px-3 py-2 text-[13px] text-rose-700"
+          >
             {removeError}
           </p>
         ) : null}
