@@ -42,8 +42,8 @@ cp .env.example .env.local
 ### 5. Redirect URLs (Auth)
 
 **Authentication → URL Configuration**:
-- Site URL: `http://localhost:3000`
-- Redirect URLs: add `http://localhost:3000/auth/callback`
+- Site URL: `http://localhost:3005`
+- Redirect URLs: add `http://localhost:3005/auth/callback`
 
 (Add the production URLs here again after deploying.)
 
@@ -54,7 +54,7 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3000> → sign in with your email → **you become the owner**
+Open <http://localhost:3005> → sign in with your email → **you become the owner**
 (the first account is auto-assigned the owner role).
 
 ### 7. Import your existing lists
