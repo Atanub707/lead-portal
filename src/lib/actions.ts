@@ -176,7 +176,9 @@ export async function deleteOrganization(formData: FormData) {
   const { error } = await supabase.from("organizations").delete().eq("id", id);
   if (error) throw new Error(error.message);
   revalidateAll();
-  redirect("/companies");
+
+  const next = field(formData, "next");
+  redirect(next && next.startsWith("/") ? next : "/companies");
 }
 
 // ─── Contacts ────────────────────────────────────────────────────────────────

@@ -5,12 +5,15 @@ import {
   ExternalLink,
   Mail,
   Search,
+  Trash2,
 } from "lucide-react";
 import { BookmarkToggle } from "@/components/bookmark-toggle";
+import { ConfirmSubmit } from "@/components/confirm-submit";
 import { FollowUpControl } from "@/components/follow-up-control";
 import { PasteUrl } from "@/components/paste-url";
 import { CompanyAvatar, KindBadge } from "@/components/badges";
-import { getCompanies } from "@/lib/data";
+import { deleteOrganization } from "@/lib/actions";
+import { getCompanies, getCurrentProfile } from "@/lib/data";
 import {
   KIND_LABEL,
   KIND_OPTIONS,
@@ -63,6 +66,9 @@ export default async function CompaniesPage({
   const pageRaw = Number(str(sp.page));
   const requestedPage =
     Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
+
+  const profile = await getCurrentProfile();
+  const isOwner = profile?.role === "owner";
 
   let result = await getCompanies({
     list,
@@ -201,6 +207,9 @@ export default async function CompaniesPage({
                 <th className="th">Reach</th>
                 <th className="th">Follow-up</th>
                 <th className="th pr-4 text-right">Email</th>
+                <th className="th w-10 pr-4">
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -299,6 +308,23 @@ export default async function CompaniesPage({
                         —
                       </span>
                     )}
+                  </td>
+                  <td className="td pr-4">
+                    {isOwner ? (
+                      <form action={deleteOrganization}>
+                        <input type="hidden" name="id" value={company.id} />
+                        <input type="hidden" name="next" value={href({})} />
+                        <ConfirmSubmit
+                          message={`Delete ${company.name}? Its contacts and interactions are deleted too. This cannot be undone.`}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span className="sr-only">
+                            Delete {company.name}
+                          </span>
+                        </ConfirmSubmit>
+                      </form>
+                    ) : null}
                   </td>
                 </tr>
               ))}
