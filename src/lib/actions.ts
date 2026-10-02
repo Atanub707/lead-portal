@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { createAdminClient } from "./supabase/admin";
 import { createClient } from "./supabase/server";
 import type { OrgKind, OrgList, PipelineStage, UserRole } from "./types";
 import { KIND_OPTIONS, PRIORITY_OPTIONS, STATUS_LABEL } from "./types";
@@ -214,7 +216,73 @@ export async function deleteInteraction(formData: FormData) {
   revalidateAll(orgId);
 }
 
-// ─── Users / roles ───────────────────────────────────────────────────────────
+async function currentSiteUrl() {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3005";
+  const proto =
+    h.get("x-forwarded-proto") ??
+    (host.includes("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
+export async function inviteUser(formData: FormData) {
+  await assertOwner();
+
+  const email = field(formData, "email");
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    redirect(`/settings?invite_error=${encodeURIComponent("Enter a valid email address")}`);
+  }
+
+  let errorMessage: string | null = null;
+  try {
+    const admin = createAdminClient();
+    const base = await currentSiteUrl();
+    const { error } = await admin.auth.admin.inviteUserByEmail(email, {
+      redirectTo: `${base}/auth/callback?next=/welcome`,
+    });
+    if (error) errorMessage = error.message;
+  } catch (err) {
+    errorMessage =
+      err instanceof Error ? err.message : "Invitation could not be sent";
+  }
+
+  revalidatePath("/settings");
+
+  if (errorMessage) {
+    redirect(`/settings?invite_error=${encodeURIComponent(errorMessage)}`);
+  }
+  redirect(`/settings?invited=${encodeURIComponent(email)}`);
+}
+
+export async function removeUser(formData: FormData) {
+  const supabase = await assertOwner();
+  const userId = field(formData, "user_id");
+  if (!userId) redirect(`/settings?remove_error=${encodeURIComponent("Missing user")}`);
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user?.id === userId) {
+    redirect(
+      `/settings?remove_error=${encodeURIComponent("You cannot remove your own account")}`
+    );
+  }
+
+  let errorMessage: string | null = null;
+  try {
+    const admin = createAdminClient();
+    const { error } = await admin.auth.admin.deleteUser(userId);
+    if (error) errorMessage = error.message;
+  } catch (err) {
+    errorMessage = err instanceof Error ? err.message : "User could not be removed";
+  }
+
+  revalidatePath("/settings");
+
+  if (errorMessage) {
+    redirect(`/settings?remove_error=${encodeURIComponent(errorMessage)}`);
+  }
+}
 
 export async function updateUserRole(formData: FormData) {
   const supabase = await assertOwner();

@@ -54,8 +54,9 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3005> → sign in with your email → **you become the owner**
-(the first account is auto-assigned the owner role).
+Open <http://localhost:3005> → **Password tab → Create account** → **you become the
+owner** (the first account is auto-assigned the owner role). This is the *only*
+public sign-up — afterwards you disable sign-ups entirely (next step).
 
 ### 7. Import your existing lists
 
@@ -66,10 +67,20 @@ node --env-file=.env.local scripts/import-csv.mjs
 Reads `../companies.csv` and `../service-companies.csv` plus the detail Markdown
 files (members + interaction logs). Safe to re-run — existing companies are skipped.
 
-### 8. Invite your friend
+### 8. Go invite-only (RBAC)
 
-They open the deployed URL, sign in with their email, and automatically become an
-**editor**. You can review roles anytime in **Settings**.
+1. Supabase → **Authentication → Sign In / Providers** → turn **OFF**
+   "Allow new users to sign up" → Save. From now on nobody can self-create an
+   account — partners join only by invitation.
+2. In the portal: **Settings → Invite a partner** → enter their email → Send.
+   They receive an email with a link, set their password on the Welcome screen,
+   and land in the app as an **editor**.
+3. Manage roles or remove users anytime in **Settings** — owner only. Editors can
+   add/edit pipeline data; the database (RLS) blocks deletes and role changes.
+
+> Invite emails use Supabase's built-in sender, which is rate-limited
+> (a few per hour). For reliable delivery connect custom SMTP
+> (free tiers: Resend, Brevo) in **Authentication → SMTP**.
 
 ## Deploy to Vercel (free)
 

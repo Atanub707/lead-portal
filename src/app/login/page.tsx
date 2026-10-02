@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState<"" | "signin" | "signup" | "magic">("");
+  const [busy, setBusy] = useState<"" | "signin" | "magic">("");
   const [error, setError] = useState("");
   const [magicSent, setMagicSent] = useState(false);
 
@@ -32,32 +32,6 @@ export default function LoginPage() {
       }
       router.push("/dashboard");
       router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-      setBusy("");
-    }
-  }
-
-  async function handleSignUp() {
-    setBusy("signup");
-    setError("");
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) {
-        setError(error.message);
-        setBusy("");
-        return;
-      }
-      if (data.session) {
-        router.push("/dashboard");
-        router.refresh();
-        return;
-      }
-      setError(
-        "Account created. Email confirmation is still ON in Supabase — turn it off (Authentication → Sign In / Providers → Email) and sign in with your password."
-      );
-      setBusy("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setBusy("");
@@ -184,18 +158,8 @@ export default function LoginPage() {
                 {busy === "signin" ? "Signing in…" : "Sign in"}
               </button>
 
-              <button
-                type="button"
-                onClick={handleSignUp}
-                className="btn-ghost w-full"
-                disabled={busy !== ""}
-              >
-                {busy === "signup" ? "Creating…" : "Create account"}
-              </button>
-
               <p className="text-center text-[12px] text-zinc-500">
-                The first account becomes the owner; everyone else joins as
-                editor.
+                Invite-only — ask the admin for an invitation.
               </p>
             </form>
           ) : magicSent ? (

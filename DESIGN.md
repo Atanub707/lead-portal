@@ -40,13 +40,22 @@ Pipeline stages:
 
 ## Security model
 
+- **Invite-only access** — public sign-up is disabled in Supabase. Accounts are
+  created only by an owner invitation (`inviteUserByEmail`); the invitee sets a
+  password on `/welcome`, then signs in normally.
 - Every authenticated user can **read** all records, **insert**, and **update**.
-- **Delete** (organizations, contacts, interactions) and **role changes** are owner-only.
-- Enforcement is two-layered:
-  1. **RLS policies** in Postgres — `is_owner()` checks the caller's profile role. Even a crafted API call cannot delete as an editor.
-  2. Server Actions double-check owner status before destructive operations.
-- The first account to sign up becomes `owner` automatically (trigger `handle_new_user`). Everyone after is `editor`.
-- Service role key is used only by the local import script and never shipped to the browser.
+- **Delete** (organizations, contacts, interactions), **role changes**,
+  **invitations**, and **user removal** are owner-only.
+- Enforcement is three-layered:
+  1. **RLS policies** in Postgres — `is_owner()` checks the caller's profile role.
+     A crafted API call cannot delete as an editor.
+  2. Server Actions double-check owner status before destructive/admin operations.
+  3. Supabase Auth admin API (secret key) is required for invitations/removals and
+     is only reachable server-side.
+- The first account created becomes `owner` automatically (trigger
+  `handle_new_user`); invited users join as `editor`.
+- The secret/service-role key is used only server-side (CSV import script +
+  invitation admin API) and is never shipped to the browser.
 
 ## Key flows
 
