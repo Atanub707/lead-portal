@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Settings,
   ShieldCheck,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -49,6 +50,12 @@ export function SidebarNav({ isOwner }: { isOwner: boolean }) {
         label="Dashboard"
         icon={LayoutDashboard}
         active={pathname === "/dashboard"}
+      />
+      <NavItem
+        href="/assistant"
+        label="AI Assistant"
+        icon={Sparkles}
+        active={pathname.startsWith("/assistant")}
       />
       <p className="px-2 pb-1 pt-4 text-[11px] font-medium uppercase tracking-wide text-zinc-400">
         Pipelines

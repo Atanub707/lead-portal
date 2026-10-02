@@ -83,6 +83,23 @@ files (members + interaction logs). Safe to re-run — existing companies are sk
 > (a few per hour). For reliable delivery connect custom SMTP
 > (free tiers: Resend, Brevo) in **Authentication → SMTP**.
 
+## AI assistant (chat intake)
+
+The **AI Assistant** page accepts pasted research — links, notes, member lists.
+Say which list ("add to POS" / "add to compliance") and it documents the company
+into the database with duplicate-checking, using your own permissions. Manual
+entry stays available on every screen.
+
+Enable it with one free API key (Google Gemini has a free tier):
+
+1. Get a key at [aistudio.google.com](https://aistudio.google.com) → **Get API key**
+2. Add it to `.env.local` (and to Vercel → Environment Variables for production):
+   `GOOGLE_GENERATIVE_AI_API_KEY=...`
+3. Restart the dev server
+
+Alternatives: `OPENAI_API_KEY` or `GROQ_API_KEY` also work (the first key found wins);
+`AI_MODEL` overrides the default model per provider.
+
 ## Deploy to Vercel (free)
 
 1. Push this `admin-portal` folder to a GitHub repository (or use the Vercel CLI)
