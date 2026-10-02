@@ -466,6 +466,7 @@ export async function inviteUser(emailInput: string): Promise<InviteResult> {
 
   try {
     const admin = createAdminClient();
+    const failures: string[] = [];
     // New email → invite (creates the account). Existing account → magic link (re-invite).
     for (const type of ["invite", "magiclink"] as const) {
       const { data, error } = await admin.auth.admin.generateLink({
@@ -491,10 +492,13 @@ export async function inviteUser(emailInput: string): Promise<InviteResult> {
               : "New account created (pending). The link is single-use and expires in 24 hours by default.",
         };
       }
+      failures.push(`${type}: ${error?.message ?? "no token returned"}`);
     }
     return {
       ok: false,
-      error: "Supabase could not create a link for this email",
+      error: `Supabase could not create a link for this email (${failures
+        .join(" | ")
+        .slice(0, 220)})`,
     };
   } catch (err) {
     return {
