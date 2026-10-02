@@ -230,6 +230,10 @@ for (const { csv, list } of CSV_FILES) {
             console.error(`  ! interaction: ${interactionError.message}`);
           }
         }
+      } else {
+        console.warn(
+          `  ! detail file not found for ${name}: ${detailFile} (members + log skipped)`
+        );
       }
     }
 
