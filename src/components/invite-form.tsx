@@ -1,37 +1,62 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Check, Copy, Loader2, Link2 } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { Check, Copy, Loader2, MailPlus, X } from "lucide-react";
 import { inviteUser } from "@/lib/actions";
+import type { UserRole } from "@/lib/types";
 
-export function InviteForm() {
+export function InviteButton() {
+  const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
+  const [role, setRole] = useState<UserRole>("editor");
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<{
-    link: string;
-    note?: string;
+    link?: string;
     emailed?: boolean;
     emailError?: string;
     to?: string;
   } | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    inputRef.current?.focus();
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
+  function openDialog() {
+    setEmail("");
+    setRole("editor");
+    setResult(null);
+    setError("");
+    setCopied(false);
+    setOpen(true);
+  }
 
   function submit() {
     const value = email.trim();
     if (!value || pending) return;
     setError("");
     setResult(null);
-    setCopied(false);
     startTransition(async () => {
-      const res = await inviteUser(value);
+      const res = await inviteUser(value, role);
       if (!res.ok || !res.link) {
-        setError(res.error ?? "Could not create the invite link");
+        setError(res.error ?? "Invite failed");
         return;
       }
       setResult({
         link: res.link,
-        note: res.note,
         emailed: res.emailed,
         emailError: res.emailError,
         to: value,
@@ -41,7 +66,7 @@ export function InviteForm() {
   }
 
   async function copy() {
-    if (!result) return;
+    if (!result?.link) return;
     try {
       await navigator.clipboard.writeText(result.link);
       setCopied(true);
@@ -52,90 +77,156 @@ export function InviteForm() {
   }
 
   return (
-    <div className="mt-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          type="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              submit();
-            }
-          }}
-          placeholder="partner@company.com"
-          aria-label="Partner email"
-          className="input max-w-sm"
-        />
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!email.trim() || pending}
-          className="btn-primary"
-        >
-          {pending ? (
-            <Loader2
-              className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
-              aria-hidden="true"
-            />
-          ) : (
-            <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
-          )}
-          Create invite link
-        </button>
-      </div>
+    <>
+      <button type="button" onClick={openDialog} className="btn-primary">
+        <MailPlus className="h-3.5 w-3.5" aria-hidden="true" />
+        Invite
+      </button>
 
-      {error ? (
-        <p
-          role="alert"
-          className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-[13px] text-rose-700"
-        >
-          {error}
-        </p>
-      ) : null}
+      {open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
+          <button
+            type="button"
+            className="absolute inset-0 bg-zinc-900/30"
+            aria-label="Close"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Invite"
+            className="relative w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl"
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-[13px] font-semibold text-zinc-900">Invite</p>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </div>
 
-      {result ? (
-        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
-          {result.emailed ? (
-            <p className="text-[12px] text-emerald-900">
-              Invite emailed to <strong>{result.to}</strong> — they set their
-              password from the link in the email.
-            </p>
-          ) : (
-            <p className="text-[12px] text-emerald-900">
-              Invite link ready — send it to them via WhatsApp, Slack, or
-              email. They will be asked to set a password when they open it.
-            </p>
-          )}
-          {result.emailError ? (
-            <p className="mt-1 text-[11px] text-amber-800">
-              The email couldn&apos;t be sent ({result.emailError}) — copy the
-              link below and send it yourself.
-            </p>
-          ) : null}
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              readOnly
-              value={result.link}
-              aria-label="Invite link"
-              onFocus={(event) => event.currentTarget.select()}
-              className="input flex-1 bg-white font-mono text-[11px]"
-            />
-            <button type="button" onClick={copy} className="btn-ghost">
-              {copied ? (
-                <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
-              ) : (
-                <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-              )}
-              {copied ? "Copied" : "Copy"}
-            </button>
+            {result ? (
+              <div className="mt-4">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                    <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                  </span>
+                  <p className="min-w-0 truncate text-[13px] text-zinc-800">
+                    Invited <strong>{result.to}</strong>
+                  </p>
+                </div>
+                {result.emailed ? (
+                  <p className="mt-2 text-[11px] text-zinc-500">
+                    Email sent — they set their password from the link.
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-2 text-[11px] text-zinc-500">
+                      {result.emailError
+                        ? `Email failed (${result.emailError}) — share the link:`
+                        : "Share the link:"}
+                    </p>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <input
+                        readOnly
+                        value={result.link ?? ""}
+                        aria-label="Invite link"
+                        onFocus={(event) => event.currentTarget.select()}
+                        className="input flex-1 bg-white font-mono text-[11px]"
+                      />
+                      <button type="button" onClick={copy} className="btn-ghost">
+                        {copied ? (
+                          <Check
+                            className="h-3.5 w-3.5 text-emerald-600"
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                        )}
+                        {copied ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={openDialog}
+                  className="btn-ghost mt-3"
+                >
+                  Invite another
+                </button>
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3">
+                <div>
+                  <label htmlFor="invite-email" className="label">
+                    Email
+                  </label>
+                  <input
+                    ref={inputRef}
+                    id="invite-email"
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        submit();
+                      }
+                    }}
+                    placeholder="name@company.com"
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="invite-role" className="label">
+                    Role
+                  </label>
+                  <select
+                    id="invite-role"
+                    value={role}
+                    onChange={(event) =>
+                      setRole(event.target.value as UserRole)
+                    }
+                    className="input"
+                  >
+                    <option value="editor">Editor</option>
+                    <option value="owner">Owner</option>
+                  </select>
+                </div>
+
+                {error ? (
+                  <p
+                    role="alert"
+                    className="rounded-md bg-rose-50 px-3 py-2 text-[12px] text-rose-700"
+                  >
+                    {error}
+                  </p>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={submit}
+                  disabled={!email.trim() || pending}
+                  className="btn-primary w-full justify-center"
+                >
+                  {pending ? (
+                    <Loader2
+                      className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                  Send invite
+                </button>
+              </div>
+            )}
           </div>
-          {result.note ? (
-            <p className="mt-2 text-[11px] text-emerald-800">{result.note}</p>
-          ) : null}
         </div>
       ) : null}
-    </div>
+    </>
   );
 }

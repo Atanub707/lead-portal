@@ -21,17 +21,12 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
       <header>
-        <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
+        <h1 className="text-lg font-semibold tracking-tight text-zinc-900">
           Dashboard
         </h1>
-        <p className="mt-1 text-[13px] text-zinc-500">
-          {pipelines.length}{" "}
-          {pipelines.length === 1 ? "pipeline" : "pipelines"}, one shared
-          database.
-        </p>
       </header>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {data.map(({ pipeline, counts, recent }, index) => {
           const total = Object.values(counts).reduce((a, b) => a + b, 0);
           const activeStages = pipeline.stages.filter(
@@ -69,10 +64,12 @@ export default async function DashboardPage() {
               <div className="mt-4 grid grid-cols-3 gap-4 border-b border-zinc-100 pb-4">
                 {stats.map(([label, value]) => (
                   <div key={label}>
-                    <p className="text-[22px] font-semibold tracking-tight text-zinc-900 tabular-nums">
+                    <p className="text-[24px] font-semibold tracking-tight text-zinc-900 tabular-nums">
                       {value}
                     </p>
-                    <p className="mt-0.5 text-xs text-zinc-500">{label}</p>
+                    <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-zinc-400">
+                      {label}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -86,7 +83,7 @@ export default async function DashboardPage() {
                       <span className="w-20 shrink-0 text-[12px] text-zinc-500">
                         {STATUS_LABEL[stage]}
                       </span>
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100">
+                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-zinc-100">
                         <div
                           className="h-full rounded-full bg-zinc-900"
                           style={{ width: `${pct}%` }}

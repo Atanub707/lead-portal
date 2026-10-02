@@ -78,12 +78,11 @@ files (members + interaction logs). Safe to re-run — existing companies are sk
 1. Supabase → **Authentication → Sign In / Providers** → turn **OFF**
    "Allow new users to sign up" → Save. From now on nobody can self-create an
    account — partners join only by invitation.
-2. In the portal: **Settings → Invite a partner** → enter their email →
-   **Create invite link**. If `BREVO_API_KEY` + `BREVO_SENDER_EMAIL` are set, the
-   invite is **emailed directly** to them; either way a copyable link appears
-   (share it via WhatsApp/Slack/email). Opening it signs them in and asks them to
-   set a password, then lands them in the app as an **editor**. Links are
-   single-use and expire in 24 hours by default.
+2. In the portal: **Settings → Invite** → email + role → **Send invite**. If
+   `BREVO_API_KEY` + `BREVO_SENDER_EMAIL` are set, the invite is **emailed directly**
+   to them; either way a copyable link appears (share it via WhatsApp/Slack/email).
+   Opening it signs them in and asks them to set a password. Links are single-use
+   and expire in 24 hours by default.
 3. Manage roles or remove users anytime in **Settings** — owner only. Editors can
    add/edit pipeline data; the database (RLS) blocks deletes and role changes.
 

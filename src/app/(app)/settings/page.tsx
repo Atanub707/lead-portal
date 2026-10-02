@@ -1,6 +1,8 @@
+import { Trash2 } from "lucide-react";
 import { ConfirmSubmit } from "@/components/confirm-submit";
-import { InviteForm } from "@/components/invite-form";
-import { removeUser, updateUserRole } from "@/lib/actions";
+import { InviteButton } from "@/components/invite-form";
+import { RoleSelect } from "@/components/role-select";
+import { removeUser } from "@/lib/actions";
 import { getCurrentProfile, getProfiles } from "@/lib/data";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -45,157 +47,116 @@ export default async function SettingsPage({
   const isOwner = profile?.role === "owner";
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
-      <div className="max-w-3xl">
-        <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
+    <div className="mx-auto w-full max-w-[880px] px-4 py-8 sm:px-8">
+      <header className="flex items-center justify-between gap-3">
+        <h1 className="text-lg font-semibold tracking-tight text-zinc-900">
           Settings
         </h1>
-        <p className="mt-1 text-[13px] text-zinc-500">
-          Invite-only workspace. Partners join when the owner invites them.
+        {isOwner ? <InviteButton /> : null}
+      </header>
+
+      {removed ? (
+        <p
+          role="status"
+          className="mt-5 rounded-lg bg-emerald-50 px-3.5 py-2.5 text-[13px] text-emerald-800"
+        >
+          User removed. They lose access immediately.
         </p>
+      ) : null}
+      {removeError ? (
+        <p
+          role="alert"
+          className="mt-5 rounded-lg bg-rose-50 px-3.5 py-2.5 text-[13px] text-rose-700"
+        >
+          {removeError}
+        </p>
+      ) : null}
 
-        {removed ? (
-          <p
-            role="status"
-            className="mt-5 rounded-md bg-emerald-50 px-3 py-2 text-[13px] text-emerald-800"
-          >
-            User removed. They lose access immediately.
-          </p>
-        ) : null}
-        {removeError ? (
-          <p
-            role="alert"
-            className="mt-5 rounded-md bg-rose-50 px-3 py-2 text-[13px] text-rose-700"
-          >
-            {removeError}
-          </p>
-        ) : null}
+      <section className="card mt-6 overflow-hidden">
+        <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-3">
+          <h2 className="text-[13px] font-semibold text-zinc-900">People</h2>
+          <span className="text-[12px] text-zinc-400 tabular-nums">
+            {users.length}
+          </span>
+        </div>
 
-        {isOwner ? (
-          <section className="card mt-6 animate-rise animate-rise-1 p-5">
-            <h2 className="text-[13px] font-semibold text-zinc-900">
-              Invite a partner
-            </h2>
-            <p className="mt-1 text-[12px] text-zinc-500">
-              Create a single-use invite link and send it to them yourself
-              (WhatsApp, Slack, email — whatever is easiest). Opening it signs
-              them in and asks them to set a password. Invited partners join as{" "}
-              <strong>editor</strong>; change roles below anytime.
-            </p>
-            <InviteForm />
-            <p className="mt-2 text-[11px] text-zinc-400">
-              Links expire in 24 hours by default. No email is sent — share the
-              link directly, so Supabase&apos;s email rate limits never block an
-              invite.
-            </p>
-          </section>
-        ) : null}
+        <ul className="divide-y divide-zinc-100">
+          {users.map((user) => {
+            const initial = (user.email ?? "?").charAt(0).toUpperCase();
+            const pending = authMeta?.get(user.id)?.pending;
+            const isSelf = user.id === profile?.id;
 
-        <section className="card mt-6 animate-rise animate-rise-2 p-5">
-          <h2 className="text-[13px] font-semibold text-zinc-900">Users</h2>
-          <p className="mt-1 text-[12px] text-zinc-500">
-            The owner can invite, remove, and change roles. Editors can add and
-            edit pipeline data; the database blocks everything else.
-          </p>
-
-          <div className="mt-3 divide-y divide-zinc-100">
-            {users.map((user) => {
-              const initial = (user.email ?? "?").charAt(0).toUpperCase();
-              const pending = authMeta?.get(user.id)?.pending;
-              const isSelf = user.id === profile?.id;
-
-              return (
-                <div
-                  key={user.id}
-                  className="flex flex-wrap items-center justify-between gap-3 py-3"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-600">
-                      {initial}
-                    </span>
-                    <div>
-                      <p className="text-[13px] text-zinc-800">
-                        {user.email ?? user.id}
-                        {isSelf ? (
-                          <span className="ml-2 text-[11px] text-zinc-400">
-                            (you)
-                          </span>
-                        ) : null}
-                      </p>
-                      <div className="flex items-center gap-2 text-[11px] text-zinc-500">
-                        {authMeta ? (
-                          pending ? (
-                            <span className="inline-flex items-center gap-1 text-amber-700">
-                              <span
-                                className="h-1 w-1 rounded-full bg-amber-500"
-                                aria-hidden="true"
-                              />
-                              Pending invite
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-emerald-700">
-                              <span
-                                className="h-1 w-1 rounded-full bg-emerald-500"
-                                aria-hidden="true"
-                              />
-                              Active
-                            </span>
-                          )
-                        ) : null}
-                        <span className="tabular-nums">
-                          Joined{" "}
-                          {new Date(user.created_at)
-                            .toISOString()
-                            .slice(0, 10)}
+            return (
+              <li
+                key={user.id}
+                className="flex items-center justify-between gap-3 px-5 py-3.5"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[11px] font-semibold text-zinc-600">
+                    {initial}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-medium text-zinc-900">
+                      {user.email ?? user.id}
+                      {isSelf ? (
+                        <span className="ml-1.5 text-[11px] font-normal text-zinc-400">
+                          you
                         </span>
-                      </div>
-                    </div>
+                      ) : null}
+                    </p>
+                    <p className="text-[11px] text-zinc-500">
+                      {authMeta
+                        ? pending
+                          ? "Pending invite"
+                          : "Active"
+                        : "Joined"}
+                      <span className="mx-1.5 text-zinc-300">·</span>
+                      <span className="tabular-nums">
+                        {new Date(user.created_at).toISOString().slice(0, 10)}
+                      </span>
+                    </p>
                   </div>
+                </div>
 
+                <div className="flex shrink-0 items-center gap-2">
                   {isOwner ? (
-                    <div className="flex items-center gap-3">
-                      <form
-                        action={updateUserRole}
-                        className="flex items-center gap-2"
-                      >
-                        <input type="hidden" name="user_id" value={user.id} />
-                        <select
-                          name="role"
-                          defaultValue={user.role}
-                          aria-label={`Role for ${user.email ?? user.id}`}
-                          className="input w-32"
-                        >
-                          <option value="editor">Editor</option>
-                          <option value="owner">Owner</option>
-                        </select>
-                        <button type="submit" className="btn-ghost">
-                          Save
-                        </button>
-                      </form>
+                    <>
+                      <RoleSelect userId={user.id} role={user.role} />
                       {!isSelf ? (
                         <form action={removeUser}>
-                          <input type="hidden" name="user_id" value={user.id} />
+                          <input
+                            type="hidden"
+                            name="user_id"
+                            value={user.id}
+                          />
                           <ConfirmSubmit
-                            message={`Remove ${user.email ?? "this user"}? They lose access immediately.`}
+                            message={`Remove ${
+                              user.email ?? "this user"
+                            }? They lose access immediately.`}
                             confirmLabel="Remove"
-                            className="text-[11px] text-zinc-400 transition-colors hover:text-rose-600"
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
                           >
-                            Remove
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            <span className="sr-only">
+                              Remove {user.email ?? "user"}
+                            </span>
                           </ConfirmSubmit>
                         </form>
-                      ) : null}
-                    </div>
+                      ) : (
+                        <span className="w-7" aria-hidden="true" />
+                      )}
+                    </>
                   ) : (
-                    <span className="text-[12px] font-medium capitalize text-zinc-600">
+                    <span className="text-[12px] font-medium capitalize text-zinc-500">
                       {user.role}
                     </span>
                   )}
                 </div>
-              );
-            })}
-          </div>
-        </section>
-      </div>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
     </div>
   );
 }

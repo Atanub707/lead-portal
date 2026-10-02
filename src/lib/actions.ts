@@ -441,8 +441,12 @@ async function sendInviteEmail(
   }
 }
 
-export async function inviteUser(emailInput: string): Promise<InviteResult> {
+export async function inviteUser(
+  emailInput: string,
+  role: UserRole = "editor"
+): Promise<InviteResult> {
   const email = emailInput.trim().toLowerCase();
+  const safeRole: UserRole = role === "owner" ? "owner" : "editor";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { ok: false, error: "Enter a valid email address" };
   }
@@ -476,6 +480,14 @@ export async function inviteUser(emailInput: string): Promise<InviteResult> {
       });
       const properties = data?.properties;
       if (!error && properties?.hashed_token) {
+        // Invite with the chosen role from the start.
+        const invitedUserId = data?.user?.id;
+        if (invitedUserId) {
+          await admin
+            .from("profiles")
+            .update({ role: safeRole })
+            .eq("id", invitedUserId);
+        }
         const link = `${base}/auth/callback?token_hash=${encodeURIComponent(
           properties.hashed_token
         )}&type=${properties.verification_type ?? type}&next=/welcome`;
@@ -539,20 +551,22 @@ export async function removeUser(formData: FormData) {
   redirect("/settings?removed=1");
 }
 
-export async function updateUserRole(formData: FormData) {
+export async function updateUserRole(
+  userId: string,
+  role: UserRole
+): Promise<{ ok: boolean; message?: string }> {
   const supabase = await assertOwner();
-  const userId = field(formData, "user_id");
-  const role = field(formData, "role");
   if (!userId || (role !== "owner" && role !== "editor")) {
-    throw new Error("Invalid role update");
+    return { ok: false, message: "Invalid role update" };
   }
 
   const { error } = await supabase
     .from("profiles")
     .update({ role: role as UserRole })
     .eq("id", userId);
-  if (error) throw new Error(error.message);
+  if (error) return { ok: false, message: error.message };
   revalidatePath("/settings");
+  return { ok: true };
 }
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
