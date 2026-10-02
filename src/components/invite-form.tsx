@@ -7,9 +7,13 @@ import { inviteUser } from "@/lib/actions";
 export function InviteForm() {
   const [email, setEmail] = useState("");
   const [pending, startTransition] = useTransition();
-  const [result, setResult] = useState<{ link: string; note?: string } | null>(
-    null
-  );
+  const [result, setResult] = useState<{
+    link: string;
+    note?: string;
+    emailed?: boolean;
+    emailError?: string;
+    to?: string;
+  } | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -25,7 +29,13 @@ export function InviteForm() {
         setError(res.error ?? "Could not create the invite link");
         return;
       }
-      setResult({ link: res.link, note: res.note });
+      setResult({
+        link: res.link,
+        note: res.note,
+        emailed: res.emailed,
+        emailError: res.emailError,
+        to: value,
+      });
       setEmail("");
     });
   }
@@ -87,10 +97,23 @@ export function InviteForm() {
 
       {result ? (
         <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
-          <p className="text-[12px] text-emerald-900">
-            Invite link ready — send it to them via WhatsApp, Slack, or email.
-            They will be asked to set a password when they open it.
-          </p>
+          {result.emailed ? (
+            <p className="text-[12px] text-emerald-900">
+              Invite emailed to <strong>{result.to}</strong> — they set their
+              password from the link in the email.
+            </p>
+          ) : (
+            <p className="text-[12px] text-emerald-900">
+              Invite link ready — send it to them via WhatsApp, Slack, or
+              email. They will be asked to set a password when they open it.
+            </p>
+          )}
+          {result.emailError ? (
+            <p className="mt-1 text-[11px] text-amber-800">
+              The email couldn&apos;t be sent ({result.emailError}) — copy the
+              link below and send it yourself.
+            </p>
+          ) : null}
           <div className="mt-2 flex items-center gap-2">
             <input
               readOnly

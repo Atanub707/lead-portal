@@ -79,16 +79,18 @@ files (members + interaction logs). Safe to re-run — existing companies are sk
    "Allow new users to sign up" → Save. From now on nobody can self-create an
    account — partners join only by invitation.
 2. In the portal: **Settings → Invite a partner** → enter their email →
-   **Create invite link** → **Copy**. Send the link to them however you like
-   (WhatsApp, Slack, email). Opening it signs them in and asks them to set a
-   password, then lands them in the app as an **editor**. No email is sent and
-   nothing is rate-limited; links are single-use and expire in 24 hours by default.
+   **Create invite link**. If `BREVO_API_KEY` + `BREVO_SENDER_EMAIL` are set, the
+   invite is **emailed directly** to them; either way a copyable link appears
+   (share it via WhatsApp/Slack/email). Opening it signs them in and asks them to
+   set a password, then lands them in the app as an **editor**. Links are
+   single-use and expire in 24 hours by default.
 3. Manage roles or remove users anytime in **Settings** — owner only. Editors can
    add/edit pipeline data; the database (RLS) blocks deletes and role changes.
 
-> Prefer automatic invite emails? That needs custom SMTP (free tiers: Resend,
-> Brevo) in **Authentication → SMTP** — but the copyable link works without it
-> and never hits Supabase's built-in email rate limits.
+> **Direct email invites:** brevo.com → free account (300 emails/day) → verify
+> your sender email → **SMTP & API → API Keys** → add `BREVO_API_KEY` and
+> `BREVO_SENDER_EMAIL` to `.env.local` and Vercel. If email fails for any reason,
+> the copied link always works.
 
 ## AI assistant ("Paste URL with AI")
 

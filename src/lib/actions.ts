@@ -389,7 +389,56 @@ export interface InviteResult {
   ok: boolean;
   link?: string;
   note?: string;
+  emailed?: boolean;
+  emailError?: string;
   error?: string;
+}
+
+async function sendInviteEmail(
+  to: string,
+  link: string
+): Promise<{ sent: boolean; error?: string }> {
+  const apiKey = process.env.BREVO_API_KEY?.trim();
+  const senderEmail = process.env.BREVO_SENDER_EMAIL?.trim();
+  if (!apiKey || !senderEmail) return { sent: false };
+
+  const senderName = process.env.BREVO_SENDER_NAME?.trim() || "Lead Portal";
+  try {
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "api-key": apiKey,
+        "Content-Type": "application/json",
+        accept: "application/json",
+      },
+      body: JSON.stringify({
+        sender: { name: senderName, email: senderEmail },
+        to: [{ email: to }],
+        subject: "You've been invited to Lead Portal",
+        htmlContent: `<div style="font-family:Inter,Arial,sans-serif;font-size:14px;color:#27272a;line-height:1.6">
+<p>Hi,</p>
+<p>You've been invited to <strong>Lead Portal</strong> — the team's pipeline for company research and outreach.</p>
+<p><a href="${link}" style="display:inline-block;background:#18181b;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:8px">Set your password &amp; join</a></p>
+<p style="color:#71717a;font-size:12px">This link works once and expires in 24 hours. If you weren't expecting this, you can ignore this email.</p>
+</div>`,
+        textContent: `You've been invited to Lead Portal.\n\nSet your password (link works once, expires in 24 hours):\n${link}\n`,
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      return {
+        sent: false,
+        error: `Email service ${res.status}: ${text.slice(0, 160)}`,
+      };
+    }
+    return { sent: true };
+  } catch (err) {
+    return {
+      sent: false,
+      error: err instanceof Error ? err.message : "Email could not be sent",
+    };
+  }
 }
 
 export async function inviteUser(emailInput: string): Promise<InviteResult> {
@@ -429,10 +478,13 @@ export async function inviteUser(emailInput: string): Promise<InviteResult> {
         const link = `${base}/auth/callback?token_hash=${encodeURIComponent(
           properties.hashed_token
         )}&type=${properties.verification_type ?? type}&next=/welcome`;
+        const emailResult = await sendInviteEmail(email, link);
         revalidatePath("/settings");
         return {
           ok: true,
           link,
+          emailed: emailResult.sent,
+          emailError: emailResult.error,
           note:
             properties.verification_type === "magiclink"
               ? "This email already has an account — the link signs them straight in."
