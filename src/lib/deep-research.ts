@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { startActorRun } from "./apify";
+import { getActorRun, getDatasetItems, startActorRun } from "./apify";
+import { matchEmailToContact } from "./match";
+import { isDecisionTitle, isGenericEmail } from "./people";
 import { createAdminClient } from "./supabase/admin";
 
 export interface NormalizedLead {
@@ -301,4 +303,304 @@ export async function startDeepResearch(
     .eq("id", run.id);
 
   return { ok: true, runId: run.id as number };
+}
+
+// ─── Reconcile (poll Apify, fetch, normalize, merge, finalize) ───────────────
+
+export interface DeepResearchSummary {
+  people: number;
+  emails: number;
+  cost: number;
+}
+
+export type ReconcileDeepResearchResult =
+  | { ok: true; status: "running" }
+  | { ok: true; status: "ok" | "failed"; summary: DeepResearchSummary };
+
+interface DeepResearchActorRef {
+  slug: string;
+  runId: string;
+  datasetId: string;
+}
+
+const TERMINAL_RUN_STATUSES = new Set([
+  "SUCCEEDED",
+  "FAILED",
+  "ABORTED",
+  "TIMED-OUT",
+]);
+
+function actorNormalizer(slug: string): ((raw: unknown) => NormalizedLead | null) | null {
+  if (slug === APOLLO_ACTOR) return normalizeApolloLead;
+  if (slug === LINKEDIN_EMPLOYEES_ACTOR) return normalizeLinkedInEmployee;
+  return null;
+}
+
+export async function reconcileDeepResearch(
+  supabase: SupabaseClient,
+  runId: number
+): Promise<ReconcileDeepResearchResult> {
+  const { data: run } = await supabase
+    .from("enrichment_runs")
+    .select("*")
+    .eq("id", runId)
+    .maybeSingle();
+  if (!run) throw new Error("Deep research run not found");
+
+  // A concurrent GET (another tab) may have already finalized this run.
+  if (run.status !== "running") {
+    return {
+      ok: true,
+      status: run.status === "ok" ? "ok" : "failed",
+      summary: {
+        people: Number(run.people_found ?? 0),
+        emails: Number(run.emails_found ?? 0),
+        cost: Number(run.cost_usd ?? 0),
+      },
+    };
+  }
+
+  const actorRefs = ((run.details?.actors ?? []) as DeepResearchActorRef[]).filter(
+    (actor) => actor?.runId
+  );
+  // The POST inserts the row before actors are persisted; leave it running until
+  // the run ids land (or the GET timeout marks it failed).
+  if (actorRefs.length === 0) return { ok: true, status: "running" };
+
+  const infos = await Promise.all(actorRefs.map((actor) => getActorRun(actor.runId)));
+  if (infos.some((info) => !TERMINAL_RUN_STATUSES.has(info.status))) {
+    return { ok: true, status: "running" };
+  }
+
+  const leads: DeepResearchLead[] = [];
+  for (let i = 0; i < actorRefs.length; i += 1) {
+    const info = infos[i];
+    if (info.status !== "SUCCEEDED") continue;
+    const normalize = actorNormalizer(actorRefs[i].slug);
+    if (!normalize) continue;
+    const items = await getDatasetItems(info.datasetId || actorRefs[i].datasetId, 100);
+    for (const item of items) {
+      const lead = normalize(item);
+      if (lead) {
+        leads.push({
+          lead,
+          source: actorRefs[i].slug === APOLLO_ACTOR ? "apollo" : "linkedin",
+        });
+      }
+    }
+  }
+
+  const succeeded = infos.filter((info) => info.status === "SUCCEEDED").length;
+  const cost = infos.reduce((sum, info) => sum + info.usageTotalUsd, 0);
+  const { people, emails, company } = await mergeLeads(supabase, {
+    orgId: run.org_id as number,
+    userId: (run.created_by as string | null) ?? null,
+    leads,
+  });
+
+  const status = succeeded > 0 ? "ok" : "failed";
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("enrichment_runs")
+    .update({
+      status,
+      people_found: people,
+      emails_found: emails,
+      cost_usd: cost,
+      details: { actors: actorRefs, company, found: { people, emails } },
+    })
+    .eq("id", run.id);
+  if (error) throw new Error(error.message);
+
+  return { ok: true, status, summary: { people, emails, cost } };
+}
+
+// ─── Merge (dedupe + insert contacts/emails + fill empty org fields) ─────────
+
+export interface DeepResearchLead {
+  lead: NormalizedLead;
+  source: "apollo" | "linkedin";
+}
+
+export interface MergedCompanyFacts {
+  phone: string | null;
+  address: string | null;
+  founded: number | null;
+  employees: number | null;
+  linkedin_url: string | null;
+}
+
+export interface MergeLeadsResult {
+  people: number;
+  emails: number;
+  company: MergedCompanyFacts;
+}
+
+function nameKey(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function linkKey(url: string | null): string {
+  return (url ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function emailKey(email: string | null): string | null {
+  return email ? email.trim().toLowerCase() : null;
+}
+
+export async function mergeLeads(
+  supabase: SupabaseClient,
+  opts: { orgId: number; userId: string | null; leads: DeepResearchLead[] }
+): Promise<MergeLeadsResult> {
+  const { orgId, userId, leads } = opts;
+
+  const [contactsRes, companyEmailsRes, orgRes] = await Promise.all([
+    supabase.from("contacts").select("name, linkedin_url, email").eq("org_id", orgId),
+    supabase.from("company_emails").select("email").eq("org_id", orgId),
+    supabase.from("organizations").select("linkedin_url").eq("id", orgId).maybeSingle(),
+  ]);
+
+  const existingContacts = (contactsRes.data ?? []) as {
+    name: string;
+    linkedin_url: string | null;
+    email: string | null;
+  }[];
+  const existingCompanyEmails = (companyEmailsRes.data ?? []) as { email: string }[];
+
+  const seenNames = new Set(existingContacts.map((contact) => nameKey(contact.name)));
+  const seenLinks = new Set(
+    existingContacts.map((contact) => linkKey(contact.linkedin_url)).filter(Boolean)
+  );
+  const contactEmails = new Set(
+    existingContacts
+      .map((contact) => emailKey(contact.email))
+      .filter((email): email is string => Boolean(email))
+  );
+  const knownEmails = new Set([
+    ...contactEmails,
+    ...existingCompanyEmails.map((row) => row.email.toLowerCase()),
+  ]);
+
+  // Firmographic extras ride on the run details only; first non-null wins.
+  const company: MergedCompanyFacts = {
+    phone: null,
+    address: null,
+    founded: null,
+    employees: null,
+    linkedin_url: null,
+  };
+  for (const { lead } of leads) {
+    if (!company.phone) company.phone = lead.companyPhone;
+    if (!company.address) company.address = lead.companyAddress;
+    if (company.founded === null) company.founded = lead.companyFounded;
+    if (company.employees === null) company.employees = lead.employeeCount;
+    if (!company.linkedin_url) company.linkedin_url = lead.companyLinkedinUrl;
+  }
+
+  const newContacts: Record<string, unknown>[] = [];
+  const newCompanyEmails = new Map<string, "general" | "personal">();
+  let contactEmailCount = 0;
+
+  for (const { lead, source } of leads) {
+    const byName = nameKey(lead.name);
+    const byLink = linkKey(lead.linkedinUrl);
+    const email = emailKey(lead.email);
+    const local = email?.split("@")[0] ?? null;
+    const generic = local ? isGenericEmail(local) : false;
+
+    const duplicate =
+      (byLink !== "" && seenLinks.has(byLink)) ||
+      seenNames.has(byName) ||
+      (email !== null &&
+        (contactEmails.has(email) ||
+          matchEmailToContact(lead.name, [...contactEmails]) !== null));
+
+    if (!duplicate) {
+      // Generic inboxes are company reach, never a person's email.
+      const contactEmail = email && !generic ? email : null;
+      newContacts.push({
+        org_id: orgId,
+        name: lead.name,
+        title: lead.title,
+        linkedin_url: lead.linkedinUrl,
+        email: contactEmail,
+        phone: lead.phone,
+        source,
+        is_decision_maker: isDecisionTitle(lead.title),
+        email_status: contactEmail ? "found" : null,
+        created_by: userId,
+      });
+      seenNames.add(byName);
+      if (byLink) seenLinks.add(byLink);
+      if (contactEmail) {
+        contactEmails.add(contactEmail);
+        knownEmails.add(contactEmail);
+        contactEmailCount += 1;
+      }
+      if (email && generic && !knownEmails.has(email)) {
+        newCompanyEmails.set(email, "general");
+        knownEmails.add(email);
+      }
+      continue;
+    }
+
+    // Duplicate person: a new email is still reachable company data.
+    if (email && !knownEmails.has(email)) {
+      newCompanyEmails.set(email, generic ? "general" : "personal");
+      knownEmails.add(email);
+    }
+  }
+
+  if (newContacts.length > 0) {
+    let { error } = await supabase.from("contacts").insert(newContacts);
+    if (error && /created_by/.test(error.message)) {
+      // Attribution column not migrated yet — insert without it so people still land.
+      const stripped = newContacts.map((row) => {
+        const copy = { ...row };
+        delete copy.created_by;
+        return copy;
+      });
+      ({ error } = await supabase.from("contacts").insert(stripped));
+    }
+    if (error) {
+      console.error("[deep-research] contact insert failed:", error.message);
+      throw new Error("Couldn't save researched contacts.");
+    }
+  }
+
+  let companyEmailCount = 0;
+  if (newCompanyEmails.size > 0) {
+    const rows = [...newCompanyEmails].map(([email, kind]) => ({
+      org_id: orgId,
+      email,
+      kind,
+      source: "apollo",
+    }));
+    const { error } = await supabase
+      .from("company_emails")
+      .upsert(rows, { onConflict: "org_id,email", ignoreDuplicates: true });
+    if (error) {
+      console.error("[deep-research] company email insert failed:", error.message);
+      throw new Error("Couldn't save researched emails.");
+    }
+    companyEmailCount = rows.length;
+  }
+
+  const orgLinkedin =
+    ((orgRes.data as { linkedin_url: string | null } | null)?.linkedin_url) ?? null;
+  if (!orgLinkedin && company.linkedin_url) {
+    const { error } = await supabase
+      .from("organizations")
+      .update({ linkedin_url: company.linkedin_url, linkedin_source: "apollo" })
+      .eq("id", orgId);
+    if (error) {
+      console.error("[deep-research] org linkedin fill failed:", error.message);
+    }
+  }
+
+  return {
+    people: newContacts.length,
+    emails: contactEmailCount + companyEmailCount,
+    company,
+  };
 }
