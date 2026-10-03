@@ -5,6 +5,7 @@ import {
   type CompanyEmail,
   type Contact,
   type EnrichmentRun,
+  type EnrichmentRunWithOrg,
   type Interaction,
   type InteractionWithOrg,
   type OrgList,
@@ -12,6 +13,110 @@ import {
   type Pipeline,
   type Profile,
 } from "./types";
+
+// id -> display label for attribution ("who added this").
+async function userLabels(): Promise<
+  Map<string, { label: string; email: string | null }>
+> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, email, full_name");
+  const map = new Map<string, { label: string; email: string | null }>();
+  for (const profile of data ?? []) {
+    const firstWord = (profile.full_name ?? "").trim().split(/\s+/)[0];
+    const label =
+      firstWord || (profile.email ? profile.email.split("@")[0] : "Someone");
+    map.set(profile.id, { label, email: profile.email ?? null });
+  }
+  return map;
+}
+
+export async function getDashboardStats(): Promise<{
+  totalCompanies: number;
+  perList: Record<string, number>;
+  people: number;
+  decisionMakers: number;
+  emails: number;
+  followUps: { overdue: number; today: number; soon: number };
+}> {
+  const supabase = await createClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const soon = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+
+  const [orgs, contacts, companyEmails] = await Promise.all([
+    supabase.from("organizations").select("list, follow_up_on"),
+    supabase.from("contacts").select("email, is_decision_maker"),
+    supabase.from("company_emails").select("id"),
+  ]);
+
+  const orgRows = (orgs.data ?? []) as {
+    list: string;
+    follow_up_on: string | null;
+  }[];
+  const contactRows = (contacts.data ?? []) as {
+    email: string | null;
+    is_decision_maker: boolean;
+  }[];
+
+  const perList: Record<string, number> = {};
+  let overdue = 0;
+  let dueToday = 0;
+  let dueSoon = 0;
+  for (const org of orgRows) {
+    perList[org.list] = (perList[org.list] ?? 0) + 1;
+    if (!org.follow_up_on) continue;
+    if (org.follow_up_on < today) overdue += 1;
+    else if (org.follow_up_on === today) dueToday += 1;
+    else if (org.follow_up_on <= soon) dueSoon += 1;
+  }
+
+  return {
+    totalCompanies: orgRows.length,
+    perList,
+    people: contactRows.length,
+    decisionMakers: contactRows.filter((c) => c.is_decision_maker).length,
+    emails:
+      contactRows.filter((c) => c.email).length +
+      (companyEmails.data?.length ?? 0),
+    followUps: { overdue, today: dueToday, soon: dueSoon },
+  };
+}
+
+export interface FollowUpItem {
+  id: number;
+  name: string;
+  list: OrgList;
+  follow_up_on: string;
+  follow_up_note: string | null;
+}
+
+export async function getUpcomingFollowUps(
+  limit = 6
+): Promise<FollowUpItem[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("id, name, list, follow_up_on, follow_up_note")
+    .not("follow_up_on", "is", null)
+    .order("follow_up_on")
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as FollowUpItem[];
+}
+
+export async function getRecentRuns(limit = 5): Promise<EnrichmentRunWithOrg[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("enrichment_runs")
+    .select("*, organizations!inner(name, list)")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as EnrichmentRunWithOrg[];
+}
 
 export async function getPipelines(): Promise<Pipeline[]> {
   const supabase = await createClient();
@@ -32,6 +137,8 @@ export interface CompanyRow extends Organization {
   decision_maker_count: number;
   email_count: number;
   first_email: string | null;
+  created_by_name: string | null;
+  created_by_email: string | null;
 }
 
 export async function getCompanies(opts: {
@@ -123,6 +230,8 @@ export async function getCompanies(opts: {
     }
   }
 
+  const labels = rows.length > 0 ? await userLabels() : new Map();
+
   const enriched: CompanyRow[] = rows.map((row) => {
     const entry = stats.get(row.id) ?? {
       people: 0,
@@ -136,6 +245,12 @@ export async function getCompanies(opts: {
       decision_maker_count: entry.decisionMakers,
       email_count: entry.emails,
       first_email: entry.firstEmail,
+      created_by_name: row.created_by
+        ? (labels.get(row.created_by)?.label ?? null)
+        : null,
+      created_by_email: row.created_by
+        ? (labels.get(row.created_by)?.email ?? null)
+        : null,
     };
   });
 

@@ -367,6 +367,7 @@ export async function POST(req: Request) {
         kind: extracted.kind,
         status: "new",
         notes: extracted.description.trim() || null,
+        created_by: userId,
       })
       .select("id, name")
       .single();
@@ -437,6 +438,7 @@ export async function POST(req: Request) {
         source: "website",
         is_decision_maker: DECISION_TITLE.test(contact.title),
         email_status: contact.email ? "found" : null,
+        created_by: userId,
       }))
     );
     if (!error) contactsAdded = toAdd.length;

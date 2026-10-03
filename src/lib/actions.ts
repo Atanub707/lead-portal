@@ -249,6 +249,7 @@ export async function createPipeline(formData: FormData) {
 // ─── Contacts ────────────────────────────────────────────────────────────────
 
 export async function addContact(formData: FormData) {
+  const { userId } = await auth();
   const supabase = await createClient();
   const orgId = Number(field(formData, "org_id"));
   const name = field(formData, "name");
@@ -262,6 +263,7 @@ export async function addContact(formData: FormData) {
     email: field(formData, "email"),
     phone: field(formData, "phone"),
     notes: field(formData, "notes"),
+    created_by: userId ?? null,
   });
 
   if (error) throw new Error(error.message);

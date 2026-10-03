@@ -92,6 +92,7 @@ export interface Organization {
   bookmarked: boolean;
   follow_up_on: string | null;
   follow_up_note: string | null;
+  created_by: string | null;
   created_at: string;
 }
 
@@ -119,6 +120,10 @@ export interface EnrichmentRun {
   created_at: string;
 }
 
+export interface EnrichmentRunWithOrg extends EnrichmentRun {
+  organizations: { name: string; list: OrgList } | null;
+}
+
 export interface Contact {
   id: number;
   org_id: number;
@@ -132,6 +137,7 @@ export interface Contact {
   is_decision_maker: boolean;
   email_status: string | null;
   source: string | null;
+  created_by: string | null;
   created_at: string;
 }
 

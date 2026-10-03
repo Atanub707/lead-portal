@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lead Portal — Dashboard (mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    body { background: #f7f7f8; }
+    .card { border-radius: 12px; border: 1px solid rgb(228 228 231 / 0.8); background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 0.03); }
+    .micro { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; color: #a1a1aa; }
+    @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .rise { animation: rise 200ms ease-out both; }
+    .d1 { animation-delay: 30ms; } .d2 { animation-delay: 60ms; } .d3 { animation-delay: 90ms; } .d4 { animation-delay: 120ms; }
+    @media (prefers-reduced-motion: reduce) { .rise { animation: none; } }
+    .row:hover { background: #fafafa; }
+  </style>
+</head>
+<body class="text-zinc-900">
+  <div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <aside class="hidden w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-[#fafafa] lg:flex">
+      <div class="flex h-14 items-center gap-2.5 border-b border-zinc-200/80 px-4">
+        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-zinc-900 text-[11px] font-bold text-white">L</span>
+        <p class="text-[13px] font-semibold">Lead Portal</p>
+      </div>
+      <nav class="flex-1 space-y-0.5 px-2 py-3">
+        <a class="flex h-8 items-center gap-2 rounded-md bg-zinc-100 px-2 text-[13px] font-medium text-zinc-900">Dashboard</a>
+        <p class="px-2 pb-1 pt-4 text-[11px] font-medium uppercase tracking-wide text-zinc-400">Pipelines</p>
+        <a class="flex h-8 items-center gap-2 rounded-md px-2 text-[13px] text-zinc-600">POS</a>
+        <a class="flex h-8 items-center gap-2 rounded-md px-2 text-[13px] text-zinc-600">Compliance</a>
+        <a class="flex h-8 items-center gap-2 rounded-md px-2 text-[13px] text-zinc-400">+ New pipeline</a>
+        <p class="px-2 pb-1 pt-4 text-[11px] font-medium uppercase tracking-wide text-zinc-400">Admin</p>
+        <a class="flex h-8 items-center gap-2 rounded-md px-2 text-[13px] text-zinc-600">Settings</a>
+      </nav>
+      <div class="border-t border-zinc-200/80 p-3">
+        <p class="truncate text-[12px] text-zinc-600">atanub707@gmail.com</p>
+        <p class="text-[11px] capitalize text-zinc-400">owner</p>
+      </div>
+    </aside>
+
+    <main class="flex-1">
+      <div class="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
+        <header class="flex items-end justify-between gap-3">
+          <h1 class="text-lg font-semibold tracking-tight">Dashboard</h1>
+        </header>
+
+        <!-- KPI row -->
+        <div class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div class="card rise d1 p-5">
+            <p class="micro">Companies</p>
+            <p class="mt-2 text-[26px] font-semibold tracking-tight tabular-nums">18</p>
+            <p class="mt-1 text-[12px] text-zinc-500">14 POS · 4 Compliance</p>
+          </div>
+          <div class="card rise d2 p-5">
+            <p class="micro">People</p>
+            <p class="mt-2 text-[26px] font-semibold tracking-tight tabular-nums">39</p>
+            <p class="mt-1 text-[12px] text-zinc-500"><span class="font-medium text-amber-700">22 decision makers</span></p>
+          </div>
+          <div class="card rise d3 p-5">
+            <p class="micro">Emails found</p>
+            <p class="mt-2 text-[26px] font-semibold tracking-tight tabular-nums">31</p>
+            <p class="mt-1 text-[12px] text-zinc-500">company + personal</p>
+          </div>
+          <div class="card rise d4 p-5">
+            <p class="micro">Follow-ups due</p>
+            <p class="mt-2 text-[26px] font-semibold tracking-tight tabular-nums">3</p>
+            <p class="mt-1 text-[12px] text-rose-600">1 overdue · 1 today · 1 this week</p>
+          </div>
+        </div>
+
+        <div class="mt-5 grid gap-5 lg:grid-cols-[1fr_360px]">
+          <!-- Pipeline cards -->
+          <div class="space-y-5">
+            <!-- POS -->
+            <section class="card rise d2 p-5">
+              <div class="flex items-center justify-between">
+                <h2 class="text-[13px] font-semibold">POS Pipeline</h2>
+                <a class="text-[12px] text-zinc-500 hover:text-zinc-900" href="#">Open →</a>
+              </div>
+              <div class="mt-4 grid grid-cols-3 gap-4 border-b border-zinc-100 pb-4">
+                <div><p class="text-[24px] font-semibold tracking-tight tabular-nums">14</p><p class="micro mt-1">Total</p></div>
+                <div><p class="text-[24px] font-semibold tracking-tight tabular-nums">6</p><p class="micro mt-1">Active</p></div>
+                <div><p class="text-[24px] font-semibold tracking-tight tabular-nums">2</p><p class="micro mt-1">Won</p></div>
+              </div>
+              <div class="mt-4 space-y-2.5">
+                <div class="flex items-center gap-3"><span class="w-20 text-[12px] text-zinc-500">New</span><div class="h-1 flex-1 overflow-hidden rounded-full bg-zinc-100"><div class="h-full rounded-full bg-zinc-900" style="width:36%"></div></div><span class="w-6 text-right text-[12px] tabular-nums text-zinc-700">5</span></div>
+                <div class="flex items-center gap-3"><span class="w-20 text-[12px] text-zinc-500">Contacted</span><div class="h-1 flex-1 overflow-hidden rounded-full bg-zinc-100"><div class="h-full rounded-full bg-zinc-900" style="width:29%"></div></div><span class="w-6 text-right text-[12px] tabular-nums text-zinc-700">4</span></div>
+                <div class="flex items-center gap-3"><span class="w-20 text-[12px] text-zinc-500">Demo</span><div class="h-1 flex-1 overflow-hidden rounded-full bg-zinc-100"><div class="h-full rounded-full bg-zinc-900" style="width:14%"></div></div><span class="w-6 text-right text-[12px] tabular-nums text-zinc-700">2</span></div>
+                <div class="flex items-center gap-3"><span class="w-20 text-[12px] text-zinc-500">Won</span><div class="h-1 flex-1 overflow-hidden rounded-full bg-zinc-100"><div class="h-full rounded-full bg-zinc-900" style="width:14%"></div></div><span class="w-6 text-right text-[12px] tabular-nums text-zinc-700">2</span></div>
+                <div class="flex items-center gap-3"><span class="w-20 text-[12px] text-zinc-500">Lost</span><div class="h-1 flex-1 overflow-hidden rounded-full bg-zinc-100"><div class="h-full rounded-full bg-zinc-900" style="width:7%"></div></div><span class="w-6 text-right text-[12px] tabular-nums text-zinc-700">1</span></div>
+              </div>
+              <div class="mt-5 border-t border-zinc-100 pt-4">
+                <p class="micro">Recent activity</p>
+                <ul class="mt-3 space-y-3">
+                  <li class="flex gap-3"><span class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-300"></span><div class="min-w-0"><a class="text-[13px] font-medium text-zinc-800 hover:text-zinc-950" href="#">Pausa</a><p class="truncate text-[12px] text-zinc-500">Intro call booked for Thursday · Call</p><p class="text-[11px] text-zinc-400">2026-10-03</p></div></li>
+                  <li class="flex gap-3"><span class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-300"></span><div class="min-w-0"><a class="text-[13px] font-medium text-zinc-800 hover:text-zinc-950" href="#">Zaplar</a><p class="truncate text-[12px] text-zinc-500">Pricing follow-up sent · Email</p><p class="text-[11px] text-zinc-400">2026-10-02</p></div></li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- Compliance -->
+            <section class="card rise d3 p-5">
+              <div class="flex items-center justify-between">
+                <h2 class="text-[13px] font-semibold">Compliance Pipeline</h2>
+                <a class="text-[12px] text-zinc-500 hover:text-zinc-900" href="#">Open →</a>
+              </div>
+              <div class="mt-4 grid grid-cols-3 gap-4 border-b border-zinc-100 pb-4">
+                <div><p class="text-[24px] font-semibold tracking-tight tabular-nums">4</p><p class="micro mt-1">Total</p></div>
+                <div><p class="text-[24px] font-semibold tracking-tight tabular-nums">2</p><p class="micro mt-1">Active</p></div>
+                <div><p class="text-[24px] font-semibold tracking-tight tabular-nums">0</p><p class="micro mt-1">Won</p></div>
+              </div>
+              <div class="mt-4 space-y-2.5">
+                <div class="flex items-center gap-3"><span class="w-20 text-[12px] text-zinc-500">New</span><div class="h-1 flex-1 overflow-hidden rounded-full bg-zinc-100"><div class="h-full rounded-full bg-zinc-900" style="width:50%"></div></div><span class="w-6 text-right text-[12px] tabular-nums text-zinc-700">2</span></div>
+                <div class="flex items-center gap-3"><span class="w-20 text-[12px] text-zinc-500">Contacted</span><div class="h-1 flex-1 overflow-hidden rounded-full bg-zinc-100"><div class="h-full rounded-full bg-zinc-900" style="width:25%"></div></div><span class="w-6 text-right text-[12px] tabular-nums text-zinc-700">1</span></div>
+                <div class="flex items-center gap-3"><span class="w-20 text-[12px] text-zinc-500">Scoping</span><div class="h-1 flex-1 overflow-hidden rounded-full bg-zinc-100"><div class="h-full rounded-full bg-zinc-900" style="width:25%"></div></div><span class="w-6 text-right text-[12px] tabular-nums text-zinc-700">1</span></div>
+              </div>
+              <div class="mt-5 border-t border-zinc-100 pt-4">
+                <p class="micro">Recent activity</p>
+                <ul class="mt-3 space-y-3">
+                  <li class="flex gap-3"><span class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-300"></span><div class="min-w-0"><a class="text-[13px] font-medium text-zinc-800 hover:text-zinc-950" href="#">ReinoLab</a><p class="truncate text-[12px] text-zinc-500">Research completed — email + LinkedIn found · Other</p><p class="text-[11px] text-zinc-400">2026-10-03</p></div></li>
+                </ul>
+              </div>
+            </section>
+          </div>
+
+          <!-- Side panels -->
+          <div class="space-y-5">
+            <section class="card rise d3 p-5">
+              <h2 class="text-[13px] font-semibold">Follow-ups <span class="ml-2 font-normal text-zinc-400">3</span></h2>
+              <ul class="mt-2 divide-y divide-zinc-100">
+                <li class="row flex items-center justify-between gap-3 rounded-md px-1 py-2.5">
+                  <div class="min-w-0"><a class="text-[13px] font-medium hover:text-zinc-950" href="#">Neon.ai</a><p class="truncate text-[12px] text-zinc-500">Send SOC 2 scoping doc</p></div>
+                  <span class="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-medium text-rose-700">Overdue</span>
+                </li>
+                <li class="row flex items-center justify-between gap-3 rounded-md px-1 py-2.5">
+                  <div class="min-w-0"><a class="text-[13px] font-medium hover:text-zinc-950" href="#">Pausa</a><p class="truncate text-[12px] text-zinc-500">Demo follow-up call</p></div>
+                  <span class="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700">Today</span>
+                </li>
+                <li class="row flex items-center justify-between gap-3 rounded-md px-1 py-2.5">
+                  <div class="min-w-0"><a class="text-[13px] font-medium hover:text-zinc-950" href="#">Zeliq</a><p class="truncate text-[12px] text-zinc-500">Re-engage Dorian</p></div>
+                  <span class="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-600">Oct 8</span>
+                </li>
+              </ul>
+            </section>
+
+            <section class="card rise d4 p-5">
+              <h2 class="text-[13px] font-semibold">Recent research runs</h2>
+              <ul class="mt-2 divide-y divide-zinc-100">
+                <li class="flex items-start justify-between gap-3 py-2.5">
+                  <div class="min-w-0"><p class="text-[13px] text-zinc-800">Website research <span class="ml-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] text-zinc-500">tinyfish+builtin</span></p><p class="mt-0.5 text-[12px] text-zinc-500">2 people · 2 emails</p></div>
+                  <div class="shrink-0 text-right text-[12px] text-zinc-400 tabular-nums"><p>Oct 3</p><p>free</p></div>
+                </li>
+                <li class="flex items-start justify-between gap-3 py-2.5">
+                  <div class="min-w-0"><p class="text-[13px] text-zinc-800">Website research <span class="ml-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] text-zinc-500">tinyfish</span></p><p class="mt-0.5 text-[12px] text-zinc-500">4 people · 1 email</p></div>
+                  <div class="shrink-0 text-right text-[12px] text-zinc-400 tabular-nums"><p>Oct 2</p><p>free</p></div>
+                </li>
+              </ul>
+            </section>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

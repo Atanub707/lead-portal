@@ -22,6 +22,7 @@ import {
   getEnrichmentRuns,
   getInteractions,
   getPipelines,
+  getProfiles,
 } from "@/lib/data";
 import {
   CHANNELS,
@@ -98,6 +99,7 @@ export default async function CompanyPage({
     pipelines,
     companyEmails,
     enrichmentRuns,
+    profiles,
   ] = await Promise.all([
     getCompany(companyId),
     getContacts(companyId),
@@ -106,9 +108,19 @@ export default async function CompanyPage({
     getPipelines(),
     getCompanyEmails(companyId),
     getEnrichmentRuns(companyId),
+    getProfiles(),
   ]);
 
   if (!company) notFound();
+
+  const labelFor = (id: string | null) => {
+    if (!id) return null;
+    const person = profiles.find((entry) => entry.id === id);
+    if (!person) return null;
+    const firstWord = (person.full_name ?? "").trim().split(/\s+/)[0];
+    return firstWord || (person.email ? person.email.split("@")[0] : null);
+  };
+  const addedBy = labelFor(company.created_by);
 
   const isOwner = profile?.role === "owner";
   const pipelineLabel = pipelineName(pipelines, company.list);
@@ -192,13 +204,14 @@ export default async function CompanyPage({
                 Edit details.
               </p>
             )}
-            <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-5">
               {(
                 [
                   ["Type", KIND_LABEL[company.kind]],
                   ["Status", STATUS_LABEL[company.status]],
                   ["Priority", company.priority ?? "—"],
                   ["Added", dateOnly(company.created_at)],
+                  ["Added by", addedBy ?? "—"],
                 ] as const
               ).map(([label, value]) => (
                 <div key={label}>
@@ -347,6 +360,11 @@ export default async function CompanyPage({
                             orgId={company.id}
                           />
                         </div>
+                      ) : null}
+                      {labelFor(contact.created_by) ? (
+                        <p className="mt-1 text-[11px] text-zinc-400">
+                          Added by {labelFor(contact.created_by)}
+                        </p>
                       ) : null}
                     </div>
                   </div>

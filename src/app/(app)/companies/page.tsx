@@ -208,6 +208,7 @@ export default async function CompaniesPage({
                 <th className="th pl-2">Company</th>
                 <th className="th">Type</th>
                 <th className="th">Reach</th>
+                <th className="th">Added by</th>
                 <th className="th">Follow-up</th>
                 <th className="th pr-4 text-right">Email</th>
                 <th className="th w-10 pr-4">
@@ -290,6 +291,28 @@ export default async function CompaniesPage({
                           .join(" · ")
                       )}
                     </span>
+                  </td>
+                  <td className="td">
+                    {company.created_by_name ? (
+                      <span
+                        className="inline-flex items-center gap-1.5"
+                        title={company.created_by_email ?? undefined}
+                      >
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[9px] font-semibold text-zinc-600">
+                          {company.created_by_name.charAt(0).toUpperCase()}
+                        </span>
+                        <span className="text-[12px] text-zinc-600">
+                          {company.created_by_name}
+                        </span>
+                      </span>
+                    ) : (
+                      <span
+                        className="text-[12px] text-zinc-300"
+                        aria-hidden="true"
+                      >
+                        —
+                      </span>
+                    )}
                   </td>
                   <td className="td">
                     <FollowUpControl
