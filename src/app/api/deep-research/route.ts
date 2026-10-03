@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getDeepResearchState } from "@/lib/data";
 import {
-  RECONCILE_CLAIM_STALE_MS,
+  isFreshReconcileClaim,
   reconcileDeepResearch,
   startDeepResearch,
   sumActorUsageUsd,
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 
   const { data: run } = await supabase
     .from("enrichment_runs")
-    .select("id, status, created_at, updated_at, details")
+    .select("id, status, created_at, details")
     .eq("id", state.activeRunId)
     .maybeSingle();
   if (!run) return NextResponse.json({ ok: true, status: "idle" });
@@ -33,23 +33,24 @@ export async function GET(request: Request) {
   const admin = createAdminClient();
 
   if (run.status === "reconciling") {
-    const claimAgeMs =
-      Date.now() - new Date(run.updated_at ?? run.created_at).getTime();
     // A fresh claim belongs to another tab: keep the UI polling without
-    // polling Apify twice. Older than 5 min means the holder died — release
-    // the claim and retry below (a stale claim is reset, never timed out).
-    if (claimAgeMs <= RECONCILE_CLAIM_STALE_MS) {
+    // polling Apify twice. A missing/malformed/old claim means the holder
+    // died — release the claim and retry below (a stale claim is reset,
+    // never timed out).
+    if (isFreshReconcileClaim(run.details)) {
       return NextResponse.json({ ok: true, status: "running" });
     }
-    const cutoff = new Date(
-      Date.now() - RECONCILE_CLAIM_STALE_MS
-    ).toISOString();
     await admin
       .from("enrichment_runs")
-      .update({ status: "running" })
+      .update({
+        status: "running",
+        details: {
+          ...((run.details as Record<string, unknown> | null) ?? {}),
+          claim_at: null,
+        },
+      })
       .eq("id", run.id)
-      .eq("status", "reconciling")
-      .lt("updated_at", cutoff);
+      .eq("status", "reconciling");
   } else if (
     run.status === "running" &&
     Date.now() - new Date(run.created_at).getTime() > RUN_TIMEOUT_MS

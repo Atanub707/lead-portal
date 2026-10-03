@@ -134,6 +134,18 @@ const DEEP_RESEARCH_ESTIMATED_RUN_USD = 0.15;
 // A reconcile claim older than this is treated as abandoned and reset.
 export const RECONCILE_CLAIM_STALE_MS = 5 * 60_000;
 
+// Claim timestamp lives in details.claim_at (jsonb) — no schema change needed.
+// Only a parsable timestamp inside the stale window counts as a live owner.
+export function isFreshReconcileClaim(details: unknown): boolean {
+  const claimAt = asRecord(details)?.claim_at;
+  if (typeof claimAt !== "string") return false;
+  const claimedAtMs = Date.parse(claimAt);
+  return (
+    Number.isFinite(claimedAtMs) &&
+    Date.now() - claimedAtMs <= RECONCILE_CLAIM_STALE_MS
+  );
+}
+
 export function apolloInput(company: { name: string; website: string | null }) {
   let domain: string | null = null;
   if (company.website) {
@@ -400,11 +412,18 @@ export async function reconcileDeepResearch(
 
   // Atomic claim: only the caller that flips running → reconciling owns this
   // reconcile (and therefore the merge). Losers get 0 rows and return a
-  // running-style result without merging.
+  // running-style result without merging. The claim timestamp rides in
+  // details.claim_at so staleness needs no schema change.
   const admin = createAdminClient();
   const { data: claimed } = await admin
     .from("enrichment_runs")
-    .update({ status: "reconciling" })
+    .update({
+      status: "reconciling",
+      details: {
+        ...((run.details as Record<string, unknown> | null) ?? {}),
+        claim_at: new Date().toISOString(),
+      },
+    })
     .eq("id", run.id)
     .eq("status", "running")
     .select("id");
@@ -499,7 +518,7 @@ export async function reconcileIfStale(
 
   const { data: run } = await supabase
     .from("enrichment_runs")
-    .select("id, status, created_at, updated_at, details")
+    .select("id, status, created_at, details")
     .eq("id", activeRunId)
     .maybeSingle();
   if (!run) return;
@@ -507,22 +526,23 @@ export async function reconcileIfStale(
   const ageMs = Date.now() - new Date(run.created_at).getTime();
 
   if (run.status === "reconciling") {
-    const claimAgeMs =
-      Date.now() - new Date(run.updated_at ?? run.created_at).getTime();
-    if (claimAgeMs <= RECONCILE_CLAIM_STALE_MS) return; // another tab owns it
-    // Stale claim (the reconcile holder died): release it, then retry below as
-    // a running run. The conditional update keeps a fresh claim from another
-    // request from being clobbered.
-    const cutoff = new Date(
-      Date.now() - RECONCILE_CLAIM_STALE_MS
-    ).toISOString();
+    // A fresh claim belongs to another tab; a missing/malformed/old one means
+    // the holder died. Release the stale claim and retry below as a running
+    // run; the status guard keeps a concurrent fresh claim from being
+    // clobbered (0 rows is fine — that reset won).
+    if (isFreshReconcileClaim(run.details)) return;
     const admin = createAdminClient();
     await admin
       .from("enrichment_runs")
-      .update({ status: "running" })
+      .update({
+        status: "running",
+        details: {
+          ...((run.details as Record<string, unknown> | null) ?? {}),
+          claim_at: null,
+        },
+      })
       .eq("id", run.id)
-      .eq("status", "reconciling")
-      .lt("updated_at", cutoff);
+      .eq("status", "reconciling");
   } else if (run.status === "running" && ageMs > RUN_TIMEOUT_MS) {
     // Mirror the GET route: read with the user client, fail the run with admin
     // (no RLS UPDATE policy). Merge details so actor refs aren't clobbered,
