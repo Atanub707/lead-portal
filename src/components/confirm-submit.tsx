@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
@@ -21,6 +21,7 @@ export function ConfirmSubmit({
   tone?: "danger" | "neutral";
 }) {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const { pending } = useFormStatus();
 
   useEffect(() => {
@@ -39,7 +40,12 @@ export function ConfirmSubmit({
 
   return (
     <>
-      <button type="button" className={className} onClick={() => setOpen(true)}>
+      <button
+        ref={triggerRef}
+        type="button"
+        className={className}
+        onClick={() => setOpen(true)}
+      >
         {children}
       </button>
 
@@ -82,9 +88,14 @@ export function ConfirmSubmit({
                     Cancel
                   </button>
                   <button
-                    type="submit"
+                    type="button"
                     autoFocus
                     disabled={pending}
+                    onClick={() => {
+                      // The dialog is portaled outside the <form>, so submit the
+                      // form that owns this trigger button programmatically.
+                      triggerRef.current?.form?.requestSubmit();
+                    }}
                     className={confirmClass}
                   >
                     {pending ? (
