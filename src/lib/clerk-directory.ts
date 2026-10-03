@@ -29,15 +29,21 @@ export async function getClerkDirectory(): Promise<ClerkDirectory | null> {
 
   try {
     const client = await clerkClient();
-    const [users, invites] = await Promise.all([
+    const [users, pending, revoked, expired] = await Promise.all([
       client.users.getUserList({ limit: 200 }),
-      client.invitations.getInvitationList({ limit: 200 }),
+      client.invitations.getInvitationList({ status: "pending", limit: 200 }),
+      client.invitations.getInvitationList({ status: "revoked", limit: 200 }),
+      client.invitations.getInvitationList({ status: "expired", limit: 200 }),
     ]);
 
     const activeUsers = new Map<string, boolean>();
     for (const user of users.data) activeUsers.set(user.id, true);
 
-    const invitations: InvitationRow[] = (invites.data ?? [])
+    const invitations: InvitationRow[] = [
+      ...(pending.data ?? []),
+      ...(revoked.data ?? []),
+      ...(expired.data ?? []),
+    ]
       .filter((invite) => invite.status !== "accepted")
       .map((invite) => {
         const raw = invite.raw as { expires_at?: number } | null;
