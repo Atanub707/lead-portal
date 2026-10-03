@@ -104,18 +104,18 @@ The assistant does the whole job in one shot:
 It finishes with a short summary: record link, contacts added, whether the LinkedIn
 company URL was found, and what's still missing so you can fill it by hand.
 
-### LinkedIn employee rosters are manual
+### Deep Research (optional paid tier)
 
-Employee scraping is intentionally not automated (LinkedIn blocks bots, and paid actors
-aren't worth it for this use case). The pipeline record keeps the company's LinkedIn
-URL — the research step finds it — and people are added manually on the company page.
-Each contact without a LinkedIn URL also has a **Find LinkedIn** button: one free search
-on demand, matched against their name + company. No confident match = nothing is saved.
+Website research stays free — fetching, extraction, team-page people, and the
+**Find LinkedIn** search all cost nothing. Deep Research is the optional paid upgrade
+for companies whose website turned up no reachable contacts: a manual **Deep Research**
+button on the company page searches paid B2B sources (Apollo-style database + LinkedIn
+employees) for decision makers, emails, and phones.
 
-**Costs:** all research is free — TinyFish Fetch/Search are free on every plan
-(limits around 1,000 fetched URLs/day and 500 searches/hour) and the built-in fallback
-costs nothing. Only the AI extraction call is metered, covered by your OpenCode Go
-subscription.
+**Costs:** ~$0.15 per run (capped inputs: 10 Apollo leads + 25 LinkedIn employees), with
+a **$5/month hard stop** across all companies — new runs are refused once the calendar
+month's deep-research spend reaches it. Results are source-labeled (`apollo` /
+`linkedin`), and the real Apify cost is recorded in the company's research log.
 
 **Guardrails:** only the exact domain you pasted (plus up to 3 subpages of it) is ever
 fetched, private/local addresses are blocked, and the TinyFish search fallback only ever

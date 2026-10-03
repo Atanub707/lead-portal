@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getDeepResearchState } from "@/lib/data";
-import { reconcileDeepResearch, startDeepResearch } from "@/lib/deep-research";
+import {
+  RECONCILE_CLAIM_STALE_MS,
+  reconcileDeepResearch,
+  startDeepResearch,
+  sumActorUsageUsd,
+} from "@/lib/deep-research";
 
 const RUN_TIMEOUT_MS = 15 * 60_000;
 
@@ -19,18 +24,43 @@ export async function GET(request: Request) {
 
   const { data: run } = await supabase
     .from("enrichment_runs")
-    .select("id, created_at, details")
+    .select("id, status, created_at, updated_at, details")
     .eq("id", state.activeRunId)
     .maybeSingle();
   if (!run) return NextResponse.json({ ok: true, status: "idle" });
 
-  if (Date.now() - new Date(run.created_at).getTime() > RUN_TIMEOUT_MS) {
-    // Run-row writes need the admin client: enrichment_runs has no RLS UPDATE policy.
-    const admin = createAdminClient();
+  // Run-row writes need the admin client: enrichment_runs has no RLS UPDATE policy.
+  const admin = createAdminClient();
+
+  if (run.status === "reconciling") {
+    const claimAgeMs =
+      Date.now() - new Date(run.updated_at ?? run.created_at).getTime();
+    // A fresh claim belongs to another tab: keep the UI polling without
+    // polling Apify twice. Older than 5 min means the holder died — release
+    // the claim and retry below (a stale claim is reset, never timed out).
+    if (claimAgeMs <= RECONCILE_CLAIM_STALE_MS) {
+      return NextResponse.json({ ok: true, status: "running" });
+    }
+    const cutoff = new Date(
+      Date.now() - RECONCILE_CLAIM_STALE_MS
+    ).toISOString();
+    await admin
+      .from("enrichment_runs")
+      .update({ status: "running" })
+      .eq("id", run.id)
+      .eq("status", "reconciling")
+      .lt("updated_at", cutoff);
+  } else if (
+    run.status === "running" &&
+    Date.now() - new Date(run.created_at).getTime() > RUN_TIMEOUT_MS
+  ) {
+    // Record whatever in-flight Apify cost is fetchable before failing.
+    const cost = await sumActorUsageUsd(run.details);
     await admin
       .from("enrichment_runs")
       .update({
         status: "failed",
+        cost_usd: cost,
         details: { ...((run.details as Record<string, unknown> | null) ?? {}), error: "timed out" },
       })
       .eq("id", run.id);

@@ -130,6 +130,9 @@ export function normalizeLinkedInEmployee(raw: unknown): NormalizedLead | null {
 export const APOLLO_ACTOR = "pipelinelabs/lead-scraper-apollo-zoominfo-lusha-ppe";
 export const LINKEDIN_EMPLOYEES_ACTOR = "harvestapi/linkedin-company-employees";
 export const DEEP_RESEARCH_MONTHLY_CAP_USD = 5;
+const DEEP_RESEARCH_ESTIMATED_RUN_USD = 0.15;
+// A reconcile claim older than this is treated as abandoned and reset.
+export const RECONCILE_CLAIM_STALE_MS = 5 * 60_000;
 
 export function apolloInput(company: { name: string; website: string | null }) {
   let domain: string | null = null;
@@ -188,13 +191,13 @@ export async function startDeepResearch(
 ): Promise<StartDeepResearchResult> {
   const { orgId, userId, company } = opts;
 
-  // Guard 1: one active run per company.
+  // Guard 1: one active run per company ("reconciling" is an active claim too).
   const { data: activeRuns } = await supabase
     .from("enrichment_runs")
     .select("id")
     .eq("org_id", orgId)
     .eq("kind", "deep_research")
-    .eq("status", "running")
+    .in("status", ["running", "reconciling"])
     .limit(1);
   if (activeRuns && activeRuns.length > 0) {
     return {
@@ -233,13 +236,18 @@ export async function startDeepResearch(
   monthStart.setUTCHours(0, 0, 0, 0);
   const { data: monthRuns } = await supabase
     .from("enrichment_runs")
-    .select("cost_usd")
+    .select("cost_usd, status")
     .eq("kind", "deep_research")
     .gte("created_at", monthStart.toISOString());
-  const monthSpend = (monthRuns ?? []).reduce(
+  const finalizedSpend = (monthRuns ?? []).reduce(
     (sum, run) => sum + Number(run.cost_usd ?? 0),
     0
   );
+  const inFlightRuns = (monthRuns ?? []).filter(
+    (run) => run.status === "running" || run.status === "reconciling"
+  ).length;
+  const monthSpend =
+    finalizedSpend + inFlightRuns * DEEP_RESEARCH_ESTIMATED_RUN_USD;
   if (monthSpend >= DEEP_RESEARCH_MONTHLY_CAP_USD) {
     return {
       ok: false,
@@ -270,6 +278,34 @@ export async function startDeepResearch(
     return {
       ok: false,
       error: "Couldn't start deep research. Please try again.",
+    };
+  }
+
+  // Double-submit TOCTOU: the guards above are read-then-act, so two tabs can
+  // both pass them. Let the oldest active run win; the younger row is marked
+  // failed before any actor is started.
+  const { data: activeAfterInsert } = await supabase
+    .from("enrichment_runs")
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("kind", "deep_research")
+    .in("status", ["running", "reconciling"])
+    .order("created_at", { ascending: true });
+  if (
+    activeAfterInsert &&
+    activeAfterInsert.length > 0 &&
+    activeAfterInsert[0].id !== run.id
+  ) {
+    await admin
+      .from("enrichment_runs")
+      .update({
+        status: "failed",
+        details: { actors: [], error: "duplicate start" },
+      })
+      .eq("id", run.id);
+    return {
+      ok: false,
+      error: "Deep research is already running for this company.",
     };
   }
 
@@ -347,7 +383,9 @@ export async function reconcileDeepResearch(
     .maybeSingle();
   if (!run) throw new Error("Deep research run not found");
 
-  // A concurrent GET (another tab) may have already finalized this run.
+  // Another tab may own the reconcile ("reconciling"), or may have finalized
+  // this run since `getDeepResearchState` was read.
+  if (run.status === "reconciling") return { ok: true, status: "running" };
   if (run.status !== "running") {
     return {
       ok: true,
@@ -360,11 +398,23 @@ export async function reconcileDeepResearch(
     };
   }
 
+  // Atomic claim: only the caller that flips running → reconciling owns this
+  // reconcile (and therefore the merge). Losers get 0 rows and return a
+  // running-style result without merging.
+  const admin = createAdminClient();
+  const { data: claimed } = await admin
+    .from("enrichment_runs")
+    .update({ status: "reconciling" })
+    .eq("id", run.id)
+    .eq("status", "running")
+    .select("id");
+  if (!claimed || claimed.length === 0) return { ok: true, status: "running" };
+
   const actorRefs = ((run.details?.actors ?? []) as DeepResearchActorRef[]).filter(
     (actor) => actor?.runId
   );
-  // The POST inserts the row before actors are persisted; leave it running until
-  // the run ids land (or the GET timeout marks it failed).
+  // The POST inserts the row before actors are persisted; the claim is held
+  // until the run ids land (or the timeout/stale-reset paths recover it).
   if (actorRefs.length === 0) return { ok: true, status: "running" };
 
   const infos = await Promise.all(actorRefs.map((actor) => getActorRun(actor.runId)));
@@ -399,7 +449,6 @@ export async function reconcileDeepResearch(
   });
 
   const status = succeeded > 0 ? "ok" : "failed";
-  const admin = createAdminClient();
   const { error } = await admin
     .from("enrichment_runs")
     .update({
@@ -420,30 +469,72 @@ export async function reconcileDeepResearch(
 const RECONCILE_MIN_AGE_MS = 30_000;
 const RUN_TIMEOUT_MS = 15 * 60_000;
 
+// Best-effort Apify usage for a run that never finalized, so a timed-out run
+// still records what it spent. Each actor lookup fails independently.
+export async function sumActorUsageUsd(details: unknown): Promise<number> {
+  const raw = (details as { actors?: unknown } | null)?.actors;
+  const actors = Array.isArray(raw) ? (raw as { runId?: string }[]) : [];
+  let total = 0;
+  for (const actor of actors) {
+    if (!actor?.runId) continue;
+    try {
+      const info = await getActorRun(actor.runId);
+      total += info.usageTotalUsd;
+    } catch (err) {
+      console.error(
+        "[deep-research] timeout cost lookup failed:",
+        err instanceof Error ? err.message : String(err)
+      );
+    }
+  }
+  return total;
+}
+
 export async function reconcileIfStale(
   supabase: SupabaseClient,
   state: { activeRunId: number | null; latestCreatedAt: string | null }
 ): Promise<void> {
-  const { activeRunId, latestCreatedAt } = state;
-  if (activeRunId === null || !latestCreatedAt) return;
+  const { activeRunId } = state;
+  if (activeRunId === null) return;
 
-  const ageMs = Date.now() - new Date(latestCreatedAt).getTime();
+  const { data: run } = await supabase
+    .from("enrichment_runs")
+    .select("id, status, created_at, updated_at, details")
+    .eq("id", activeRunId)
+    .maybeSingle();
+  if (!run) return;
 
-  if (ageMs > RUN_TIMEOUT_MS) {
+  const ageMs = Date.now() - new Date(run.created_at).getTime();
+
+  if (run.status === "reconciling") {
+    const claimAgeMs =
+      Date.now() - new Date(run.updated_at ?? run.created_at).getTime();
+    if (claimAgeMs <= RECONCILE_CLAIM_STALE_MS) return; // another tab owns it
+    // Stale claim (the reconcile holder died): release it, then retry below as
+    // a running run. The conditional update keeps a fresh claim from another
+    // request from being clobbered.
+    const cutoff = new Date(
+      Date.now() - RECONCILE_CLAIM_STALE_MS
+    ).toISOString();
+    const admin = createAdminClient();
+    await admin
+      .from("enrichment_runs")
+      .update({ status: "running" })
+      .eq("id", run.id)
+      .eq("status", "reconciling")
+      .lt("updated_at", cutoff);
+  } else if (run.status === "running" && ageMs > RUN_TIMEOUT_MS) {
     // Mirror the GET route: read with the user client, fail the run with admin
-    // (no RLS UPDATE policy). Merge details so actor refs aren't clobbered.
+    // (no RLS UPDATE policy). Merge details so actor refs aren't clobbered,
+    // and record whatever in-flight Apify cost is fetchable.
+    const cost = await sumActorUsageUsd(run.details);
     try {
-      const { data: run } = await supabase
-        .from("enrichment_runs")
-        .select("id, details")
-        .eq("id", activeRunId)
-        .maybeSingle();
-      if (!run) return;
       const admin = createAdminClient();
       await admin
         .from("enrichment_runs")
         .update({
           status: "failed",
+          cost_usd: cost,
           details: {
             ...((run.details as Record<string, unknown> | null) ?? {}),
             error: "timed out",

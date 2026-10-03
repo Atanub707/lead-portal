@@ -369,7 +369,9 @@ export async function getDeepResearchState(orgId: number): Promise<DeepResearchS
     .limit(5);
   const runs = (data ?? []) as EnrichmentRun[];
   return {
-    activeRunId: runs.find((r) => r.status === "running")?.id ?? null,
+    activeRunId:
+      runs.find((r) => r.status === "running" || r.status === "reconciling")
+        ?.id ?? null,
     lastSuccessAt: runs.find((r) => r.status === "ok")?.created_at ?? null,
     latest: runs[0] ?? null,
   };
