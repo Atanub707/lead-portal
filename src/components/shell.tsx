@@ -10,31 +10,27 @@ import {
 } from "lucide-react";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { ConfirmSubmit } from "@/components/confirm-submit";
+import { UserAvatar } from "@/components/badges";
 import type { Pipeline } from "@/lib/types";
 import { signOut } from "@/lib/actions";
 
 const STORAGE_KEY = "tl-sidebar-collapsed";
 
 function UserBlock({
+  userId,
   email,
   role,
   collapsed = false,
 }: {
+  userId: string;
   email: string;
   role: string;
   collapsed?: boolean;
 }) {
-  const initial = (email || "?").charAt(0).toUpperCase();
-
   if (collapsed) {
     return (
       <div className="flex flex-col items-center gap-2 py-3">
-        <span
-          className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-600"
-          title={email}
-        >
-          {initial}
-        </span>
+        <UserAvatar seed={userId} name={email} size={24} />
         <form action={signOut}>
           <ConfirmSubmit
             message="Sign out of Lead Portal?"
@@ -52,9 +48,7 @@ function UserBlock({
 
   return (
     <div className="flex items-center gap-2 px-3 py-3">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-600">
-        {initial}
-      </span>
+      <UserAvatar seed={userId} name={email} size={24} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs text-zinc-600">{email}</p>
         <p className="text-[11px] capitalize text-zinc-400">{role}</p>
@@ -75,12 +69,14 @@ function UserBlock({
 }
 
 export function Shell({
+  userId,
   isOwner,
   email,
   role,
   pipelines,
   children,
 }: {
+  userId: string;
   isOwner: boolean;
   email: string;
   role: string;
@@ -185,7 +181,12 @@ export function Shell({
         <SidebarNav isOwner={isOwner} pipelines={pipelines} collapsed={collapsed} />
 
         <div className="shrink-0 border-t border-zinc-200/80">
-          <UserBlock email={email} role={role} collapsed={collapsed} />
+          <UserBlock
+            userId={userId}
+            email={email}
+            role={role}
+            collapsed={collapsed}
+          />
         </div>
       </aside>
 
@@ -233,7 +234,7 @@ export function Shell({
               onNavigate={() => setMobileOpen(false)}
             />
             <div className="shrink-0 border-t border-zinc-200/80">
-              <UserBlock email={email} role={role} />
+              <UserBlock userId={userId} email={email} role={role} />
             </div>
           </div>
         </div>

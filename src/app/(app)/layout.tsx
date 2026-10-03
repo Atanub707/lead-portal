@@ -21,6 +21,7 @@ export default async function AppLayout({
 
   return (
     <Shell
+      userId={profile.id}
       isOwner={profile.role === "owner"}
       email={profile.email ?? ""}
       role={profile.role}
