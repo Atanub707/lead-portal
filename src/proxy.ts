@@ -9,11 +9,28 @@ export default clerkMiddleware(async (auth, request) => {
   if (isPublicRoute(request)) return;
 
   const { userId } = await auth();
-  if (!userId) {
-    const signInUrl = new URL("/sign-in", request.url);
-    signInUrl.searchParams.set("redirect_url", request.url);
-    return NextResponse.redirect(signInUrl);
+  if (userId) return;
+
+  const url = new URL(request.url);
+  const status = url.searchParams.get("__clerk_status");
+  const ticket = url.searchParams.get("__clerk_ticket");
+
+  // Invitation / handshake links arrive as query params (Clerk appends
+  // __clerk_status=sign_up&__clerk_ticket=… to the redirect URL). Forward them to
+  // the matching Clerk page so <SignUp /> / <SignIn /> can consume the ticket.
+  if (ticket || status === "sign_up" || status === "sign_in") {
+    const target = new URL(status === "sign_in" ? "/sign-in" : "/sign-up", request.url);
+    url.searchParams.forEach((value, key) => {
+      if (key.startsWith("__clerk") || key === "redirect_url") {
+        target.searchParams.set(key, value);
+      }
+    });
+    return NextResponse.redirect(target);
   }
+
+  const signInUrl = new URL("/sign-in", request.url);
+  signInUrl.searchParams.set("redirect_url", request.url);
+  return NextResponse.redirect(signInUrl);
 });
 
 export const config = {
