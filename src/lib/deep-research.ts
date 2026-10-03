@@ -133,6 +133,8 @@ export const DEEP_RESEARCH_MONTHLY_CAP_USD = 5;
 const DEEP_RESEARCH_ESTIMATED_RUN_USD = 0.15;
 // A reconcile claim older than this is treated as abandoned and reset.
 export const RECONCILE_CLAIM_STALE_MS = 5 * 60_000;
+// A run older than this is always failed, never reset or re-claimed.
+const RUN_TIMEOUT_MS = 15 * 60_000;
 
 // Claim timestamp lives in details.claim_at (jsonb) — no schema change needed.
 // Only a parsable timestamp inside the stale window counts as a live owner.
@@ -140,10 +142,11 @@ export function isFreshReconcileClaim(details: unknown): boolean {
   const claimAt = asRecord(details)?.claim_at;
   if (typeof claimAt !== "string") return false;
   const claimedAtMs = Date.parse(claimAt);
-  return (
-    Number.isFinite(claimedAtMs) &&
-    Date.now() - claimedAtMs <= RECONCILE_CLAIM_STALE_MS
-  );
+  if (!Number.isFinite(claimedAtMs)) return false;
+  // Future-dated claims are clock skew, not liveness: treat them as stale so
+  // they can't block recovery until the clock catches up.
+  const claimAgeMs = Date.now() - claimedAtMs;
+  return claimAgeMs >= 0 && claimAgeMs <= RECONCILE_CLAIM_STALE_MS;
 }
 
 export function apolloInput(company: { name: string; website: string | null }) {
@@ -294,20 +297,31 @@ export async function startDeepResearch(
   }
 
   // Double-submit TOCTOU: the guards above are read-then-act, so two tabs can
-  // both pass them. Let the oldest active run win; the younger row is marked
-  // failed before any actor is started.
-  const { data: activeAfterInsert } = await supabase
+  // both pass them. Let the oldest active run win (id breaks created_at ties);
+  // the younger row is marked failed before any actor is started. A read error
+  // fails closed — without proof we won the race, never start actors.
+  const { data: activeAfterInsert, error: activeReadError } = await supabase
     .from("enrichment_runs")
     .select("id")
     .eq("org_id", orgId)
     .eq("kind", "deep_research")
     .in("status", ["running", "reconciling"])
-    .order("created_at", { ascending: true });
-  if (
-    activeAfterInsert &&
-    activeAfterInsert.length > 0 &&
-    activeAfterInsert[0].id !== run.id
-  ) {
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true });
+  if (activeReadError) {
+    console.error(
+      "[deep-research] active-run recheck failed:",
+      activeReadError.message
+    );
+  }
+  const lostRace =
+    Boolean(activeReadError) ||
+    Boolean(
+      activeAfterInsert &&
+        activeAfterInsert.length > 0 &&
+        activeAfterInsert[0].id !== run.id
+    );
+  if (lostRace) {
     await admin
       .from("enrichment_runs")
       .update({
@@ -410,6 +424,21 @@ export async function reconcileDeepResearch(
     };
   }
 
+  // Defense in depth: a run past the 15-min wall is failed even if a caller
+  // skipped the GET/lazy stale guards — never reset and re-claimed.
+  if (Date.now() - new Date(run.created_at).getTime() > RUN_TIMEOUT_MS) {
+    const cost = await failTimedOutRun(run);
+    return {
+      ok: true,
+      status: "failed",
+      summary: {
+        people: Number(run.people_found ?? 0),
+        emails: Number(run.emails_found ?? 0),
+        cost,
+      },
+    };
+  }
+
   // Atomic claim: only the caller that flips running → reconciling owns this
   // reconcile (and therefore the merge). Losers get 0 rows and return a
   // running-style result without merging. The claim timestamp rides in
@@ -486,7 +515,6 @@ export async function reconcileDeepResearch(
 // Lazy finalization for runs whose tab was closed. A run younger than this is
 // left alone so a page load moments after starting doesn't poll Apify twice.
 const RECONCILE_MIN_AGE_MS = 30_000;
-const RUN_TIMEOUT_MS = 15 * 60_000;
 
 // Best-effort Apify usage for a run that never finalized, so a timed-out run
 // still records what it spent. Each actor lookup fails independently.
@@ -509,11 +537,75 @@ export async function sumActorUsageUsd(details: unknown): Promise<number> {
   return total;
 }
 
+// Shared timeout exit: record whatever in-flight Apify cost is fetchable, then
+// fail the run with the "timed out" details the route has always written.
+// Returns the fetched cost so callers can include it in their summary.
+export async function failTimedOutRun(run: {
+  id: number;
+  details: unknown;
+}): Promise<number> {
+  const cost = await sumActorUsageUsd(run.details);
+  const admin = createAdminClient();
+  await admin
+    .from("enrichment_runs")
+    .update({
+      status: "failed",
+      cost_usd: cost,
+      details: {
+        ...((run.details as Record<string, unknown> | null) ?? {}),
+        error: "timed out",
+      },
+    })
+    .eq("id", run.id);
+  return cost;
+}
+
+type ObservedClaimAt =
+  | { kind: "iso"; value: string }
+  | { kind: "missing" }
+  | { kind: "malformed" };
+
+function observedClaimAt(details: unknown): ObservedClaimAt {
+  const claimAt = asRecord(details)?.claim_at;
+  if (claimAt === null || claimAt === undefined) return { kind: "missing" };
+  if (typeof claimAt === "string" && Number.isFinite(Date.parse(claimAt))) {
+    return { kind: "iso", value: claimAt };
+  }
+  return { kind: "malformed" };
+}
+
+// Claim-value CAS: release a stale reconcile claim only when details.claim_at
+// still equals the value observed by the caller. A malformed or mismatched
+// claim is never reset — returning false means "someone else acted first".
+export async function resetStaleReconcileClaim(run: {
+  id: number;
+  details: unknown;
+}): Promise<boolean> {
+  const claim = observedClaimAt(run.details);
+  if (claim.kind === "malformed") return false;
+  const admin = createAdminClient();
+  const reset = admin
+    .from("enrichment_runs")
+    .update({
+      status: "running",
+      details: {
+        ...((run.details as Record<string, unknown> | null) ?? {}),
+        claim_at: null,
+      },
+    })
+    .eq("id", run.id)
+    .eq("status", "reconciling");
+  const { data } = await (claim.kind === "iso"
+    ? reset.eq("details->>claim_at", claim.value)
+    : reset.is("details->>claim_at", null)
+  ).select("id");
+  return data?.length === 1;
+}
+
 export async function reconcileIfStale(
   supabase: SupabaseClient,
-  state: { activeRunId: number | null; latestCreatedAt: string | null }
+  activeRunId: number | null
 ): Promise<void> {
-  const { activeRunId } = state;
   if (activeRunId === null) return;
 
   const { data: run } = await supabase
@@ -525,48 +617,35 @@ export async function reconcileIfStale(
 
   const ageMs = Date.now() - new Date(run.created_at).getTime();
 
-  if (run.status === "reconciling") {
-    // A fresh claim belongs to another tab; a missing/malformed/old one means
-    // the holder died. Release the stale claim and retry below as a running
-    // run; the status guard keeps a concurrent fresh claim from being
-    // clobbered (0 rows is fine — that reset won).
-    if (isFreshReconcileClaim(run.details)) return;
-    const admin = createAdminClient();
-    await admin
-      .from("enrichment_runs")
-      .update({
-        status: "running",
-        details: {
-          ...((run.details as Record<string, unknown> | null) ?? {}),
-          claim_at: null,
-        },
-      })
-      .eq("id", run.id)
-      .eq("status", "reconciling");
-  } else if (run.status === "running" && ageMs > RUN_TIMEOUT_MS) {
-    // Mirror the GET route: read with the user client, fail the run with admin
-    // (no RLS UPDATE policy). Merge details so actor refs aren't clobbered,
-    // and record whatever in-flight Apify cost is fetchable.
-    const cost = await sumActorUsageUsd(run.details);
+  // Mirror the GET route: read with the user client, fail the run with admin
+  // (no RLS UPDATE policy). Never let a lazy failure break the page render.
+  const failLazily = async () => {
     try {
-      const admin = createAdminClient();
-      await admin
-        .from("enrichment_runs")
-        .update({
-          status: "failed",
-          cost_usd: cost,
-          details: {
-            ...((run.details as Record<string, unknown> | null) ?? {}),
-            error: "timed out",
-          },
-        })
-        .eq("id", run.id);
+      await failTimedOutRun(run);
     } catch (err) {
       console.error(
         "[deep-research] lazy timeout failed:",
         err instanceof Error ? err.message : String(err)
       );
     }
+  };
+
+  if (run.status === "reconciling") {
+    // A fresh claim belongs to another tab; a missing/malformed/old one means
+    // the holder died. A run past the 15-min wall takes the timeout path
+    // instead of a reset — resetting would let a zombie cycle reset→claim
+    // forever and never be observed as timed out.
+    if (isFreshReconcileClaim(run.details)) return;
+    if (ageMs > RUN_TIMEOUT_MS) {
+      await failLazily();
+      return;
+    }
+    // Claim-value CAS: only release the exact claim observed above. 0 rows
+    // means another request reset (or re-claimed) first — leave it alone.
+    const released = await resetStaleReconcileClaim(run);
+    if (!released) return;
+  } else if (run.status === "running" && ageMs > RUN_TIMEOUT_MS) {
+    await failLazily();
     return;
   }
 

@@ -114,7 +114,8 @@ employees) for decision makers, emails, and phones.
 
 **Costs:** ~$0.15 per run (capped inputs: 10 Apollo leads + 25 LinkedIn employees), with
 a **$5/month hard stop** across all companies — new runs are refused once the calendar
-month's deep-research spend reaches it. Results are source-labeled (`apollo` /
+month's **estimated** deep-research spend (finalized cost + in-flight runs at the per-run
+cap) reaches it. Results are source-labeled (`apollo` /
 `linkedin`), and the real Apify cost is recorded in the company's research log.
 
 **Guardrails:** only the exact domain you pasted (plus up to 3 subpages of it) is ever

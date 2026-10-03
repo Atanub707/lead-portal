@@ -1,13 +1,13 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getDeepResearchState } from "@/lib/data";
 import {
+  failTimedOutRun,
   isFreshReconcileClaim,
   reconcileDeepResearch,
+  resetStaleReconcileClaim,
   startDeepResearch,
-  sumActorUsageUsd,
 } from "@/lib/deep-research";
 
 const RUN_TIMEOUT_MS = 15 * 60_000;
@@ -29,42 +29,29 @@ export async function GET(request: Request) {
     .maybeSingle();
   if (!run) return NextResponse.json({ ok: true, status: "idle" });
 
-  // Run-row writes need the admin client: enrichment_runs has no RLS UPDATE policy.
-  const admin = createAdminClient();
+  const ageMs = Date.now() - new Date(run.created_at).getTime();
 
   if (run.status === "reconciling") {
     // A fresh claim belongs to another tab: keep the UI polling without
-    // polling Apify twice. A missing/malformed/old claim means the holder
-    // died — release the claim and retry below (a stale claim is reset,
-    // never timed out).
+    // polling Apify twice.
     if (isFreshReconcileClaim(run.details)) {
       return NextResponse.json({ ok: true, status: "running" });
     }
-    await admin
-      .from("enrichment_runs")
-      .update({
-        status: "running",
-        details: {
-          ...((run.details as Record<string, unknown> | null) ?? {}),
-          claim_at: null,
-        },
-      })
-      .eq("id", run.id)
-      .eq("status", "reconciling");
-  } else if (
-    run.status === "running" &&
-    Date.now() - new Date(run.created_at).getTime() > RUN_TIMEOUT_MS
-  ) {
+    // A stale claim on a run past the 15-min wall takes the timeout path:
+    // resetting would let a zombie cycle reset→claim forever and never be
+    // observed as timed out.
+    if (ageMs > RUN_TIMEOUT_MS) {
+      await failTimedOutRun(run);
+      return NextResponse.json({ ok: true, status: "failed", error: "timed out" });
+    }
+    // Claim-value CAS: release only the exact claim observed above. 0 rows
+    // means another request reset (or re-claimed) first, or the claim was
+    // unverifiable — leave the row alone and keep polling.
+    const released = await resetStaleReconcileClaim(run);
+    if (!released) return NextResponse.json({ ok: true, status: "running" });
+  } else if (run.status === "running" && ageMs > RUN_TIMEOUT_MS) {
     // Record whatever in-flight Apify cost is fetchable before failing.
-    const cost = await sumActorUsageUsd(run.details);
-    await admin
-      .from("enrichment_runs")
-      .update({
-        status: "failed",
-        cost_usd: cost,
-        details: { ...((run.details as Record<string, unknown> | null) ?? {}), error: "timed out" },
-      })
-      .eq("id", run.id);
+    await failTimedOutRun(run);
     return NextResponse.json({ ok: true, status: "failed", error: "timed out" });
   }
 

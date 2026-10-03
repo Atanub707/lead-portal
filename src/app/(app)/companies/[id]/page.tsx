@@ -143,10 +143,7 @@ export default async function CompanyPage({
   // of the page data loads — so its merged results appear in this render.
   const supabase = await createClient();
   const deepResearchState = await getDeepResearchState(companyId);
-  await reconcileIfStale(supabase, {
-    activeRunId: deepResearchState.activeRunId,
-    latestCreatedAt: deepResearchState.latest?.created_at ?? null,
-  });
+  await reconcileIfStale(supabase, deepResearchState.activeRunId);
 
   // Phase 2: everything else.
   const [
