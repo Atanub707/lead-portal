@@ -466,12 +466,14 @@ export async function inviteUser(
   const base = await currentSiteUrl();
 
   // Clerk sends the invitation email itself (notify defaults to true).
+  // expiresInDays: 1 — short-lived invites (Clerk's minimum unit is days).
   const createInvite = async (): Promise<string | null> => {
     const client = await clerkClient();
     const invitation = await client.invitations.createInvitation({
       emailAddress: email,
       publicMetadata: { role: safeRole },
       redirectUrl: `${base}/dashboard`,
+      expiresInDays: 1,
     });
     return (invitation as { url?: string }).url ?? null;
   };
@@ -587,14 +589,18 @@ export async function updateMyName(formData: FormData): Promise<void> {
   const name = field(formData, "full_name");
   if (!name) throw new Error("Name is required");
 
-  const supabase = await createClient();
-  const { error } = await supabase
+  // Admin client so a user can always set their OWN name even before the
+  // row-level "update self" policy migration lands. Ownership is enforced here:
+  // the update is hard-scoped to the signed-in user's id.
+  const admin = createAdminClient();
+  const { error } = await admin
     .from("profiles")
     .update({ full_name: name.slice(0, 80) })
     .eq("id", userId);
   if (error) throw new Error(error.message);
 
   revalidatePath("/settings");
+  revalidateAll();
   revalidatePath("/", "layout");
 }
 
