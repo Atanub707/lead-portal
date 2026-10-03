@@ -46,6 +46,7 @@ const RUN_KIND_LABEL: Record<string, string> = {
   linkedin_roster: "LinkedIn team roster",
   linkedin_profile: "LinkedIn profile details",
   email_search: "Email search",
+  deep_research: "Deep research (Apify)",
   manual: "Manual entry",
 };
 
@@ -61,6 +62,46 @@ function host(url: string) {
   } catch {
     return url;
   }
+}
+
+interface DeepResearchCompanyFacts {
+  phone: string | null;
+  address: string | null;
+  founded: number | null;
+  employees: number | null;
+}
+
+function deepResearchCompanyFacts(
+  details: Record<string, unknown> | null
+): DeepResearchCompanyFacts | null {
+  const company = details?.company;
+  if (
+    typeof company !== "object" ||
+    company === null ||
+    Array.isArray(company)
+  ) {
+    return null;
+  }
+  const record = company as Record<string, unknown>;
+  const text = (value: unknown) =>
+    typeof value === "string" && value.trim() !== "" ? value : null;
+  const count = (value: unknown) =>
+    typeof value === "number" && Number.isFinite(value) ? value : null;
+  const facts: DeepResearchCompanyFacts = {
+    phone: text(record.phone),
+    address: text(record.address),
+    founded: count(record.founded),
+    employees: count(record.employees),
+  };
+  if (
+    facts.phone === null &&
+    facts.address === null &&
+    facts.founded === null &&
+    facts.employees === null
+  ) {
+    return null;
+  }
+  return facts;
 }
 
 function Section({
@@ -142,6 +183,10 @@ export default async function CompanyPage({
     activeRunId: deepResearchState.activeRunId,
     lastSuccessAt: deepResearchState.lastSuccessAt,
   });
+  const companyFacts =
+    deepResearchState.latest?.status === "ok"
+      ? deepResearchCompanyFacts(deepResearchState.latest.details)
+      : null;
   const dateOnly = (iso: string) => new Date(iso).toISOString().slice(0, 10);
 
   return (
@@ -222,6 +267,32 @@ export default async function CompanyPage({
                 Edit details.
               </p>
             )}
+            {companyFacts ? (
+              <div className="mt-3 rounded-md border border-zinc-100 bg-zinc-50/60 px-3 py-2.5">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+                  {(
+                    [
+                      ["Phone", companyFacts.phone],
+                      ["Address", companyFacts.address],
+                      ["Founded", companyFacts.founded],
+                      ["Employees", companyFacts.employees],
+                    ] as const
+                  )
+                    .filter(([, value]) => value !== null)
+                    .map(([label, value]) => (
+                      <div key={label}>
+                        <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">
+                          {label}
+                        </dt>
+                        <dd className="mt-1 text-[13px] text-zinc-800 tabular-nums">
+                          {value}
+                        </dd>
+                      </div>
+                    ))}
+                </dl>
+                <p className="mt-2 text-[11px] text-zinc-400">via Apify</p>
+              </div>
+            ) : null}
             <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-5">
               {(
                 [
@@ -545,6 +616,22 @@ export default async function CompanyPage({
                         <span className="ml-2 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] text-zinc-500">
                           {run.source}
                         </span>
+                        {run.kind === "deep_research" &&
+                        run.status === "running" ? (
+                          <span className="ml-1.5 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                            <span
+                              className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse motion-reduce:animate-none"
+                              aria-hidden="true"
+                            />
+                            running
+                          </span>
+                        ) : null}
+                        {run.kind === "deep_research" &&
+                        run.status === "failed" ? (
+                          <span className="ml-1.5 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-700">
+                            failed
+                          </span>
+                        ) : null}
                       </p>
                       <p className="mt-0.5 text-[12px] text-zinc-500">
                         {run.people_found}{" "}

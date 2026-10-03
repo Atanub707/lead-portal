@@ -17,6 +17,7 @@ const RUN_KIND_LABEL: Record<string, string> = {
   linkedin_roster: "LinkedIn team roster",
   linkedin_profile: "LinkedIn profile details",
   email_search: "Email search",
+  deep_research: "Deep research (Apify)",
   manual: "Manual entry",
 };
 
