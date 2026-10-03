@@ -28,6 +28,7 @@ function NavItem({
   icon: Icon,
   collapsed = false,
   onNavigate,
+  prefetch = true,
 }: {
   href: string;
   label: string;
@@ -35,11 +36,12 @@ function NavItem({
   icon: LucideIcon;
   collapsed?: boolean;
   onNavigate?: () => void;
+  prefetch?: boolean | "auto";
 }) {
   return (
     <Link
       href={href}
-      prefetch={true}
+      prefetch={prefetch}
       onClick={onNavigate}
       title={collapsed ? label : undefined}
       className={`relative flex h-8 items-center rounded-md text-[13px] transition duration-150 active:scale-[0.98] ${
@@ -123,6 +125,7 @@ export function SidebarNav({
             active={pathname.startsWith("/settings")}
             collapsed={collapsed}
             onNavigate={onNavigate}
+            prefetch="auto"
           />
         </>
       ) : null}
