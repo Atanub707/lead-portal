@@ -92,6 +92,13 @@ files (members + interaction logs). Safe to re-run — existing companies are sk
 > `BREVO_SENDER_EMAIL` to `.env.local` and Vercel. If email fails for any reason,
 > the copied link always works.
 
+> **Magic links & password resets:** connect Brevo as Supabase SMTP so those emails
+> deliver reliably (invites go through Brevo's API and are unaffected). Automated:
+> add `SUPABASE_ACCESS_TOKEN` (supabase.com/dashboard/account/tokens) and
+> `BREVO_SMTP_KEY` (brevo.com → SMTP & API → **SMTP** tab) to `.env.local`, then run
+> `node --env-file=.env.local scripts/configure-auth.mjs` — it sets the Site URL,
+> redirect allowlist, and Brevo SMTP in one go.
+
 ## AI assistant ("Paste URL with AI")
 
 Each pipeline page has a **Paste URL with AI** button next to "Add company". Paste a
