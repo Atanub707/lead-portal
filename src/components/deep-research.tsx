@@ -25,9 +25,11 @@ const POLL_MS = 5000;
 export function DeepResearch({
   orgId,
   initialActiveRun,
+  monthSpend,
 }: {
   orgId: number;
   initialActiveRun: boolean;
+  monthSpend: number;
 }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>(
@@ -245,6 +247,9 @@ export function DeepResearch({
                   + LinkedIn) for decision makers, emails and phones. It usually
                   takes 1–3 minutes. Runs on paid Apify actors — capped at
                   ~$0.15 per run.
+                </p>
+                <p className="mt-3 text-[12px] text-zinc-500 tabular-nums">
+                  {`This month's deep research spend: $${monthSpend.toFixed(2)} of $5.00`}
                 </p>
                 {dialogError ? (
                   <p

@@ -375,6 +375,22 @@ export async function getDeepResearchState(orgId: number): Promise<DeepResearchS
   };
 }
 
+export async function getDeepResearchMonthSpend(): Promise<number> {
+  const supabase = await createClient();
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(0, 0, 0, 0);
+  const { data } = await supabase
+    .from("enrichment_runs")
+    .select("cost_usd")
+    .eq("kind", "deep_research")
+    .gte("created_at", monthStart.toISOString());
+  return (data ?? []).reduce(
+    (sum, run) => sum + Number(run.cost_usd ?? 0),
+    0
+  );
+}
+
 export async function getInteractions(orgId: number): Promise<Interaction[]> {
   const supabase = await createClient();
   const { data, error } = await supabase

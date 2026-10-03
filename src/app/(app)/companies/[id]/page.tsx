@@ -22,6 +22,7 @@ import {
   getCompanyEmails,
   getContacts,
   getCurrentProfile,
+  getDeepResearchMonthSpend,
   getDeepResearchState,
   getEnrichmentRuns,
   getInteractions,
@@ -192,6 +193,7 @@ export default async function CompanyPage({
     activeRunId: deepResearchState.activeRunId,
     lastSuccessAt: deepResearchState.lastSuccessAt,
   });
+  const monthSpend = showDeepResearch ? await getDeepResearchMonthSpend() : 0;
   const companyFacts =
     deepResearchState.latest?.status === "ok"
       ? deepResearchCompanyFacts(deepResearchState.latest.details)
@@ -340,6 +342,7 @@ export default async function CompanyPage({
             <DeepResearch
               orgId={company.id}
               initialActiveRun={deepResearchState.activeRunId !== null}
+              monthSpend={monthSpend}
             />
           ) : null}
 

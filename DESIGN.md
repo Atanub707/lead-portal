@@ -117,13 +117,21 @@ per-contact emails).
   URL get one TinyFish Search each (`site:linkedin.com/in "Name" "Company"`); only
   confident name+company matches are saved (`findLinkedInProfile`). A per-contact
   **Find LinkedIn** button on the company page does the same on demand.
-- **LinkedIn employee rosters are manual** — direct scraping is the blocked/banned
-  surface, and the paid Apify actor was removed (2026-10) in favor of the free
-  company/profile-URL lookups. The old integration is recoverable from git history.
+- **LinkedIn employee rosters are manual in the free flow** — direct scraping is the
+  blocked/banned surface, so free website research only uses the company and personal
+  profile URLs. Rosters (with emails and phones) come only from the paid **Deep
+  Research** run below.
+- **Deep Research is the only paid tier** — the manual button on thin companies (no
+  decision maker, and no reachable person or company email) runs Apify actors: an
+  Apollo/ZoomInfo-style people search plus the LinkedIn company-employee roster when
+  the company has a LinkedIn URL. Inputs are capped (~$0.15/run) and a **hard
+  $5.00/month stop** refuses runs once the month's logged cost is reached; the
+  confirm dialog shows the month's spend. Results merge source-labeled (`apollo` /
+  `linkedin`) and each run logs its real cost in the Research log.
 - **Enrichment cost order:** website + company LinkedIn + personal profile URLs are all
-  free (TinyFish, or the built-in fetcher). Paid tools (Apify deep-dive, email
-  verification) come only after a person is known and worth it; personal emails are
-  manual — no safe public source exists.
+  free (TinyFish, or the built-in fetcher). Deep Research is the only paid tool —
+  manual, input-capped, and budget-stopped. Personal emails are otherwise manual — no
+  safe free public source exists.
 - **Laya ([convaiinnovations/laya](https://huggingface.co/convaiinnovations/laya)) has
   no role here:** it is a ~400M-param non-autoregressive *classifier* (calibrated
   choice/score/yes-no decisions, ~33 ms/pass, Apache-2.0) — not a web or enrichment

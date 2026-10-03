@@ -144,7 +144,7 @@ fallback models.
 1. Push this `admin-portal` folder to a GitHub repository (or use the Vercel CLI)
 2. [vercel.com](https://vercel.com) → **Add New → Project** → import the repo
 3. Add the environment variables (Supabase publishable/secret keys, `OPENCODE_API_KEY`,
-   and optionally `TINYFISH_API_KEY`) — see `.env.example`
+   `APIFY_API_TOKEN` for Deep Research, and optionally `TINYFISH_API_KEY`) — see `.env.example`
 4. Deploy, then add `https://<your-app>.vercel.app/auth/callback` to
    Supabase → Authentication → URL Configuration → Redirect URLs
    (and update the Site URL)
