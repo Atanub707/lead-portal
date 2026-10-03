@@ -28,7 +28,8 @@ import {
   getPipelines,
   getProfiles,
 } from "@/lib/data";
-import { needsDeepResearch } from "@/lib/deep-research";
+import { needsDeepResearch, reconcileIfStale } from "@/lib/deep-research";
+import { createClient } from "@/lib/supabase/server";
 import {
   CHANNELS,
   KIND_LABEL,
@@ -137,6 +138,16 @@ export default async function CompanyPage({
   const companyId = Number(id);
   if (!Number.isFinite(companyId)) notFound();
 
+  // Phase 1: finish a deep-research run whose tab was closed, before the rest
+  // of the page data loads — so its merged results appear in this render.
+  const supabase = await createClient();
+  const deepResearchState = await getDeepResearchState(companyId);
+  await reconcileIfStale(supabase, {
+    activeRunId: deepResearchState.activeRunId,
+    latestCreatedAt: deepResearchState.latest?.created_at ?? null,
+  });
+
+  // Phase 2: everything else.
   const [
     company,
     contacts,
@@ -145,7 +156,6 @@ export default async function CompanyPage({
     pipelines,
     companyEmails,
     enrichmentRuns,
-    deepResearchState,
     profiles,
   ] = await Promise.all([
     getCompany(companyId),
@@ -155,7 +165,6 @@ export default async function CompanyPage({
     getPipelines(),
     getCompanyEmails(companyId),
     getEnrichmentRuns(companyId),
-    getDeepResearchState(companyId),
     getProfiles(),
   ]);
 

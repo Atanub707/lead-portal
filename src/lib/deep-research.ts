@@ -415,6 +415,62 @@ export async function reconcileDeepResearch(
   return { ok: true, status, summary: { people, emails, cost } };
 }
 
+// Lazy finalization for runs whose tab was closed. A run younger than this is
+// left alone so a page load moments after starting doesn't poll Apify twice.
+const RECONCILE_MIN_AGE_MS = 30_000;
+const RUN_TIMEOUT_MS = 15 * 60_000;
+
+export async function reconcileIfStale(
+  supabase: SupabaseClient,
+  state: { activeRunId: number | null; latestCreatedAt: string | null }
+): Promise<void> {
+  const { activeRunId, latestCreatedAt } = state;
+  if (activeRunId === null || !latestCreatedAt) return;
+
+  const ageMs = Date.now() - new Date(latestCreatedAt).getTime();
+
+  if (ageMs > RUN_TIMEOUT_MS) {
+    // Mirror the GET route: read with the user client, fail the run with admin
+    // (no RLS UPDATE policy). Merge details so actor refs aren't clobbered.
+    try {
+      const { data: run } = await supabase
+        .from("enrichment_runs")
+        .select("id, details")
+        .eq("id", activeRunId)
+        .maybeSingle();
+      if (!run) return;
+      const admin = createAdminClient();
+      await admin
+        .from("enrichment_runs")
+        .update({
+          status: "failed",
+          details: {
+            ...((run.details as Record<string, unknown> | null) ?? {}),
+            error: "timed out",
+          },
+        })
+        .eq("id", run.id);
+    } catch (err) {
+      console.error(
+        "[deep-research] lazy timeout failed:",
+        err instanceof Error ? err.message : String(err)
+      );
+    }
+    return;
+  }
+
+  if (ageMs > RECONCILE_MIN_AGE_MS) {
+    try {
+      await reconcileDeepResearch(supabase, activeRunId);
+    } catch (err) {
+      console.error(
+        "[deep-research] lazy reconcile failed:",
+        err instanceof Error ? err.message : String(err)
+      );
+    }
+  }
+}
+
 // ─── Merge (dedupe + insert contacts/emails + fill empty org fields) ─────────
 
 export interface DeepResearchLead {
