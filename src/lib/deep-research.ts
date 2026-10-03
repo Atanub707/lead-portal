@@ -460,6 +460,19 @@ export async function mergeLeads(
     supabase.from("organizations").select("linkedin_url").eq("id", orgId).maybeSingle(),
   ]);
 
+  const failedRead = [
+    { label: "contacts", error: contactsRes.error },
+    { label: "company_emails", error: companyEmailsRes.error },
+    { label: "organizations", error: orgRes.error },
+  ].find((read) => read.error);
+  if (failedRead) {
+    console.error(
+      `[deep-research] ${failedRead.label} read failed:`,
+      failedRead.error?.message
+    );
+    throw new Error(`Couldn't load existing ${failedRead.label} for merge.`);
+  }
+
   const existingContacts = (contactsRes.data ?? []) as {
     name: string;
     linkedin_url: string | null;
@@ -592,7 +605,8 @@ export async function mergeLeads(
     const { error } = await supabase
       .from("organizations")
       .update({ linkedin_url: company.linkedin_url, linkedin_source: "apollo" })
-      .eq("id", orgId);
+      .eq("id", orgId)
+      .is("linkedin_url", null);
     if (error) {
       console.error("[deep-research] org linkedin fill failed:", error.message);
     }
