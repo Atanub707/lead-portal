@@ -1,5 +1,6 @@
 import { clerkClient } from "@clerk/nextjs/server";
 import { Trash2 } from "lucide-react";
+import { UserAvatar } from "@/components/badges";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { InviteButton } from "@/components/invite-form";
 import { RoleSelect } from "@/components/role-select";
@@ -103,7 +104,6 @@ export default async function SettingsPage({
 
         <ul className="divide-y divide-zinc-100">
           {users.map((user) => {
-            const initial = (user.email ?? "?").charAt(0).toUpperCase();
             const pending =
               authMeta?.get(user.id) ??
               (user.email
@@ -117,9 +117,7 @@ export default async function SettingsPage({
                 className="flex items-center justify-between gap-3 px-5 py-3.5"
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[11px] font-semibold text-zinc-600">
-                    {initial}
-                  </span>
+                  <UserAvatar seed={user.id} name={user.email} size={28} />
                   <div className="min-w-0">
                     <p className="truncate text-[13px] font-medium text-zinc-900">
                       {user.email ?? user.id}

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink, Mail, Plus, Star } from "lucide-react";
-import { CompanyAvatar, KindBadge, StatusDot } from "@/components/badges";
+import { KindBadge, StatusDot, UserAvatar } from "@/components/badges";
+import { CompanyMark } from "@/components/company-mark";
+import { LinkedInBadge } from "@/components/icons";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { FindLinkedInButton } from "@/components/find-linkedin-button";
 import { FollowUpControl } from "@/components/follow-up-control";
@@ -143,7 +145,11 @@ export default async function CompanyPage({
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="mt-3">
         <div className="flex flex-wrap items-center gap-3">
-          <CompanyAvatar name={company.name} />
+          <CompanyMark
+            name={company.name}
+            website={company.website}
+            size={32}
+          />
           <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
             {company.name}
           </h1>
@@ -169,7 +175,7 @@ export default async function CompanyPage({
           ) : null}
           {company.linkedin_url ? (
             <a
-              className="inline-flex items-center gap-1 text-[13px] text-zinc-500 transition-colors hover:text-zinc-900"
+              className="inline-flex items-center gap-1.5 text-[13px] text-zinc-600 transition-colors hover:text-zinc-900"
               href={company.linkedin_url}
               target="_blank"
               rel="noreferrer"
@@ -179,6 +185,7 @@ export default async function CompanyPage({
                   : "Found via verified search — double-check it"
               }
             >
+              <LinkedInBadge className="h-4 w-4" />
               LinkedIn
               <ExternalLink className="h-3 w-3" aria-hidden="true" />
             </a>
@@ -219,7 +226,18 @@ export default async function CompanyPage({
                     {label}
                   </dt>
                   <dd className="mt-1 text-[13px] capitalize text-zinc-800 tabular-nums">
-                    {value}
+                    {label === "Added by" && company.created_by ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <UserAvatar
+                          seed={company.created_by}
+                          name={addedBy}
+                          size={18}
+                        />
+                        {value}
+                      </span>
+                    ) : (
+                      value
+                    )}
                   </dd>
                 </div>
               ))}
@@ -290,7 +308,11 @@ export default async function CompanyPage({
                   className="flex items-start justify-between gap-3 py-3"
                 >
                   <div className="flex min-w-0 items-start gap-2.5">
-                    <CompanyAvatar name={contact.name} size="sm" />
+                    <UserAvatar
+                      seed={contact.created_by ?? contact.name}
+                      name={contact.name}
+                      size={26}
+                    />
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate text-[13px] font-medium text-zinc-900">
@@ -316,11 +338,12 @@ export default async function CompanyPage({
                       <div className="mt-0.5 flex flex-wrap items-center gap-3 text-[12px]">
                         {contact.linkedin_url ? (
                           <a
-                            className="text-zinc-500 transition-colors hover:text-zinc-900"
+                            className="inline-flex items-center gap-1.5 text-zinc-500 transition-colors hover:text-zinc-900"
                             href={contact.linkedin_url}
                             target="_blank"
                             rel="noreferrer"
                           >
+                            <LinkedInBadge className="h-3.5 w-3.5" />
                             LinkedIn
                           </a>
                         ) : null}

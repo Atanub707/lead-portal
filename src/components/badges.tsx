@@ -44,37 +44,103 @@ export function KindBadge({ kind }: { kind: OrgKind }) {
   );
 }
 
-const AVATAR_STYLES = [
-  "bg-rose-50 text-rose-700",
-  "bg-amber-50 text-amber-700",
-  "bg-emerald-50 text-emerald-700",
-  "bg-sky-50 text-sky-700",
-  "bg-violet-50 text-violet-700",
-  "bg-zinc-100 text-zinc-600",
+const AVATAR_GRADIENTS = [
+  "from-amber-400 to-amber-600",
+  "from-pink-400 to-pink-600",
+  "from-sky-400 to-blue-600",
+  "from-emerald-400 to-emerald-600",
+  "from-violet-400 to-violet-600",
+  "from-orange-400 to-orange-600",
+  "from-cyan-400 to-cyan-600",
+  "from-rose-400 to-rose-600",
 ];
+
+function hashString(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
 
 export function CompanyAvatar({
   name,
-  size = "md",
+  size = 24,
 }: {
   name: string;
-  size?: "md" | "sm";
+  size?: number;
 }) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i += 1) {
-    hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
-  }
-  const style = AVATAR_STYLES[hash % AVATAR_STYLES.length];
+  const style = AVATAR_GRADIENTS[hashString(name) % AVATAR_GRADIENTS.length];
   const letter = name.trim().charAt(0).toUpperCase() || "?";
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center rounded font-semibold ${style} ${
-        size === "sm" ? "h-5 w-5 text-[10px]" : "h-6 w-6 text-[11px]"
-      }`}
+      className={`inline-flex shrink-0 items-center justify-center rounded bg-gradient-to-br font-semibold text-white ring-1 ring-black/5 ${style}`}
+      style={{
+        width: size,
+        height: size,
+        fontSize: Math.max(9, Math.round(size * 0.45)),
+      }}
       aria-hidden="true"
     >
       {letter}
+    </span>
+  );
+}
+
+// Cartoon display pictures: a stable emoji + gradient per person, derived from
+// their user id (no storage needed). Covers the fun range — people, animals,
+// robots — and stays consistent everywhere the person appears.
+const PERSON_EMOJIS = [
+  "👨",
+  "👩",
+  "🧑",
+  "👨‍💻",
+  "👩‍💻",
+  "🧔",
+  "👩‍🦰",
+  "👨‍🦱",
+  "👩‍🦳",
+  "🐱",
+  "🦊",
+  "🦇",
+  "🦁",
+  "🐼",
+  "🐸",
+  "🦉",
+  "🐙",
+  "🤖",
+  "🦄",
+  "🐯",
+  "🐨",
+  "🐵",
+];
+
+export function UserAvatar({
+  seed,
+  name,
+  size = 22,
+  title,
+}: {
+  seed?: string | null;
+  name?: string | null;
+  size?: number;
+  title?: string;
+}) {
+  const key = seed || name || "?";
+  const hash = hashString(key);
+  const emoji = PERSON_EMOJIS[hash % PERSON_EMOJIS.length];
+  const gradient =
+    AVATAR_GRADIENTS[(hash >>> 5) % AVATAR_GRADIENTS.length];
+
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br shadow-sm ring-1 ring-black/10 ${gradient}`}
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.52) }}
+      title={title ?? name ?? undefined}
+      aria-hidden="true"
+    >
+      <span className="translate-y-[0.5px] leading-none">{emoji}</span>
     </span>
   );
 }

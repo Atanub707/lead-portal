@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Building2, CalendarClock, Mail, Users } from "lucide-react";
 import {
   getDashboardStats,
   getPipelines,
@@ -55,34 +56,48 @@ export default async function DashboardPage() {
     )
     .join(" · ");
 
-  const kpis: { label: string; value: number; detail: string; tone?: string }[] =
-    [
-      {
-        label: "Companies",
-        value: stats.totalCompanies,
-        detail: listBreakdown,
-      },
-      {
-        label: "People",
-        value: stats.people,
-        detail:
-          stats.decisionMakers > 0
-            ? `${stats.decisionMakers} decision makers`
-            : "no decision makers yet",
-        tone: stats.decisionMakers > 0 ? "text-amber-700" : undefined,
-      },
-      {
-        label: "Emails found",
-        value: stats.emails,
-        detail: "company + personal",
-      },
-      {
-        label: "Follow-ups due",
-        value: followUpsDue,
-        detail: followUpParts || "nothing due",
-        tone: stats.followUps.overdue > 0 ? "text-rose-600" : undefined,
-      },
-    ];
+  const kpis: {
+    label: string;
+    value: number;
+    detail: string;
+    tone?: string;
+    icon: typeof Building2;
+    iconTone: string;
+  }[] = [
+    {
+      label: "Companies",
+      value: stats.totalCompanies,
+      detail: listBreakdown,
+      icon: Building2,
+      iconTone: "bg-indigo-50 text-indigo-600",
+    },
+    {
+      label: "People",
+      value: stats.people,
+      detail:
+        stats.decisionMakers > 0
+          ? `${stats.decisionMakers} decision makers`
+          : "no decision makers yet",
+      tone: stats.decisionMakers > 0 ? "text-amber-700" : undefined,
+      icon: Users,
+      iconTone: "bg-emerald-50 text-emerald-600",
+    },
+    {
+      label: "Emails found",
+      value: stats.emails,
+      detail: "company + personal",
+      icon: Mail,
+      iconTone: "bg-sky-50 text-sky-600",
+    },
+    {
+      label: "Follow-ups due",
+      value: followUpsDue,
+      detail: followUpParts || "nothing due",
+      tone: stats.followUps.overdue > 0 ? "text-rose-600" : undefined,
+      icon: CalendarClock,
+      iconTone: "bg-amber-50 text-amber-600",
+    },
+  ];
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
@@ -99,9 +114,16 @@ export default async function DashboardPage() {
             key={kpi.label}
             className={`card animate-rise animate-rise-${index + 1} p-5`}
           >
-            <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">
-              {kpi.label}
-            </p>
+            <div className="flex items-start justify-between">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">
+                {kpi.label}
+              </p>
+              <span
+                className={`-mt-1 -mr-1 flex h-7 w-7 items-center justify-center rounded-lg ${kpi.iconTone}`}
+              >
+                <kpi.icon className="h-3.5 w-3.5" aria-hidden="true" />
+              </span>
+            </div>
             <p className="mt-2 text-[26px] font-semibold tracking-tight text-zinc-900 tabular-nums">
               {kpi.value}
             </p>

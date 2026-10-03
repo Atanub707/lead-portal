@@ -12,7 +12,9 @@ import { BookmarkToggle } from "@/components/bookmark-toggle";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { FollowUpControl } from "@/components/follow-up-control";
 import { PasteUrl } from "@/components/paste-url";
-import { CompanyAvatar, KindBadge } from "@/components/badges";
+import { KindBadge, UserAvatar } from "@/components/badges";
+import { CompanyMark } from "@/components/company-mark";
+import { LinkedInBadge } from "@/components/icons";
 import { deleteOrganization } from "@/lib/actions";
 import { getCompanies, getCurrentProfile, getPipelines } from "@/lib/data";
 import {
@@ -230,7 +232,10 @@ export default async function CompaniesPage({
                   </td>
                   <td className="td pl-2">
                     <div className="flex items-center gap-2.5">
-                      <CompanyAvatar name={company.name} />
+                      <CompanyMark
+                        name={company.name}
+                        website={company.website}
+                      />
                       <div className="min-w-0">
                         <Link
                           href={`/companies/${company.id}`}
@@ -252,6 +257,17 @@ export default async function CompaniesPage({
                               className="h-3 w-3 shrink-0"
                               aria-hidden="true"
                             />
+                          </a>
+                        ) : null}
+                        {company.linkedin_url ? (
+                          <a
+                            href={company.linkedin_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="LinkedIn"
+                            className="ml-1.5 inline-flex align-middle"
+                          >
+                            <LinkedInBadge className="h-3.5 w-3.5" />
                           </a>
                         ) : null}
                       </div>
@@ -298,9 +314,11 @@ export default async function CompaniesPage({
                         className="inline-flex items-center gap-1.5"
                         title={company.created_by_email ?? undefined}
                       >
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[9px] font-semibold text-zinc-600">
-                          {company.created_by_name.charAt(0).toUpperCase()}
-                        </span>
+                        <UserAvatar
+                          seed={company.created_by}
+                          name={company.created_by_name}
+                          size={20}
+                        />
                         <span className="text-[12px] text-zinc-600">
                           {company.created_by_name}
                         </span>
