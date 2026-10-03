@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getActorRun, getDatasetItems, startActorRun } from "./apify";
+import { getActorRun, getDatasetItems, startActorRun, type ActorRunInfo } from "./apify";
 import { matchEmailToContact } from "./match";
 import { isDecisionTitle, isGenericEmail } from "./people";
 import { createAdminClient } from "./supabase/admin";
@@ -127,14 +127,70 @@ export function normalizeLinkedInEmployee(raw: unknown): NormalizedLead | null {
   };
 }
 
+export interface NormalizedLinkedInCompany {
+  linkedinUrl: string | null;
+  name: string | null;
+  phone: string | null;
+  address: string | null;
+  founded: number | null;
+  employeeCount: number | null;
+}
+
+export function normalizeLinkedInCompany(
+  raw: unknown
+): NormalizedLinkedInCompany | null {
+  const r = asRecord(raw);
+  if (!r) return null;
+  const universalName = str(r.universalName);
+  const linkedinUrl =
+    str(r.linkedinUrl) ??
+    str(r.linkedin_url) ??
+    str(r.url) ??
+    (universalName
+      ? `https://www.linkedin.com/company/${universalName}`
+      : null);
+  const name = str(r.name) ?? str(r.companyName);
+  if (!linkedinUrl && !name) return null;
+
+  const locations = Array.isArray(r.locations) ? r.locations : [];
+  const hq =
+    locations.find((location) => asRecord(location)?.headquarter === true) ??
+    locations[0];
+  const hqRecord = asRecord(hq);
+  const address =
+    fromRecord(hqRecord?.parsed, ["text"]) ??
+    str(hqRecord?.line1) ??
+    str(hqRecord?.description) ??
+    str(r.address);
+
+  const foundedOn = asRecord(r.foundedOn);
+  const founded =
+    typeof foundedOn?.year === "number"
+      ? foundedOn.year
+      : typeof r.founded === "number"
+        ? r.founded
+        : null;
+
+  return {
+    linkedinUrl,
+    name,
+    phone: str(r.phone) ?? str(r.companyPhone),
+    address,
+    founded,
+    employeeCount:
+      typeof r.employeeCount === "number" ? r.employeeCount : null,
+  };
+}
+
 export const APOLLO_ACTOR = "pipelinelabs/lead-scraper-apollo-zoominfo-lusha-ppe";
 export const LINKEDIN_EMPLOYEES_ACTOR = "harvestapi/linkedin-company-employees";
+export const LINKEDIN_COMPANY_ACTOR = "harvestapi/linkedin-company";
 export const DEEP_RESEARCH_MONTHLY_CAP_USD = 5;
 const DEEP_RESEARCH_ESTIMATED_RUN_USD = 0.15;
 // A reconcile claim older than this is treated as abandoned and reset.
 export const RECONCILE_CLAIM_STALE_MS = 5 * 60_000;
 // A run older than this is always failed, never reset or re-claimed.
-const RUN_TIMEOUT_MS = 15 * 60_000;
+export const RUN_TIMEOUT_MS = 10 * 60_000;
 
 // Claim timestamp lives in details.claim_at (jsonb) — no schema change needed.
 // Only a parsable timestamp inside the stale window counts as a live owner.
@@ -187,6 +243,14 @@ export function linkedinEmployeesInput(companyLinkedinUrl: string) {
   };
 }
 
+// The actor resolves names via its `searches` array; `companies` only accepts
+// LinkedIn company URLs (verified against its published input schema).
+export function linkedinCompanyInput(companyName: string) {
+  return {
+    searches: [companyName],
+  };
+}
+
 export type StartDeepResearchResult =
   | { ok: true; runId: number }
   | { ok: false; error: string };
@@ -221,19 +285,22 @@ export async function startDeepResearch(
     };
   }
 
-  // Guard 2: 7-day cooldown after the last successful run.
+  // Guard 2: 7-day cooldown after the last successful run — but only when that
+  // run actually found people. A zero-result success may be retried anytime.
   const { data: successRuns } = await supabase
     .from("enrichment_runs")
-    .select("created_at")
+    .select("created_at, people_found")
     .eq("org_id", orgId)
     .eq("kind", "deep_research")
     .eq("status", "ok")
     .order("created_at", { ascending: false })
     .limit(1);
-  const lastSuccessAt = successRuns?.[0]?.created_at as string | undefined;
-  if (lastSuccessAt) {
+  const lastSuccess = successRuns?.[0] as
+    | { created_at: string; people_found: number }
+    | undefined;
+  if (lastSuccess && Number(lastSuccess.people_found ?? 0) > 0) {
     const remaining =
-      7 * DAY_MS - (Date.now() - new Date(lastSuccessAt).getTime());
+      7 * DAY_MS - (Date.now() - new Date(lastSuccess.created_at).getTime());
     if (remaining > 0) {
       const days = Math.ceil(remaining / DAY_MS);
       return {
@@ -345,6 +412,14 @@ export async function startDeepResearch(
         linkedinEmployeesInput(company.linkedin_url)
       );
       actors.push({ slug: LINKEDIN_EMPLOYEES_ACTOR, ...linkedin });
+    } else {
+      // No LinkedIn URL: resolve the company page from its name first. The
+      // reconcile chain starts the employees actor once the URL lands.
+      const resolver = await startActorRun(
+        LINKEDIN_COMPANY_ACTOR,
+        linkedinCompanyInput(company.name)
+      );
+      actors.push({ slug: LINKEDIN_COMPANY_ACTOR, ...resolver });
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -376,7 +451,11 @@ export interface DeepResearchSummary {
 }
 
 export type ReconcileDeepResearchResult =
-  | { ok: true; status: "running" }
+  | {
+      ok: true;
+      status: "running";
+      partial?: { people: number; emails: number };
+    }
   | { ok: true; status: "ok" | "failed"; summary: DeepResearchSummary };
 
 interface DeepResearchActorRef {
@@ -398,6 +477,115 @@ function actorNormalizer(slug: string): ((raw: unknown) => NormalizedLead | null
   return null;
 }
 
+function runningResult(
+  people: number,
+  emails: number
+): ReconcileDeepResearchResult {
+  return people > 0 || emails > 0
+    ? { ok: true, status: "running", partial: { people, emails } }
+    : { ok: true, status: "running" };
+}
+
+function parseCompanyFacts(value: unknown): MergedCompanyFacts {
+  const r = asRecord(value) ?? {};
+  return {
+    phone: str(r.phone),
+    address: str(r.address),
+    founded: typeof r.founded === "number" ? r.founded : null,
+    employees: typeof r.employees === "number" ? r.employees : null,
+    linkedin_url: str(r.linkedin_url),
+  };
+}
+
+function mergeCompanyFacts(
+  target: MergedCompanyFacts,
+  incoming: MergedCompanyFacts
+): MergedCompanyFacts {
+  return {
+    phone: target.phone ?? incoming.phone,
+    address: target.address ?? incoming.address,
+    founded: target.founded ?? incoming.founded,
+    employees: target.employees ?? incoming.employees,
+    linkedin_url: target.linkedin_url ?? incoming.linkedin_url,
+  };
+}
+
+async function getOrgLinkedInUrl(
+  supabase: SupabaseClient,
+  orgId: number
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("linkedin_url")
+    .eq("id", orgId)
+    .maybeSingle();
+  if (error) {
+    console.error("[deep-research] org linkedin read failed:", error.message);
+    return null;
+  }
+  return ((data as { linkedin_url: string | null } | null)?.linkedin_url) ?? null;
+}
+
+async function fillOrgLinkedInFromResolver(
+  supabase: SupabaseClient,
+  orgId: number,
+  linkedinUrl: string | null
+): Promise<void> {
+  if (!linkedinUrl) return;
+  // Conditional on the DB value still being empty, so a concurrent fill wins.
+  const { error } = await supabase
+    .from("organizations")
+    .update({ linkedin_url: linkedinUrl, linkedin_source: "apollo" })
+    .eq("id", orgId)
+    .is("linkedin_url", null);
+  if (error) {
+    console.error("[deep-research] org linkedin fill failed:", error.message);
+  }
+}
+
+interface ReconcileClaimState {
+  actors: DeepResearchActorRef[];
+  mergedSlugs: Set<string>;
+  employeesStarted: boolean;
+  companyFacts: MergedCompanyFacts;
+  people: number;
+  emails: number;
+}
+
+// The claim is held only around merge/finalize work (seconds). Every exit that
+// leaves the run unfinished releases it back to "running" with the accumulated
+// details, so the next poll can keep merging.
+async function releaseClaim(
+  admin: SupabaseClient,
+  runId: number,
+  details: Record<string, unknown>,
+  state: ReconcileClaimState
+): Promise<void> {
+  const { error } = await admin
+    .from("enrichment_runs")
+    .update({
+      status: "running",
+      people_found: state.people,
+      emails_found: state.emails,
+      details: {
+        ...details,
+        actors: state.actors,
+        merged_slugs: [...state.mergedSlugs],
+        company: state.companyFacts,
+        employees_started: state.employeesStarted,
+        claim_at: null,
+      },
+    })
+    .eq("id", runId)
+    .eq("status", "reconciling");
+  if (error) {
+    console.error(
+      "[deep-research] reconcile claim release failed:",
+      error.message
+    );
+  }
+}
+
 export async function reconcileDeepResearch(
   supabase: SupabaseClient,
   runId: number
@@ -409,10 +597,8 @@ export async function reconcileDeepResearch(
     .maybeSingle();
   if (!run) throw new Error("Deep research run not found");
 
-  // Another tab may own the reconcile ("reconciling"), or may have finalized
-  // this run since `getDeepResearchState` was read.
-  if (run.status === "reconciling") return { ok: true, status: "running" };
-  if (run.status !== "running") {
+  // Another request may have finalized this run since the caller read state.
+  if (run.status !== "running" && run.status !== "reconciling") {
     return {
       ok: true,
       status: run.status === "ok" ? "ok" : "failed",
@@ -424,9 +610,11 @@ export async function reconcileDeepResearch(
     };
   }
 
-  // Defense in depth: a run past the 15-min wall is failed even if a caller
-  // skipped the GET/lazy stale guards — never reset and re-claimed.
-  if (Date.now() - new Date(run.created_at).getTime() > RUN_TIMEOUT_MS) {
+  const ageMs = Date.now() - new Date(run.created_at).getTime();
+
+  // Defense in depth: a stale run is failed even if a caller skipped the
+  // GET/lazy guards — never reset and re-claimed.
+  if (ageMs > RUN_TIMEOUT_MS) {
     const cost = await failTimedOutRun(run);
     return {
       ok: true,
@@ -439,77 +627,207 @@ export async function reconcileDeepResearch(
     };
   }
 
-  // Atomic claim: only the caller that flips running → reconciling owns this
-  // reconcile (and therefore the merge). Losers get 0 rows and return a
-  // running-style result without merging. The claim timestamp rides in
-  // details.claim_at so staleness needs no schema change.
   const admin = createAdminClient();
+
+  if (run.status === "reconciling") {
+    // A fresh claim belongs to a live merge (seconds); a stale/missing claim
+    // means the holder died, so CAS-reset it and re-claim below.
+    if (isFreshReconcileClaim(run.details)) {
+      return runningResult(
+        Number(run.people_found ?? 0),
+        Number(run.emails_found ?? 0)
+      );
+    }
+    const released = await resetStaleReconcileClaim(run);
+    if (!released) {
+      return runningResult(
+        Number(run.people_found ?? 0),
+        Number(run.emails_found ?? 0)
+      );
+    }
+  }
+
+  // Atomic claim: only the caller that flips running → reconciling owns this
+  // reconcile (and therefore the merge). Losers get 0 rows. The claim
+  // timestamp rides in details.claim_at so staleness needs no schema change.
+  const details = (run.details as Record<string, unknown> | null) ?? {};
   const { data: claimed } = await admin
     .from("enrichment_runs")
     .update({
       status: "reconciling",
-      details: {
-        ...((run.details as Record<string, unknown> | null) ?? {}),
-        claim_at: new Date().toISOString(),
-      },
+      details: { ...details, claim_at: new Date().toISOString() },
     })
     .eq("id", run.id)
     .eq("status", "running")
     .select("id");
-  if (!claimed || claimed.length === 0) return { ok: true, status: "running" };
-
-  const actorRefs = ((run.details?.actors ?? []) as DeepResearchActorRef[]).filter(
-    (actor) => actor?.runId
-  );
-  // The POST inserts the row before actors are persisted; the claim is held
-  // until the run ids land (or the timeout/stale-reset paths recover it).
-  if (actorRefs.length === 0) return { ok: true, status: "running" };
-
-  const infos = await Promise.all(actorRefs.map((actor) => getActorRun(actor.runId)));
-  if (infos.some((info) => !TERMINAL_RUN_STATUSES.has(info.status))) {
-    return { ok: true, status: "running" };
+  if (!claimed || claimed.length === 0) {
+    return runningResult(
+      Number(run.people_found ?? 0),
+      Number(run.emails_found ?? 0)
+    );
   }
 
-  const leads: DeepResearchLead[] = [];
-  for (let i = 0; i < actorRefs.length; i += 1) {
-    const info = infos[i];
-    if (info.status !== "SUCCEEDED") continue;
-    const normalize = actorNormalizer(actorRefs[i].slug);
-    if (!normalize) continue;
-    const items = await getDatasetItems(info.datasetId || actorRefs[i].datasetId, 100);
-    for (const item of items) {
-      const lead = normalize(item);
-      if (lead) {
-        leads.push({
-          lead,
-          source: actorRefs[i].slug === APOLLO_ACTOR ? "apollo" : "linkedin",
-        });
+  const state: ReconcileClaimState = {
+    actors: ((details.actors ?? []) as DeepResearchActorRef[]).filter(
+      (actor) => actor?.runId
+    ),
+    mergedSlugs: new Set<string>(
+      Array.isArray(details.merged_slugs)
+        ? (details.merged_slugs as string[])
+        : []
+    ),
+    employeesStarted: Boolean(details.employees_started),
+    companyFacts: parseCompanyFacts(details.company),
+    people: Number(run.people_found ?? 0),
+    emails: Number(run.emails_found ?? 0),
+  };
+
+  try {
+    // The POST inserts the row before actor ids are persisted; nothing to
+    // poll or merge yet.
+    if (state.actors.length === 0) {
+      await releaseClaim(admin, run.id, details, state);
+      return runningResult(state.people, state.emails);
+    }
+
+    const infos = new Map<string, ActorRunInfo>();
+    const polled = await Promise.all(
+      state.actors.map((actor) => getActorRun(actor.runId))
+    );
+    state.actors.forEach((actor, index) =>
+      infos.set(actor.runId, polled[index])
+    );
+
+    // Progressive merge: each terminal actor's data lands as soon as it is
+    // ready — never wait for slower siblings. merged_slugs makes it once-only.
+    for (const actor of state.actors) {
+      const info = infos.get(actor.runId);
+      if (!info || !TERMINAL_RUN_STATUSES.has(info.status)) continue;
+      if (state.mergedSlugs.has(actor.slug)) continue;
+
+      if (info.status === "SUCCEEDED") {
+        const datasetId = info.datasetId || actor.datasetId;
+        if (actor.slug === LINKEDIN_COMPANY_ACTOR) {
+          const items = await getDatasetItems(datasetId, 10);
+          let resolved: NormalizedLinkedInCompany | null = null;
+          for (const item of items) {
+            resolved = normalizeLinkedInCompany(item);
+            if (resolved) break;
+          }
+          if (resolved) {
+            await fillOrgLinkedInFromResolver(
+              supabase,
+              run.org_id as number,
+              resolved.linkedinUrl
+            );
+            state.companyFacts = mergeCompanyFacts(state.companyFacts, {
+              phone: resolved.phone,
+              address: resolved.address,
+              founded: resolved.founded,
+              employees: resolved.employeeCount,
+              linkedin_url: resolved.linkedinUrl,
+            });
+          }
+        } else {
+          const normalize = actorNormalizer(actor.slug);
+          if (normalize) {
+            const items = await getDatasetItems(datasetId, 100);
+            const source = actor.slug === APOLLO_ACTOR ? "apollo" : "linkedin";
+            const leads: DeepResearchLead[] = [];
+            for (const item of items) {
+              const lead = normalize(item);
+              if (lead) leads.push({ lead, source });
+            }
+            if (leads.length > 0) {
+              const merged = await mergeLeads(supabase, {
+                orgId: run.org_id as number,
+                userId: (run.created_by as string | null) ?? null,
+                leads,
+              });
+              state.people += merged.people;
+              state.emails += merged.emails;
+              state.companyFacts = mergeCompanyFacts(
+                state.companyFacts,
+                merged.company
+              );
+            }
+          }
+        }
+      }
+      state.mergedSlugs.add(actor.slug);
+    }
+
+    // Chain the employees actor once the org has a LinkedIn URL (the resolver
+    // just filled it). Runs at most once per run; the actor-list check guards
+    // against a duplicate when startDeepResearch already started it.
+    if (
+      !state.employeesStarted &&
+      !state.actors.some((actor) => actor.slug === LINKEDIN_EMPLOYEES_ACTOR)
+    ) {
+      const orgLinkedin = await getOrgLinkedInUrl(
+        supabase,
+        run.org_id as number
+      );
+      if (orgLinkedin) {
+        const started = await startActorRun(
+          LINKEDIN_EMPLOYEES_ACTOR,
+          linkedinEmployeesInput(orgLinkedin)
+        );
+        state.actors.push({ slug: LINKEDIN_EMPLOYEES_ACTOR, ...started });
+        state.employeesStarted = true;
       }
     }
+
+    const allTerminal = state.actors.every((actor) => {
+      const info = infos.get(actor.runId);
+      return Boolean(info && TERMINAL_RUN_STATUSES.has(info.status));
+    });
+
+    if (allTerminal) {
+      const allInfos = state.actors
+        .map((actor) => infos.get(actor.runId))
+        .filter((info): info is ActorRunInfo => Boolean(info));
+      const succeeded = allInfos.filter(
+        (info) => info.status === "SUCCEEDED"
+      ).length;
+      const cost = allInfos.reduce((sum, info) => sum + info.usageTotalUsd, 0);
+      const status = succeeded > 0 ? "ok" : "failed";
+      const { error } = await admin
+        .from("enrichment_runs")
+        .update({
+          status,
+          people_found: state.people,
+          emails_found: state.emails,
+          cost_usd: cost,
+          details: {
+            ...details,
+            actors: state.actors,
+            merged_slugs: [...state.mergedSlugs],
+            company: state.companyFacts,
+            employees_started: state.employeesStarted,
+            found: { people: state.people, emails: state.emails },
+            claim_at: null,
+          },
+        })
+        .eq("id", run.id);
+      if (error) throw new Error(error.message);
+      return {
+        ok: true,
+        status,
+        summary: { people: state.people, emails: state.emails, cost },
+      };
+    }
+
+    await releaseClaim(admin, run.id, details, state);
+    return runningResult(state.people, state.emails);
+  } catch (err) {
+    console.error(
+      "[deep-research] reconcile failed:",
+      err instanceof Error ? err.message : String(err)
+    );
+    await releaseClaim(admin, run.id, details, state);
+    return runningResult(state.people, state.emails);
   }
-
-  const succeeded = infos.filter((info) => info.status === "SUCCEEDED").length;
-  const cost = infos.reduce((sum, info) => sum + info.usageTotalUsd, 0);
-  const { people, emails, company } = await mergeLeads(supabase, {
-    orgId: run.org_id as number,
-    userId: (run.created_by as string | null) ?? null,
-    leads,
-  });
-
-  const status = succeeded > 0 ? "ok" : "failed";
-  const { error } = await admin
-    .from("enrichment_runs")
-    .update({
-      status,
-      people_found: people,
-      emails_found: emails,
-      cost_usd: cost,
-      details: { actors: actorRefs, company, found: { people, emails } },
-    })
-    .eq("id", run.id);
-  if (error) throw new Error(error.message);
-
-  return { ok: true, status, summary: { people, emails, cost } };
 }
 
 // Lazy finalization for runs whose tab was closed. A run younger than this is
@@ -632,7 +950,7 @@ export async function reconcileIfStale(
 
   if (run.status === "reconciling") {
     // A fresh claim belongs to another tab; a missing/malformed/old one means
-    // the holder died. A run past the 15-min wall takes the timeout path
+    // the holder died. A run past the 10-min wall takes the timeout path
     // instead of a reset — resetting would let a zombie cycle reset→claim
     // forever and never be observed as timed out.
     if (isFreshReconcileClaim(run.details)) return;

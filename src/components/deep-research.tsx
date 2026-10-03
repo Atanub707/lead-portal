@@ -14,6 +14,7 @@ interface DeepResearchSummary {
 interface StatusResponse {
   ok?: boolean;
   status?: "idle" | "running" | "ok" | "failed";
+  partial?: { people: number; emails: number };
   summary?: DeepResearchSummary;
   error?: string;
 }
@@ -21,6 +22,12 @@ interface StatusResponse {
 type Phase = "idle" | "running" | "done" | "failed";
 
 const POLL_MS = 5000;
+
+function formatElapsed(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
 
 export function DeepResearch({
   orgId,
@@ -40,8 +47,14 @@ export function DeepResearch({
   const [dialogError, setDialogError] = useState("");
   const [failedError, setFailedError] = useState("Deep research failed");
   const [summary, setSummary] = useState<DeepResearchSummary | null>(null);
+  const [partial, setPartial] = useState<{
+    people: number;
+    emails: number;
+  } | null>(null);
+  const [elapsed, setElapsed] = useState(0);
   // Ensures the terminal transition (and its router.refresh) runs only once.
   const settledRef = useRef(false);
+  const startedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!dialogOpen) return;
@@ -51,6 +64,15 @@ export function DeepResearch({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [dialogOpen, posting]);
+
+  useEffect(() => {
+    if (phase !== "running") return;
+    const startedAt = startedAtRef.current ?? Date.now();
+    const id = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [phase]);
 
   useEffect(() => {
     if (phase !== "running") return;
@@ -77,6 +99,9 @@ export function DeepResearch({
           settledRef.current = true;
           setPhase("idle");
           router.refresh();
+        } else if (json.status === "running" && json.partial?.people) {
+          // Counts only grow within a run, so a stale response can't shrink them.
+          setPartial(json.partial);
         }
       } catch {
         // Transient failure — keep polling.
@@ -111,7 +136,10 @@ export function DeepResearch({
         return;
       }
       settledRef.current = false;
+      startedAtRef.current = Date.now();
+      setElapsed(0);
       setSummary(null);
+      setPartial(null);
       setDialogError("");
       setFailedError("Deep research failed");
       setDialogOpen(false);
@@ -138,10 +166,21 @@ export function DeepResearch({
           <div>
             <p className="text-[13px] font-medium text-zinc-800">
               Searching B2B databases… usually 1–3 minutes.
+              <span
+                className="ml-1.5 font-normal text-zinc-400 tabular-nums"
+                aria-hidden="true"
+              >
+                {formatElapsed(elapsed)}
+              </span>
             </p>
             <p className="mt-1 text-[12px] text-zinc-500">
               You can leave this page — results are saved.
             </p>
+            {partial && partial.people > 0 ? (
+              <p className="mt-1 text-[12px] text-zinc-600">
+                {`${partial.people} found so far — they're already in People below.`}
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
@@ -149,17 +188,26 @@ export function DeepResearch({
   }
 
   if (phase === "done") {
+    const foundNothing = summary !== null && summary.people === 0;
     return (
       <div className="card animate-rise animate-rise-1 p-5" aria-live="polite">
-        <p className="flex items-center gap-2 text-[13px] text-zinc-700">
-          <Check
-            className="h-4 w-4 shrink-0 text-emerald-600"
-            aria-hidden="true"
-          />
-          {summary
-            ? `Found ${summary.people} people · ${summary.emails} emails · $${summary.cost.toFixed(2)}`
-            : "Deep research finished."}
-        </p>
+        {foundNothing ? (
+          <p className="text-[13px] text-zinc-600">
+            {
+              "No new contacts found — these databases don't have this company yet. You can try again anytime."
+            }
+          </p>
+        ) : (
+          <p className="flex items-center gap-2 text-[13px] text-zinc-700">
+            <Check
+              className="h-4 w-4 shrink-0 text-emerald-600"
+              aria-hidden="true"
+            />
+            {summary
+              ? `Found ${summary.people} people · ${summary.emails} emails · $${summary.cost.toFixed(2)}`
+              : "Deep research finished."}
+          </p>
+        )}
       </div>
     );
   }
