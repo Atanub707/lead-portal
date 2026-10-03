@@ -5,6 +5,7 @@ import { KindBadge, StatusDot, UserAvatar } from "@/components/badges";
 import { CompanyMark } from "@/components/company-mark";
 import { LinkedInBadge } from "@/components/icons";
 import { ConfirmSubmit } from "@/components/confirm-submit";
+import { DeepResearch } from "@/components/deep-research";
 import { FindLinkedInButton } from "@/components/find-linkedin-button";
 import { FollowUpControl } from "@/components/follow-up-control";
 import { SubmitButton } from "@/components/submit-button";
@@ -21,11 +22,13 @@ import {
   getCompanyEmails,
   getContacts,
   getCurrentProfile,
+  getDeepResearchState,
   getEnrichmentRuns,
   getInteractions,
   getPipelines,
   getProfiles,
 } from "@/lib/data";
+import { needsDeepResearch } from "@/lib/deep-research";
 import {
   CHANNELS,
   KIND_LABEL,
@@ -101,6 +104,7 @@ export default async function CompanyPage({
     pipelines,
     companyEmails,
     enrichmentRuns,
+    deepResearchState,
     profiles,
   ] = await Promise.all([
     getCompany(companyId),
@@ -110,6 +114,7 @@ export default async function CompanyPage({
     getPipelines(),
     getCompanyEmails(companyId),
     getEnrichmentRuns(companyId),
+    getDeepResearchState(companyId),
     getProfiles(),
   ]);
 
@@ -131,6 +136,12 @@ export default async function CompanyPage({
   const decisionMakers = contacts.filter(
     (contact) => contact.is_decision_maker
   ).length;
+  const showDeepResearch = needsDeepResearch({
+    contacts,
+    companyEmailCount: companyEmails.length,
+    activeRunId: deepResearchState.activeRunId,
+    lastSuccessAt: deepResearchState.lastSuccessAt,
+  });
   const dateOnly = (iso: string) => new Date(iso).toISOString().slice(0, 10);
 
   return (
@@ -243,6 +254,14 @@ export default async function CompanyPage({
               ))}
             </dl>
           </Section>
+
+          {/* Deep research */}
+          {showDeepResearch ? (
+            <DeepResearch
+              orgId={company.id}
+              initialActiveRun={deepResearchState.activeRunId !== null}
+            />
+          ) : null}
 
           {/* Reach */}
           <Section
