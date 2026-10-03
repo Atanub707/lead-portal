@@ -88,6 +88,9 @@ function sanitize(query: string) {
   return query.replace(/[%(),]/g, " ").trim();
 }
 
+const DECISION_TITLE =
+  /(founder|co-?founder|ceo|cto|coo|cfo|cmo|owner|president|partner|head of|director)/i;
+
 function normalise(value: string | null | undefined) {
   return (value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -313,7 +316,7 @@ export async function POST(req: Request) {
   const q = sanitize(name);
   const { data: matches } = await supabase
     .from("organizations")
-    .select("id, name, website, linkedin_url, emails")
+    .select("id, name, website, linkedin_url")
     .or(`name.ilike.%${q}%,website.ilike.%${domain}%`)
     .limit(1);
   const existing = matches?.[0] ?? null;
@@ -323,16 +326,11 @@ export async function POST(req: Request) {
   let orgName: string;
 
   if (existing) {
-    const patch: Record<string, string | string[]> = {};
+    const patch: Record<string, string> = {};
     if (!existing.website && website) patch.website = website;
     if (!existing.linkedin_url && linkedin) {
       patch.linkedin_url = linkedin;
       patch.linkedin_source = linkedinSource as string;
-    }
-    if (generalEmails.length > 0) {
-      const current = (existing.emails ?? []) as string[];
-      const merged = [...new Set([...current, ...generalEmails])];
-      if (merged.length !== current.length) patch.emails = merged;
     }
     if (Object.keys(patch).length > 0) {
       await supabase.from("organizations").update(patch).eq("id", existing.id);
@@ -352,7 +350,6 @@ export async function POST(req: Request) {
         kind: extracted.kind,
         status: "new",
         notes: extracted.description.trim() || null,
-        emails: generalEmails,
       })
       .select("id, name")
       .single();
@@ -365,6 +362,19 @@ export async function POST(req: Request) {
     orgId = inserted.id;
     orgName = inserted.name;
     created = true;
+  }
+
+  // Company emails are typed rows; duplicates across runs are ignored.
+  if (generalEmails.length > 0) {
+    await supabase.from("company_emails").upsert(
+      generalEmails.map((email) => ({
+        org_id: orgId,
+        email,
+        kind: "general",
+        source: tinyfishEnabled() ? "tinyfish" : "website",
+      })),
+      { onConflict: "org_id,email", ignoreDuplicates: true }
+    );
   }
 
   const { data: existingContacts } = await supabase
@@ -399,22 +409,48 @@ export async function POST(req: Request) {
         title: contact.title || null,
         linkedin_url: contact.linkedin_url || null,
         email: contact.email || null,
+        source: "website",
+        is_decision_maker: DECISION_TITLE.test(contact.title),
+        email_status: contact.email ? "found" : null,
       }))
     );
     if (!error) contactsAdded = toAdd.length;
   }
+
+  // Enrichment audit trail (what this run found, from where, at what cost).
+  await supabase.from("enrichment_runs").insert({
+    org_id: orgId,
+    kind: "website_research",
+    source: tinyfishEnabled() ? "tinyfish" : "builtin",
+    status: "ok",
+    people_found: contacts.length,
+    emails_found: emails.length,
+    cost_usd: 0,
+    details: {
+      requested_url: research.requested_url,
+      final_url: research.final_url,
+      needs_js: research.needs_js ?? false,
+      linkedin_source: linkedinSource,
+      unverified_linkedin: unverifiedLinkedin,
+    },
+    created_by: userId,
+  });
 
   // Summarise the record as it stands AFTER saving — not just this run's findings,
   // so the report can never claim something is missing when the record already has it.
   const finalLinkedin = linkedin ?? existing?.linkedin_url ?? null;
   const existingRows = existingContacts ?? [];
   const finalContactCount = existingRows.length + contactsAdded;
+  const { data: orgEmailRows } = await supabase
+    .from("company_emails")
+    .select("email")
+    .eq("org_id", orgId);
   const finalEmails = [
     ...new Set(
       [
         ...existingRows.map((contact) => contact.email),
         ...toAdd.map((contact) => contact.email),
-        ...(existing?.emails ?? []),
+        ...(orgEmailRows ?? []).map((row) => row.email),
         ...generalEmails,
       ].filter((value): value is string => Boolean(value))
     ),

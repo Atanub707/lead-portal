@@ -89,10 +89,33 @@ export interface Organization {
   next_action: string | null;
   last_contact: string | null;
   notes: string | null;
-  emails: string[];
   bookmarked: boolean;
   follow_up_on: string | null;
   follow_up_note: string | null;
+  created_at: string;
+}
+
+export interface CompanyEmail {
+  id: number;
+  org_id: number;
+  email: string;
+  kind: "general" | "personal" | "other";
+  source: string;
+  verified: boolean;
+  created_at: string;
+}
+
+export interface EnrichmentRun {
+  id: number;
+  org_id: number;
+  kind: string;
+  source: string;
+  status: string;
+  people_found: number;
+  emails_found: number;
+  cost_usd: number;
+  details: Record<string, unknown> | null;
+  created_by: string | null;
   created_at: string;
 }
 

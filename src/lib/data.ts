@@ -77,10 +77,12 @@ export async function getCompanies(opts: {
   const ids = rows.map((row) => row.id);
 
   if (ids.length > 0) {
-    const { data: contactRows } = await supabase
-      .from("contacts")
-      .select("org_id, email")
-      .in("org_id", ids);
+    const [{ data: contactRows }, { data: companyEmailRows }] =
+      await Promise.all([
+        supabase.from("contacts").select("org_id, email").in("org_id", ids),
+        supabase.from("company_emails").select("org_id, email").in("org_id", ids),
+      ]);
+
     for (const contact of contactRows ?? []) {
       const entry = stats.get(contact.org_id) ?? {
         people: 0,
@@ -94,6 +96,17 @@ export async function getCompanies(opts: {
       }
       stats.set(contact.org_id, entry);
     }
+
+    for (const companyEmail of companyEmailRows ?? []) {
+      const entry = stats.get(companyEmail.org_id) ?? {
+        people: 0,
+        emails: 0,
+        firstEmail: null,
+      };
+      entry.emails += 1;
+      if (!entry.firstEmail) entry.firstEmail = companyEmail.email;
+      stats.set(companyEmail.org_id, entry);
+    }
   }
 
   const enriched: CompanyRow[] = rows.map((row) => {
@@ -102,12 +115,11 @@ export async function getCompanies(opts: {
       emails: 0,
       firstEmail: null,
     };
-    const orgEmails = row.emails ?? [];
     return {
       ...row,
       people_count: entry.people,
-      email_count: entry.emails + orgEmails.length,
-      first_email: entry.firstEmail ?? orgEmails[0] ?? null,
+      email_count: entry.emails,
+      first_email: entry.firstEmail,
     };
   });
 
