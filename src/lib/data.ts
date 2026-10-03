@@ -29,6 +29,7 @@ export async function getPipelines(): Promise<Pipeline[]> {
 
 export interface CompanyRow extends Organization {
   people_count: number;
+  decision_maker_count: number;
   email_count: number;
   first_email: string | null;
 }
@@ -74,24 +75,34 @@ export async function getCompanies(opts: {
   const rows = (data ?? []) as Organization[];
   const stats = new Map<
     number,
-    { people: number; emails: number; firstEmail: string | null }
+    {
+      people: number;
+      decisionMakers: number;
+      emails: number;
+      firstEmail: string | null;
+    }
   >();
   const ids = rows.map((row) => row.id);
 
   if (ids.length > 0) {
     const [{ data: contactRows }, { data: companyEmailRows }] =
       await Promise.all([
-        supabase.from("contacts").select("org_id, email").in("org_id", ids),
+        supabase
+          .from("contacts")
+          .select("org_id, email, is_decision_maker")
+          .in("org_id", ids),
         supabase.from("company_emails").select("org_id, email").in("org_id", ids),
       ]);
 
     for (const contact of contactRows ?? []) {
       const entry = stats.get(contact.org_id) ?? {
         people: 0,
+        decisionMakers: 0,
         emails: 0,
         firstEmail: null,
       };
       entry.people += 1;
+      if (contact.is_decision_maker) entry.decisionMakers += 1;
       if (contact.email) {
         entry.emails += 1;
         if (!entry.firstEmail) entry.firstEmail = contact.email;
@@ -102,6 +113,7 @@ export async function getCompanies(opts: {
     for (const companyEmail of companyEmailRows ?? []) {
       const entry = stats.get(companyEmail.org_id) ?? {
         people: 0,
+        decisionMakers: 0,
         emails: 0,
         firstEmail: null,
       };
@@ -114,12 +126,14 @@ export async function getCompanies(opts: {
   const enriched: CompanyRow[] = rows.map((row) => {
     const entry = stats.get(row.id) ?? {
       people: 0,
+      decisionMakers: 0,
       emails: 0,
       firstEmail: null,
     };
     return {
       ...row,
       people_count: entry.people,
+      decision_maker_count: entry.decisionMakers,
       email_count: entry.emails,
       first_email: entry.firstEmail,
     };

@@ -1,6 +1,7 @@
 import { generateObject, generateText } from "ai";
 import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
+import { matchEmailToContact } from "@/lib/match";
 import { NO_AI_KEY_MESSAGE, pickModel } from "@/lib/ai";
 import {
   findLinkedInProfile,
@@ -288,7 +289,9 @@ export async function POST(req: Request) {
     .filter(
       (contact) =>
         contact.name.length > 1 &&
-        !/^(unknown|n\/?a|none)$/i.test(contact.name)
+        !/^(unknown|n\/?a|none|info|sales|support|contact|admin|hello|team|press|media|office|help|billing|hr)$/i.test(
+          contact.name
+        )
     )
     .slice(0, 12);
 
@@ -306,6 +309,20 @@ export async function POST(req: Request) {
         linkedinProfilesFound += 1;
       }
     });
+  }
+
+  // Match found emails to the right person when the address carries their name
+  // (dorian.ciavarella@…). Unmatched emails stay as company-level emails.
+  const claimedEmails = new Set(
+    contacts.map((contact) => contact.email).filter(Boolean)
+  );
+  for (const contact of contacts) {
+    if (contact.email) continue;
+    const matched = matchEmailToContact(contact.name, emails);
+    if (matched && !claimedEmails.has(matched)) {
+      contact.email = matched;
+      claimedEmails.add(matched);
+    }
   }
 
   const usedEmails = new Set(
@@ -390,13 +407,21 @@ export async function POST(req: Request) {
       .map((contact) => normalise(contact.linkedin_url))
       .filter(Boolean)
   );
+  const seenEmails = new Set(
+    (existingContacts ?? [])
+      .map((contact) => normalise(contact.email))
+      .filter(Boolean)
+  );
   const toAdd = contacts.filter((contact) => {
     const byName = normalise(contact.name);
     const byLink = normalise(contact.linkedin_url);
+    const byEmail = normalise(contact.email);
     if (seenNames.has(byName)) return false;
     if (byLink && seenLinks.has(byLink)) return false;
+    if (byEmail && seenEmails.has(byEmail)) return false;
     seenNames.add(byName);
     if (byLink) seenLinks.add(byLink);
+    if (byEmail) seenEmails.add(byEmail);
     return true;
   });
 

@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lead Portal — Company detail (mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    body { background: #f7f7f8; }
+    .card { border-radius: 12px; border: 1px solid rgb(228 228 231 / 0.8); background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 0.03); }
+    .label { display: block; font-size: 12px; font-weight: 500; color: #52525b; margin-bottom: 6px; }
+    .input { width: 100%; height: 34px; border-radius: 8px; border: 1px solid #d4d4d8; background: #fff; padding: 0 10px; font-size: 13px; color: #18181b; outline: none; }
+    .input:focus { border-color: #a1a1aa; }
+    textarea.input { height: auto; padding: 8px 10px; resize: vertical; }
+    .btn-primary { display: inline-flex; align-items: center; gap: 6px; height: 32px; border-radius: 8px; background: #18181b; color: #fff; font-size: 12px; font-weight: 500; padding: 0 14px; }
+    .btn-ghost { display: inline-flex; align-items: center; gap: 6px; height: 32px; border-radius: 8px; border: 1px solid #e4e4e7; background: #fff; font-size: 12px; color: #3f3f46; padding: 0 12px; }
+    .chip { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; border: 1px solid #e4e4e7; background: #fafafa; padding: 2px 8px; font-size: 10px; color: #52525b; }
+  </style>
+</head>
+<body class="text-zinc-900">
+  <div class="flex min-h-screen">
+    <!-- Sidebar (app chrome) -->
+    <aside class="hidden w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-[#fafafa] lg:flex">
+      <div class="flex h-14 items-center gap-2.5 border-b border-zinc-200/80 px-4">
+        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-zinc-900 text-[11px] font-bold text-white">L</span>
+        <p class="text-[13px] font-semibold">Lead Portal</p>
+      </div>
+      <nav class="flex-1 space-y-0.5 px-2 py-3">
+        <a class="flex h-8 items-center gap-2 rounded-md px-2 text-[13px] text-zinc-600">Dashboard</a>
+        <p class="px-2 pb-1 pt-4 text-[11px] font-medium uppercase tracking-wide text-zinc-400">Pipelines</p>
+        <a class="flex h-8 items-center gap-2 rounded-md px-2 text-[13px] text-zinc-600">POS</a>
+        <a class="flex h-8 items-center gap-2 rounded-md bg-zinc-100 px-2 text-[13px] font-medium text-zinc-900">Compliance</a>
+        <a class="flex h-8 items-center gap-2 rounded-md px-2 text-[13px] text-zinc-400">+ New pipeline</a>
+        <p class="px-2 pb-1 pt-4 text-[11px] font-medium uppercase tracking-wide text-zinc-400">Admin</p>
+        <a class="flex h-8 items-center gap-2 rounded-md px-2 text-[13px] text-zinc-600">Settings</a>
+      </nav>
+      <div class="border-t border-zinc-200/80 p-3">
+        <p class="truncate text-[12px] text-zinc-600">atanub707@gmail.com</p>
+        <p class="text-[11px] capitalize text-zinc-400">owner</p>
+      </div>
+    </aside>
+
+    <!-- Content -->
+    <main class="flex-1">
+      <div class="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
+        <a class="text-[13px] text-zinc-500 hover:text-zinc-900" href="#">← Compliance Pipeline</a>
+
+        <!-- Header -->
+        <header class="mt-3">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-200 text-[12px] font-semibold text-zinc-600">R</span>
+            <h1 class="text-xl font-semibold tracking-tight">ReinoLab</h1>
+          </div>
+          <div class="mt-2 flex flex-wrap items-center gap-3">
+            <span class="rounded-full border border-zinc-200 bg-white px-2.5 py-0.5 text-[11px] font-medium text-zinc-600">Lead</span>
+            <span class="inline-flex items-center gap-1.5 text-[12px] text-zinc-600">
+              <span class="h-1.5 w-1.5 rounded-full bg-zinc-400"></span> New
+            </span>
+            <a class="inline-flex items-center gap-1 text-[13px] text-zinc-500 hover:text-zinc-900" href="#">reinolab.tech
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>
+            </a>
+            <a class="inline-flex items-center gap-1 text-[13px] text-zinc-500 hover:text-zinc-900" href="#" title="Found via verified search — double-check it">LinkedIn
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>
+            </a>
+          </div>
+        </header>
+
+        <div class="mt-6 grid gap-5 lg:grid-cols-[1fr_340px]">
+          <!-- Main column -->
+          <div class="space-y-5">
+            <!-- Identity -->
+            <section class="card p-5">
+              <h2 class="text-[13px] font-semibold">Identity</h2>
+              <p class="mt-2 text-[13px] leading-relaxed text-zinc-700">An AI-powered digital science lab platform that lets university students, researchers, and professionals simulate experiments such as PCR, restriction digests, chemistry, and physics with real-time AI Lab Assistant guidance and collaborative sessions.</p>
+              <dl class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <div><dt class="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Type</dt><dd class="mt-1 text-[13px] text-zinc-800">Lead</dd></div>
+                <div><dt class="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Status</dt><dd class="mt-1 text-[13px] text-zinc-800">New</dd></div>
+                <div><dt class="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Priority</dt><dd class="mt-1 text-[13px] text-zinc-800">—</dd></div>
+                <div><dt class="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Added</dt><dd class="mt-1 text-[13px] text-zinc-800 tabular-nums">2026-10-02</dd></div>
+              </dl>
+            </section>
+
+            <!-- Reach -->
+            <section class="card p-5">
+              <h2 class="text-[13px] font-semibold">Reach <span class="ml-2 font-normal text-zinc-400">2</span></h2>
+              <ul class="mt-1 divide-y divide-zinc-100">
+                <li class="flex flex-wrap items-center gap-2 py-2.5">
+                  <svg class="text-zinc-300" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>
+                  <a class="text-[13px] text-zinc-800 hover:text-zinc-950" href="mailto:contact@reinolab.tech">contact@reinolab.tech</a>
+                  <span class="chip">General</span>
+                  <span class="text-[10px] font-medium text-emerald-600">verified</span>
+                  <span class="text-[11px] text-zinc-400">via website</span>
+                </li>
+                <li class="flex flex-wrap items-center gap-2 py-2.5">
+                  <svg class="text-zinc-300" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>
+                  <a class="text-[13px] text-zinc-800 hover:text-zinc-950" href="mailto:partners@reinolab.tech">partners@reinolab.tech</a>
+                  <span class="chip">General</span>
+                  <span class="text-[11px] text-zinc-400">via website</span>
+                </li>
+              </ul>
+            </section>
+
+            <!-- People -->
+            <section class="card p-5">
+              <h2 class="text-[13px] font-semibold">People <span class="ml-2 font-normal text-zinc-400">2</span></h2>
+              <p class="mt-0.5 text-[11px] text-zinc-400">2 decision makers</p>
+              <div class="mt-2 divide-y divide-zinc-100">
+                <div class="flex items-start justify-between gap-3 py-3">
+                  <div class="flex min-w-0 items-start gap-2.5">
+                    <span class="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-600">D</span>
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <p class="text-[13px] font-medium">Dorian Ciavarella</p>
+                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01z"/></svg>
+                          Decision maker
+                        </span>
+                      </div>
+                      <p class="text-[12px] text-zinc-500">CEO &amp; Co-Founder</p>
+                      <div class="mt-0.5 flex flex-wrap items-center gap-3 text-[12px]">
+                        <a class="text-zinc-500 hover:text-zinc-900" href="#">LinkedIn</a>
+                        <a class="text-zinc-500 hover:text-zinc-900" href="mailto:dorian@reinolab.tech">dorian@reinolab.tech</a>
+                        <span class="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] text-zinc-500">email found</span>
+                      </div>
+                    </div>
+                  </div>
+                  <button class="text-[11px] text-zinc-400 hover:text-rose-600">Delete</button>
+                </div>
+                <div class="flex items-start justify-between gap-3 py-3">
+                  <div class="flex min-w-0 items-start gap-2.5">
+                    <span class="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-600">G</span>
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <p class="text-[13px] font-medium">Guillaume Cruz</p>
+                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01z"/></svg>
+                          Decision maker
+                        </span>
+                      </div>
+                      <p class="text-[12px] text-zinc-500">COO &amp; Co-founder</p>
+                      <div class="mt-1">
+                        <button class="inline-flex items-center gap-1 text-[11px] text-zinc-400 hover:text-zinc-900">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                          Find LinkedIn
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <button class="text-[11px] text-zinc-400 hover:text-rose-600">Delete</button>
+                </div>
+              </div>
+              <details class="mt-3">
+                <summary class="cursor-pointer list-none text-[13px] font-medium text-zinc-500 hover:text-zinc-900">+ Add person</summary>
+              </details>
+            </section>
+
+            <!-- Outreach -->
+            <section class="card p-5">
+              <h2 class="text-[13px] font-semibold">Outreach</h2>
+              <dl class="mt-3 grid gap-4 sm:grid-cols-3">
+                <div>
+                  <dt class="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Follow-up</dt>
+                  <dd class="mt-1.5">
+                    <span class="inline-flex items-center gap-1 rounded-full border border-dashed border-zinc-300 px-2.5 py-1 text-[11px] font-medium text-zinc-400">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>
+                      Set
+                    </span>
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Next action</dt>
+                  <dd class="mt-1.5 text-[13px] text-zinc-800">Send intro email to Dorian</dd>
+                </div>
+                <div>
+                  <dt class="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Last contact</dt>
+                  <dd class="mt-1.5 text-[13px] text-zinc-800 tabular-nums">2026-10-02</dd>
+                </div>
+              </dl>
+            </section>
+
+            <!-- Research log -->
+            <section class="card p-5">
+              <h2 class="text-[13px] font-semibold">Research log <span class="ml-2 font-normal text-zinc-400">2</span></h2>
+              <ul class="mt-1 divide-y divide-zinc-100">
+                <li class="flex items-start justify-between gap-3 py-2.5">
+                  <div class="min-w-0">
+                    <p class="text-[13px] text-zinc-800">Website research <span class="chip ml-2">tinyfish + builtin</span></p>
+                    <p class="mt-0.5 text-[12px] text-zinc-500">2 people · 2 emails</p>
+                  </div>
+                  <div class="shrink-0 text-right text-[12px] text-zinc-400 tabular-nums">
+                    <p>2026-10-03</p>
+                    <p>free</p>
+                  </div>
+                </li>
+                <li class="flex items-start justify-between gap-3 py-2.5">
+                  <div class="min-w-0">
+                    <p class="text-[13px] text-zinc-800">Website research <span class="chip ml-2">builtin</span></p>
+                    <p class="mt-0.5 text-[12px] text-zinc-500">0 people · 0 emails</p>
+                  </div>
+                  <div class="shrink-0 text-right text-[12px] text-zinc-400 tabular-nums">
+                    <p>2026-10-02</p>
+                    <p>free</p>
+                  </div>
+                </li>
+              </ul>
+            </section>
+
+            <!-- Timeline -->
+            <section class="card p-5">
+              <h2 class="text-[13px] font-semibold">Timeline <span class="ml-2 font-normal text-zinc-400">1</span></h2>
+              <details class="mt-3">
+                <summary class="cursor-pointer list-none rounded-md border border-dashed border-zinc-200 px-3 py-2 text-[13px] text-zinc-500 hover:border-zinc-300 hover:text-zinc-800">+ Log interaction</summary>
+              </details>
+              <ul class="relative ml-1 mt-4 space-y-4 border-l border-zinc-100 pl-4">
+                <li class="relative">
+                  <span class="absolute -left-[21px] top-1.5 h-1.5 w-1.5 rounded-full bg-zinc-300 ring-2 ring-white"></span>
+                  <p class="text-[12px] text-zinc-500 tabular-nums">2026-10-03 · Email</p>
+                  <p class="mt-0.5 text-[13px] text-zinc-800">Intro email sent to contact@reinolab.tech</p>
+                  <p class="mt-0.5 text-[12px] text-zinc-500">Outcome: awaiting reply</p>
+                </li>
+              </ul>
+            </section>
+          </div>
+
+          <!-- Side column -->
+          <div class="space-y-5">
+            <!-- Edit details -->
+            <section class="card p-5">
+              <h2 class="text-[13px] font-semibold">Edit details</h2>
+              <div class="mt-4 space-y-3.5">
+                <div><label class="label">Name</label><input class="input" value="ReinoLab" /></div>
+                <div><label class="label">Website</label><input class="input" value="https://reinolab.tech/" /></div>
+                <div>
+                  <label class="label">LinkedIn</label>
+                  <input class="input" value="https://www.linkedin.com/company/reinolab" />
+                  <p class="mt-1 text-[11px] text-zinc-400">Found via verified search — double-check it</p>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="label">Type</label>
+                    <select class="input"><option>Lead</option><option>Partner</option><option>Competitor</option><option>Other</option></select>
+                  </div>
+                  <div>
+                    <label class="label">Priority</label>
+                    <select class="input"><option>—</option><option>High</option><option>Medium</option><option>Low</option></select>
+                  </div>
+                </div>
+                <div>
+                  <label class="label">Status</label>
+                  <select class="input"><option>New</option><option>Contacted</option><option>Scoping</option><option>Proposal</option><option>Won</option><option>Lost</option></select>
+                </div>
+                <div class="border-t border-zinc-100 pt-3.5">
+                  <p class="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Outreach</p>
+                </div>
+                <div><label class="label">Next action</label><input class="input" value="Send intro email to Dorian" /></div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div><label class="label">Follow-up date</label><input class="input" type="date" /></div>
+                  <div><label class="label">Follow-up note</label><input class="input" placeholder="What to do" /></div>
+                </div>
+                <div><label class="label">Last contact</label><input class="input" type="date" value="2026-10-02" /></div>
+                <div>
+                  <label class="label">Notes / description</label>
+                  <textarea class="input" rows="5">An AI-powered digital science lab platform that lets university students, researchers, and professionals simulate experiments such as PCR, restriction digests, chemistry, and physics.</textarea>
+                </div>
+                <div class="flex justify-end pt-1"><button class="btn-primary">Save changes</button></div>
+              </div>
+            </section>
+
+            <!-- Danger zone -->
+            <section class="card p-5">
+              <h2 class="text-[13px] font-semibold">Danger zone</h2>
+              <p class="mt-1 text-[12px] text-zinc-500">Deleting removes this company with its people and history. Owner only.</p>
+              <button class="mt-3 inline-flex h-8 w-full items-center justify-center rounded-lg bg-rose-600 text-[12px] font-medium text-white hover:bg-rose-700">Delete company</button>
+            </section>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

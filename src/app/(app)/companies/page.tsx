@@ -273,6 +273,13 @@ export default async function CompaniesPage({
                                   : "people"
                               }`
                             : null,
+                          company.decision_maker_count > 0
+                            ? `${company.decision_maker_count} ${
+                                company.decision_maker_count === 1
+                                  ? "decision maker"
+                                  : "decision makers"
+                              }`
+                            : null,
                           company.email_count > 0
                             ? `${company.email_count} ${
                                 company.email_count === 1 ? "email" : "emails"
