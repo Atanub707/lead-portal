@@ -17,8 +17,10 @@ export async function startActorRun(
   actorId: string,
   input: unknown
 ): Promise<{ runId: string; datasetId: string }> {
+  // The REST API addresses actors as `username~actor-name` (a raw slash 404s).
+  const apiId = actorId.replace("/", "~");
   const res = await fetch(
-    `${APIFY_BASE}/acts/${actorId}/runs?token=${token()}`,
+    `${APIFY_BASE}/acts/${apiId}/runs?token=${token()}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
