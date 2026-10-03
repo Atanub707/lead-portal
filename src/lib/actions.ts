@@ -528,6 +528,7 @@ export async function revokeInvitation(formData: FormData) {
   await client.invitations.revokeInvitation(id);
   clearClerkDirectoryCache();
   revalidatePath("/settings");
+  redirect("/settings");
 }
 
 export async function deleteInvitation(formData: FormData) {
@@ -548,6 +549,7 @@ export async function deleteInvitation(formData: FormData) {
   }
   clearClerkDirectoryCache();
   revalidatePath("/settings");
+  redirect("/settings");
 }
 
 export async function removeUser(formData: FormData) {
