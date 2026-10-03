@@ -728,13 +728,61 @@ export interface WebsiteResearch {
   needs_js?: boolean;
 }
 
+function mergeResearch(
+  primary: WebsiteResearch,
+  extra: WebsiteResearch
+): WebsiteResearch {
+  const links: SiteLinks = {
+    linkedin_company: [],
+    linkedin_people: [],
+    emails: [],
+    socials: [],
+  };
+  mergeSiteLinks(links, primary.links);
+  mergeSiteLinks(links, extra.links);
+
+  const pages = [...primary.pages];
+  for (const page of extra.pages) {
+    if (!pages.some((existing) => existing.url === page.url)) pages.push(page);
+  }
+
+  const notes = [primary.notes, extra.notes].filter(Boolean).join(" ");
+
+  return {
+    requested_url: primary.requested_url,
+    final_url: primary.final_url || extra.final_url,
+    title: primary.title ?? extra.title,
+    description: primary.description ?? extra.description,
+    site_name: primary.site_name ?? extra.site_name,
+    links,
+    pages: pages.slice(0, 6),
+    notes: notes || undefined,
+    needs_js: Boolean(primary.needs_js || extra.needs_js),
+  };
+}
+
 export async function researchWebsite(rawUrl: string): Promise<WebsiteResearch> {
   const url = isPublicHttpUrl(rawUrl);
   if (!url) throw new Error("Not a valid public http(s) URL");
 
   if (tinyfishKey()) {
     try {
-      return await researchWebsiteTinyfish(url, rawUrl);
+      const result = await researchWebsiteTinyfish(url, rawUrl);
+      const thin =
+        result.links.emails.length === 0 &&
+        result.links.linkedin_company.length === 0 &&
+        result.links.socials.length === 0;
+      if (!thin) return result;
+
+      // TinyFish rendered the page but surfaced nothing useful (some sites). Run
+      // the built-in enrichment (Cloudflare email decode + JS chunk mining) and
+      // merge, so a free source always contributes.
+      try {
+        const direct = await researchWebsiteDirect(url, rawUrl);
+        return mergeResearch(result, direct);
+      } catch {
+        return result;
+      }
     } catch {
       // TinyFish unavailable — fall back to the built-in fetcher below.
     }
