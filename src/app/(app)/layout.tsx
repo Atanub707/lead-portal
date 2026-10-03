@@ -16,7 +16,7 @@ export default async function AppLayout({
   ]);
 
   if (!profile) {
-    redirect("/login");
+    redirect("/sign-in");
   }
 
   return (

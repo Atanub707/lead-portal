@@ -493,5 +493,5 @@ export async function signOut() {
     const client = await clerkClient();
     await client.sessions.revokeSession(sessionId);
   }
-  redirect("/login");
+  redirect("/sign-in");
 }
