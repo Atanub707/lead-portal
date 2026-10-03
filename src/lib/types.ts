@@ -128,6 +128,10 @@ export interface Contact {
   email: string | null;
   phone: string | null;
   notes: string | null;
+  seniority: string | null;
+  is_decision_maker: boolean;
+  email_status: string | null;
+  source: string | null;
   created_at: string;
 }
 

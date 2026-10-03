@@ -2,7 +2,9 @@ import { createClient } from "./supabase/server";
 import { ensureProfile } from "./auth";
 import {
   FALLBACK_PIPELINES,
+  type CompanyEmail,
   type Contact,
+  type EnrichmentRun,
   type Interaction,
   type InteractionWithOrg,
   type OrgList,
@@ -161,9 +163,35 @@ export async function getContacts(orgId: number): Promise<Contact[]> {
     .from("contacts")
     .select("*")
     .eq("org_id", orgId)
+    .order("is_decision_maker", { ascending: false })
     .order("name");
   if (error) throw new Error(error.message);
   return (data ?? []) as Contact[];
+}
+
+export async function getCompanyEmails(orgId: number): Promise<CompanyEmail[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("company_emails")
+    .select("*")
+    .eq("org_id", orgId)
+    .order("created_at");
+  if (error) throw new Error(error.message);
+  return (data ?? []) as CompanyEmail[];
+}
+
+export async function getEnrichmentRuns(
+  orgId: number
+): Promise<EnrichmentRun[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("enrichment_runs")
+    .select("*")
+    .eq("org_id", orgId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as EnrichmentRun[];
 }
 
 export async function getInteractions(orgId: number): Promise<Interaction[]> {
