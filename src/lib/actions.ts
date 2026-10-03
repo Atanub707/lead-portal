@@ -242,18 +242,17 @@ export async function deleteOrganization(formData: FormData) {
     .eq("id", id)
     .maybeSingle();
 
-  // Logged before the delete: the org_id FK would be gone afterwards.
+  const { error } = await supabase.from("organizations").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+
   await logActivity({
     actorId: userId,
     action: "company.delete",
-    orgId: id,
     targetType: "company",
     targetId: id,
     summary: `Deleted company “${org?.name ?? "Unknown"}”`,
   });
 
-  const { error } = await supabase.from("organizations").delete().eq("id", id);
-  if (error) throw new Error(error.message);
   revalidateAll();
 
   const next = field(formData, "next");

@@ -821,17 +821,17 @@ export async function reconcileDeepResearch(
         })
         .eq("id", run.id);
       if (error) throw new Error(error.message);
+      const companyName =
+        typeof run.details?.company_name === "string"
+          ? run.details.company_name
+          : "company";
       await logActivity({
         actorId: (run.created_by as string | null) ?? null,
         action: "research.deep_done",
         orgId: run.org_id as number,
         targetType: "research",
         targetId: run.id as number,
-        summary: `Deep research for “${
-          typeof details.company_name === "string"
-            ? details.company_name
-            : "Unknown company"
-        }” finished: ${state.people} people, ${state.emails} emails, $${cost.toFixed(2)}`,
+        summary: `Deep research for “${companyName}” finished: ${state.people} people, ${state.emails} emails, $${cost.toFixed(2)}`,
       });
       return {
         ok: true,

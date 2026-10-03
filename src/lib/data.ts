@@ -458,6 +458,7 @@ export async function getActivityLog(opts: {
     .from("activity_log")
     .select("*", { count: "exact" })
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .range(from, from + per - 1);
 
   if (opts.actorId) query = query.eq("actor_id", opts.actorId);

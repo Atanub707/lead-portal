@@ -176,7 +176,11 @@ export default async function AuditPage({
 
         {count === 0 ? (
           <div className="px-4 py-16 text-center">
-            <p className="text-[13px] text-zinc-500">No activity recorded yet.</p>
+            <p className="text-[13px] text-zinc-500">
+              {actor || group
+                ? "No matching activity."
+                : "No activity recorded yet."}
+            </p>
           </div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200/80 px-4 py-2.5">
