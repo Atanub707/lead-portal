@@ -1,18 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 
 export function ConfirmSubmit({
   children,
   message,
+  title,
   className,
   confirmLabel = "Delete",
   tone = "danger",
 }: {
   children: React.ReactNode;
   message: string;
+  title?: string;
   className?: string;
   confirmLabel?: string;
   tone?: "danger" | "neutral";
@@ -40,45 +43,64 @@ export function ConfirmSubmit({
         {children}
       </button>
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
-          <button
-            type="button"
-            className="animate-overlay absolute inset-0 bg-zinc-900/30"
-            aria-label="Close"
-            onClick={() => setOpen(false)}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Confirm"
-            className="animate-panel relative w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl"
-          >
-            <p className="text-[13px] leading-relaxed text-zinc-800">
-              {message}
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
+      {open
+        ? createPortal(
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
               <button
                 type="button"
-                className="btn-ghost"
-                disabled={pending}
-                onClick={() => setOpen(false)}
+                className="animate-overlay absolute inset-0 bg-zinc-900/30"
+                aria-label="Close"
+                onClick={() => {
+                  if (!pending) setOpen(false);
+                }}
+              />
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={title ?? "Confirm"}
+                className="animate-panel relative w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl"
               >
-                Cancel
-              </button>
-              <button type="submit" autoFocus disabled={pending} className={confirmClass}>
-                {pending ? (
-                  <Loader2
-                    className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
-                    aria-hidden="true"
-                  />
+                {title ? (
+                  <h2 className="text-sm font-semibold tracking-tight text-zinc-900">
+                    {title}
+                  </h2>
                 ) : null}
-                {pending ? "Working…" : confirmLabel}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+                <p
+                  className={`text-[13px] leading-relaxed text-zinc-600 ${
+                    title ? "mt-1" : ""
+                  }`}
+                >
+                  {message}
+                </p>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    disabled={pending}
+                    onClick={() => setOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    autoFocus
+                    disabled={pending}
+                    className={confirmClass}
+                  >
+                    {pending ? (
+                      <Loader2
+                        className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                    {pending ? "Working…" : confirmLabel}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </>
   );
 }

@@ -33,7 +33,8 @@ function UserBlock({
         <UserAvatar seed={userId} name={email} size={24} />
         <form action={signOut}>
           <ConfirmSubmit
-            message="Sign out of Lead Portal?"
+            title="Sign out?"
+            message="You'll be returned to the sign-in page. Use your invitation link or ask the owner to get back in."
             confirmLabel="Sign out"
             tone="neutral"
             className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
@@ -55,7 +56,8 @@ function UserBlock({
       </div>
       <form action={signOut}>
         <ConfirmSubmit
-          message="Sign out of Lead Portal?"
+          title="Sign out?"
+          message="You'll be returned to the sign-in page. Use your invitation link or ask the owner to get back in."
           confirmLabel="Sign out"
           tone="neutral"
           className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"

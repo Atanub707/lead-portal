@@ -34,7 +34,7 @@ export default async function NewCompanyPage({
           ← {listName}
         </Link>
 
-        <h1 className="mt-3 text-xl font-semibold tracking-tight text-zinc-900">
+        <h1 className="mt-3 text-lg font-semibold tracking-tight text-zinc-900">
           Add company
         </h1>
         <p className="mt-1 text-[13px] text-zinc-500">

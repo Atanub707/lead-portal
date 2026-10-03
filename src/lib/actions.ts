@@ -246,6 +246,45 @@ export async function createPipeline(formData: FormData) {
   redirect(`/companies?list=${id}`);
 }
 
+export async function deletePipeline(formData: FormData) {
+  const supabase = await assertOwner();
+
+  const id = field(formData, "id");
+  if (!id) throw new Error("Missing pipeline id");
+
+  const [{ count: companies }, { count: total }] = await Promise.all([
+    supabase
+      .from("organizations")
+      .select("id", { count: "exact", head: true })
+      .eq("list", id),
+    supabase.from("pipelines").select("id", { count: "exact", head: true }),
+  ]);
+
+  const used = companies ?? 0;
+  if (used > 0) {
+    redirect(
+      `/settings?pipeline_error=${encodeURIComponent(
+        `${used} compan${used === 1 ? "y is" : "ies are"} still in this pipeline — move or delete ${
+          used === 1 ? "it" : "them"
+        } first.`
+      )}`
+    );
+  }
+  if ((total ?? 0) <= 1) {
+    redirect(
+      `/settings?pipeline_error=${encodeURIComponent(
+        "You need at least one pipeline."
+      )}`
+    );
+  }
+
+  const { error } = await supabase.from("pipelines").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/", "layout");
+  redirect("/settings?pipeline_removed=1");
+}
+
 // ─── Contacts ────────────────────────────────────────────────────────────────
 
 export async function addContact(formData: FormData) {

@@ -132,6 +132,35 @@ export async function getPipelines(): Promise<Pipeline[]> {
   }));
 }
 
+export interface PipelineUsage {
+  id: string;
+  name: string;
+  icon: string;
+  count: number;
+}
+
+export async function getPipelineUsage(): Promise<PipelineUsage[]> {
+  const supabase = await createClient();
+  const [{ data: pipelines }, { data: orgs }] = await Promise.all([
+    supabase
+      .from("pipelines")
+      .select("id, name, icon")
+      .order("sort_order")
+      .order("created_at"),
+    supabase.from("organizations").select("list"),
+  ]);
+  const counts = new Map<string, number>();
+  for (const org of orgs ?? []) {
+    counts.set(org.list, (counts.get(org.list) ?? 0) + 1);
+  }
+  return (pipelines ?? []).map((pipeline) => ({
+    id: pipeline.id,
+    name: pipeline.name,
+    icon: pipeline.icon,
+    count: counts.get(pipeline.id) ?? 0,
+  }));
+}
+
 export interface CompanyRow extends Organization {
   people_count: number;
   decision_maker_count: number;

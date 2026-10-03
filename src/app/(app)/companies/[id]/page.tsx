@@ -150,7 +150,7 @@ export default async function CompanyPage({
             website={company.website}
             size={32}
           />
-          <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
+          <h1 className="text-lg font-semibold tracking-tight text-zinc-900">
             {company.name}
           </h1>
         </div>

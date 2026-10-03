@@ -1,11 +1,25 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { LayoutDashboard, Settings, type LucideIcon } from "lucide-react";
 import { NewPipelineButton } from "@/components/new-pipeline-dialog";
 import { pipelineIcon } from "@/components/pipeline-icon";
 import type { Pipeline } from "@/lib/types";
+
+// Instant feedback on click: a small pulsing dot on the item being navigated
+// to, so the app never feels stuck even when the server render takes a moment.
+function NavHint({ collapsed }: { collapsed: boolean }) {
+  const { pending } = useLinkStatus();
+  return (
+    <span
+      aria-hidden="true"
+      className={`nav-hint ${collapsed ? "absolute right-0.5 top-0.5" : "ml-auto"} ${
+        pending ? "nav-hint-pending" : ""
+      }`}
+    />
+  );
+}
 
 function NavItem({
   href,
@@ -25,9 +39,10 @@ function NavItem({
   return (
     <Link
       href={href}
+      prefetch={true}
       onClick={onNavigate}
       title={collapsed ? label : undefined}
-      className={`flex h-8 items-center rounded-md text-[13px] transition-colors ${
+      className={`relative flex h-8 items-center rounded-md text-[13px] transition duration-150 active:scale-[0.98] ${
         collapsed ? "justify-center px-0" : "gap-2 px-2"
       } ${
         active
@@ -38,6 +53,7 @@ function NavItem({
       <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
       {collapsed ? null : label}
       {collapsed ? <span className="sr-only">{label}</span> : null}
+      <NavHint collapsed={collapsed} />
     </Link>
   );
 }

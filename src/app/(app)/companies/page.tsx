@@ -120,7 +120,7 @@ export default async function CompaniesPage({
     <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
+          <h1 className="text-lg font-semibold tracking-tight text-zinc-900">
             {pipelineName(pipelines, list)}
           </h1>
           <p className="mt-1 text-[13px] text-zinc-500 tabular-nums">
@@ -129,9 +129,6 @@ export default async function CompaniesPage({
         </div>
         <div className="flex items-center gap-2">
           <PasteUrl list={list} pipelines={pipelines} />
-          <Link href={`/companies/new?list=${list}`} className="btn-primary">
-            + Add company
-          </Link>
         </div>
       </header>
 
