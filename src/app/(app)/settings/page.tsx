@@ -12,7 +12,17 @@ import { getCurrentProfile, getPipelineUsage, getProfiles } from "@/lib/data";
 export const dynamic = "force-dynamic";
 
 // id -> pending? Pending invitations are keyed by email until accepted.
+// Cached briefly so prefetches and revisits don't hammer Clerk's API.
+let authMetaCache: {
+  at: number;
+  data: Map<string, boolean> | null;
+} | null = null;
+const AUTH_META_TTL_MS = 60_000;
+
 async function getAuthMeta(): Promise<Map<string, boolean> | null> {
+  if (authMetaCache && Date.now() - authMetaCache.at < AUTH_META_TTL_MS) {
+    return authMetaCache.data;
+  }
   try {
     const client = await clerkClient();
     const [users, invites] = await Promise.all([
@@ -26,9 +36,10 @@ async function getAuthMeta(): Promise<Map<string, boolean> | null> {
         map.set(`email:${inv.emailAddress.toLowerCase()}`, true);
       }
     }
+    authMetaCache = { at: Date.now(), data: map };
     return map;
   } catch {
-    return null;
+    return authMetaCache?.data ?? null;
   }
 }
 
