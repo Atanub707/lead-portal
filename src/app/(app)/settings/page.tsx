@@ -1,28 +1,27 @@
+import { clerkClient } from "@clerk/nextjs/server";
 import { Trash2 } from "lucide-react";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { InviteButton } from "@/components/invite-form";
 import { RoleSelect } from "@/components/role-select";
 import { removeUser } from "@/lib/actions";
 import { getCurrentProfile, getProfiles } from "@/lib/data";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-interface AuthMeta {
-  pending: boolean;
-}
-
-async function getAuthMeta(): Promise<Map<string, AuthMeta> | null> {
+// id -> pending? Pending invitations are keyed by email until accepted.
+async function getAuthMeta(): Promise<Map<string, boolean> | null> {
   try {
-    const admin = createAdminClient();
-    const { data, error } = await admin.auth.admin.listUsers({
-      page: 1,
-      perPage: 200,
-    });
-    if (error) return null;
-    const map = new Map<string, AuthMeta>();
-    for (const u of data.users) {
-      map.set(u.id, { pending: !u.last_sign_in_at });
+    const client = await clerkClient();
+    const [users, invites] = await Promise.all([
+      client.users.getUserList({ limit: 200 }),
+      client.invitations.getInvitationList({ status: "pending", limit: 200 }),
+    ]);
+    const map = new Map<string, boolean>();
+    for (const u of users.data) map.set(u.id, false);
+    for (const inv of invites.data) {
+      if (inv.emailAddress) {
+        map.set(`email:${inv.emailAddress.toLowerCase()}`, true);
+      }
     }
     return map;
   } catch {
@@ -83,7 +82,11 @@ export default async function SettingsPage({
         <ul className="divide-y divide-zinc-100">
           {users.map((user) => {
             const initial = (user.email ?? "?").charAt(0).toUpperCase();
-            const pending = authMeta?.get(user.id)?.pending;
+            const pending =
+              authMeta?.get(user.id) ??
+              (user.email
+                ? authMeta?.get(`email:${user.email.toLowerCase()}`)
+                : undefined);
             const isSelf = user.id === profile?.id;
 
             return (

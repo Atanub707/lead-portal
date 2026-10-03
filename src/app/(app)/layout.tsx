@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { getPipelines } from "@/lib/data";
-import { createClient } from "@/lib/supabase/server";
+import { ensureProfile } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,34 +10,20 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const [{ data: profile }, pipelines] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("role, onboarded")
-      .eq("id", user.id)
-      .maybeSingle(),
+  const [profile, pipelines] = await Promise.all([
+    ensureProfile(),
     getPipelines(),
   ]);
 
-  // Invited users finish the welcome screen (set a password) before entering the app.
-  if (profile && profile.onboarded === false) {
-    redirect("/welcome");
+  if (!profile) {
+    redirect("/login");
   }
 
   return (
     <Shell
-      isOwner={profile?.role === "owner"}
-      email={user.email ?? ""}
-      role={profile?.role ?? "editor"}
+      isOwner={profile.role === "owner"}
+      email={profile.email ?? ""}
+      role={profile.role}
       pipelines={pipelines}
     >
       {children}

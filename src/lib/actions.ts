@@ -1,5 +1,6 @@
 "use server";
 
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -23,16 +24,14 @@ function revalidateAll(orgId?: number) {
 }
 
 async function assertOwner() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not signed in");
+  const { userId } = await auth();
+  if (!userId) throw new Error("Not signed in");
 
+  const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")
     .select("role")
-    .eq("id", user.id)
+    .eq("id", userId)
     .maybeSingle();
 
   if (data?.role !== "owner") {
@@ -44,10 +43,8 @@ async function assertOwner() {
 // ─── Organizations ───────────────────────────────────────────────────────────
 
 export async function createOrganization(formData: FormData) {
+  const { userId } = await auth();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   const name = field(formData, "name");
   if (!name) throw new Error("Company name is required");
@@ -80,7 +77,7 @@ export async function createOrganization(formData: FormData) {
           : null,
       next_action: field(formData, "next_action"),
       notes: field(formData, "notes"),
-      created_by: user?.id ?? null,
+      created_by: userId ?? null,
     })
     .select("id")
     .single();
@@ -131,11 +128,9 @@ export async function toggleBookmark(
   orgId: number,
   bookmarked: boolean
 ): Promise<{ ok: boolean }> {
+  const { userId } = await auth();
+  if (!userId) return { ok: false };
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false };
 
   const { error } = await supabase
     .from("organizations")
@@ -152,11 +147,9 @@ export async function setFollowUp(
   date: string | null,
   note: string | null
 ): Promise<{ ok: boolean; message?: string }> {
+  const { userId } = await auth();
+  if (!userId) return { ok: false, message: "Not signed in" };
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: "Not signed in" };
 
   const cleanDate =
     date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
@@ -277,11 +270,9 @@ export async function findContactLinkedIn(
   contactId: number,
   orgId: number
 ): Promise<{ ok: boolean; message?: string }> {
+  const { userId } = await auth();
+  if (!userId) return { ok: false, message: "Not signed in" };
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: "Not signed in" };
 
   if (!tinyfishEnabled()) {
     return {
@@ -325,10 +316,8 @@ export async function findContactLinkedIn(
 // ─── Interactions ────────────────────────────────────────────────────────────
 
 export async function addInteraction(formData: FormData) {
+  const { userId } = await auth();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   const orgId = Number(field(formData, "org_id"));
   const summary = field(formData, "summary");
@@ -344,7 +333,7 @@ export async function addInteraction(formData: FormData) {
     channel: field(formData, "channel"),
     summary,
     outcome: field(formData, "outcome"),
-    logged_by: user?.id ?? null,
+    logged_by: userId ?? null,
   });
   if (error) throw new Error(error.message);
 
@@ -387,58 +376,8 @@ async function currentSiteUrl() {
 
 export interface InviteResult {
   ok: boolean;
-  link?: string;
-  note?: string;
   emailed?: boolean;
-  emailError?: string;
   error?: string;
-}
-
-async function sendInviteEmail(
-  to: string,
-  link: string
-): Promise<{ sent: boolean; error?: string }> {
-  const apiKey = process.env.BREVO_API_KEY?.trim();
-  const senderEmail = process.env.BREVO_SENDER_EMAIL?.trim();
-  if (!apiKey || !senderEmail) return { sent: false };
-
-  const senderName = process.env.BREVO_SENDER_NAME?.trim() || "Lead Portal";
-  try {
-    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: {
-        "api-key": apiKey,
-        "Content-Type": "application/json",
-        accept: "application/json",
-      },
-      body: JSON.stringify({
-        sender: { name: senderName, email: senderEmail },
-        to: [{ email: to }],
-        subject: "You've been invited to Lead Portal",
-        htmlContent: `<div style="font-family:Inter,Arial,sans-serif;font-size:14px;color:#27272a;line-height:1.6">
-<p>Hi,</p>
-<p>You've been invited to <strong>Lead Portal</strong> — the team's pipeline for company research and outreach.</p>
-<p><a href="${link}" style="display:inline-block;background:#18181b;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:8px">Set your password &amp; join</a></p>
-<p style="color:#71717a;font-size:12px">This link works once and expires in 24 hours. If you weren't expecting this, you can ignore this email.</p>
-</div>`,
-        textContent: `You've been invited to Lead Portal.\n\nSet your password (link works once, expires in 24 hours):\n${link}\n`,
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      return {
-        sent: false,
-        error: `Email service ${res.status}: ${text.slice(0, 160)}`,
-      };
-    }
-    return { sent: true };
-  } catch (err) {
-    return {
-      sent: false,
-      error: err instanceof Error ? err.message : "Email could not be sent",
-    };
-  }
 }
 
 export async function inviteUser(
@@ -451,16 +390,14 @@ export async function inviteUser(
     return { ok: false, error: "Enter a valid email address" };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Not signed in" };
+  const { userId } = await auth();
+  if (!userId) return { ok: false, error: "Not signed in" };
 
+  const supabase = await createClient();
   const { data: me } = await supabase
     .from("profiles")
     .select("role")
-    .eq("id", user.id)
+    .eq("id", userId)
     .maybeSingle();
   if (me?.role !== "owner") {
     return { ok: false, error: "Only the owner can invite people" };
@@ -469,49 +406,14 @@ export async function inviteUser(
   const base = await currentSiteUrl();
 
   try {
-    const admin = createAdminClient();
-    const failures: string[] = [];
-    // New email → invite (creates the account). Existing account → magic link (re-invite).
-    for (const type of ["invite", "magiclink"] as const) {
-      const { data, error } = await admin.auth.admin.generateLink({
-        type,
-        email,
-        options: { redirectTo: `${base}/auth/callback?next=/welcome` },
-      });
-      const properties = data?.properties;
-      if (!error && properties?.hashed_token) {
-        // Invite with the chosen role from the start.
-        const invitedUserId = data?.user?.id;
-        if (invitedUserId) {
-          await admin
-            .from("profiles")
-            .update({ role: safeRole })
-            .eq("id", invitedUserId);
-        }
-        const link = `${base}/auth/callback?token_hash=${encodeURIComponent(
-          properties.hashed_token
-        )}&type=${properties.verification_type ?? type}&next=/welcome`;
-        const emailResult = await sendInviteEmail(email, link);
-        revalidatePath("/settings");
-        return {
-          ok: true,
-          link,
-          emailed: emailResult.sent,
-          emailError: emailResult.error,
-          note:
-            properties.verification_type === "magiclink"
-              ? "This email already has an account — the link signs them straight in."
-              : "New account created (pending). The link is single-use and expires in 24 hours by default.",
-        };
-      }
-      failures.push(`${type}: ${error?.message ?? "no token returned"}`);
-    }
-    return {
-      ok: false,
-      error: `Supabase could not create a link for this email (${failures
-        .join(" | ")
-        .slice(0, 220)})`,
-    };
+    const client = await clerkClient();
+    await client.invitations.createInvitation({
+      emailAddress: email,
+      publicMetadata: { role: safeRole },
+      redirectUrl: `${base}/dashboard`,
+    });
+    revalidatePath("/settings");
+    return { ok: true, emailed: true };
   } catch (err) {
     return {
       ok: false,
@@ -536,14 +438,12 @@ export async function removeUser(formData: FormData) {
 }
 
 async function removeUserInner(formData: FormData) {
-  const supabase = await assertOwner();
-  const userId = field(formData, "user_id");
-  if (!userId) redirect(`/settings?remove_error=${encodeURIComponent("Missing user")}`);
+  await assertOwner();
+  const targetId = field(formData, "user_id");
+  if (!targetId) redirect(`/settings?remove_error=${encodeURIComponent("Missing user")}`);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (user?.id === userId) {
+  const { userId } = await auth();
+  if (userId === targetId) {
     redirect(
       `/settings?remove_error=${encodeURIComponent("You cannot remove your own account")}`
     );
@@ -551,9 +451,10 @@ async function removeUserInner(formData: FormData) {
 
   let errorMessage: string | null = null;
   try {
+    const client = await clerkClient();
+    await client.users.deleteUser(targetId);
     const admin = createAdminClient();
-    const { error } = await admin.auth.admin.deleteUser(userId);
-    if (error) errorMessage = error.message;
+    await admin.from("profiles").delete().eq("id", targetId);
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : "User could not be removed";
   }
@@ -586,26 +487,11 @@ export async function updateUserRole(
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
-export async function completeOnboarding(): Promise<{ ok: boolean }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false };
-
-  try {
-    const admin = createAdminClient();
-    await admin.from("profiles").update({ onboarded: true }).eq("id", user.id);
-  } catch {
-    return { ok: false };
-  }
-
-  revalidatePath("/", "layout");
-  return { ok: true };
-}
-
 export async function signOut() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  const { sessionId } = await auth();
+  if (sessionId) {
+    const client = await clerkClient();
+    await client.sessions.revokeSession(sessionId);
+  }
   redirect("/login");
 }

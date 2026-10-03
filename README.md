@@ -5,7 +5,7 @@ Next.js + Supabase. Deployable to Vercel for free.
 
 ## What's inside
 
-- Magic-link sign-in (no passwords) via Supabase Auth
+- Clerk authentication — invitations, password sign-in, password resets (Clerk sends all auth emails)
 - Two pipelines — **POS** and **Compliance** — one shared database, kept separate
 - **Pipelines are data:** the owner can add new sections from the sidebar (**+ New
   pipeline**) with a name and an icon; they get the standard stages and work exactly
@@ -30,27 +30,29 @@ Next.js + Supabase. Deployable to Vercel for free.
 2. Paste everything from `supabase/migrations/20261002000000_init.sql` → **Run**
    (run it once — migrations are single-apply)
 
-### 3. Collect your keys
+### 3. Create the Clerk application (authentication)
+
+1. [clerk.com](https://clerk.com) → **Create application** (email + password is enough)
+2. **API Keys** → copy the publishable and secret keys into `.env.local` / Vercel
+3. **User & Authentication → Restrictions** → sign-up mode: **Restricted (invitations only)**
+4. Supabase → **Authentication → Third-Party Auth → Add provider → Clerk** → paste your
+   Clerk **issuer URL** (Clerk → API Keys / JWT settings, like `https://xxx.clerk.accounts.dev`)
+
+Clerk owns sign-in, invitations, and password resets — it sends all auth emails itself.
+
+### 4. Collect your Supabase keys (database only)
 
 **Settings → API Keys** — copy:
 - Project URL
 - **Publishable** key (new projects) — legacy projects: the `anon` public key
 - **Secret** key (new projects: `sb_secret_…`) — legacy projects: `service_role` key
 
-### 4. Local environment
+### 5. Local environment
 
 ```bash
 cp .env.example .env.local
-# edit .env.local and paste the URL + keys
+# edit .env.local and paste the Clerk + Supabase keys
 ```
-
-### 5. Redirect URLs (Auth)
-
-**Authentication → URL Configuration**:
-- Site URL: `http://localhost:3005`
-- Redirect URLs: add `http://localhost:3005/auth/callback`
-
-(Add the production URLs here again after deploying.)
 
 ### 6. Run it
 
@@ -59,10 +61,8 @@ npm install
 npm run dev
 ```
 
-Create your admin account in Supabase → **Authentication → Users → Add user →
-Create new user** (your email + a strong password, enable **Auto Confirm User**).
-You become the **owner** automatically (first account). Then sign in at
-<http://localhost:3005> with that email and password.
+Sign up at <http://localhost:3005/login> with your email — the first account to sign
+in becomes the **owner** automatically.
 
 ### 7. Import your existing lists
 
@@ -73,31 +73,15 @@ node --env-file=.env.local scripts/import-csv.mjs
 Reads `../companies.csv` and `../service-companies.csv` plus the detail Markdown
 files (members + interaction logs). Safe to re-run — existing companies are skipped.
 
-### 8. Go invite-only (RBAC)
+### 8. Invite-only (Clerk)
 
-1. Supabase → **Authentication → Sign In / Providers** → turn **OFF**
-   "Allow new users to sign up" → Save. From now on nobody can self-create an
-   account — partners join only by invitation.
-2. In the portal: **Settings → Invite** → email + role → **Send invite**. If
-   `BREVO_API_KEY` + `BREVO_SENDER_EMAIL` are set, the invite is **emailed directly**
-   to them; either way a copyable link appears (share it via WhatsApp/Slack/email).
-   Opening it signs them in and shows a **standalone welcome screen** (no app shell)
-   where they set a password before entering. Links are single-use and expire in
-   24 hours by default.
+1. Clerk → **User & Authentication → Restrictions** → sign-up mode:
+   **Restricted (invitations only)** — nobody can self-create an account.
+2. In the portal: **Settings → Invite** → email + role → **Send invite**. Clerk emails
+   the invitation; the person sets their password and lands in the dashboard as an
+   **editor** (or **owner** if you chose that role).
 3. Manage roles or remove users anytime in **Settings** — owner only. Editors can
    add/edit pipeline data; the database (RLS) blocks deletes and role changes.
-
-> **Direct email invites:** brevo.com → free account (300 emails/day) → verify
-> your sender email → **SMTP & API → API Keys** → add `BREVO_API_KEY` and
-> `BREVO_SENDER_EMAIL` to `.env.local` and Vercel. If email fails for any reason,
-> the copied link always works.
-
-> **Magic links & password resets:** connect Brevo as Supabase SMTP so those emails
-> deliver reliably (invites go through Brevo's API and are unaffected). Automated:
-> add `SUPABASE_ACCESS_TOKEN` (supabase.com/dashboard/account/tokens) and
-> `BREVO_SMTP_KEY` (brevo.com → SMTP & API → **SMTP** tab) to `.env.local`, then run
-> `node --env-file=.env.local scripts/configure-auth.mjs` — it sets the Site URL,
-> redirect allowlist, and Brevo SMTP in one go.
 
 ## AI assistant ("Paste URL with AI")
 

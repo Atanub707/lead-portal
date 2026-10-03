@@ -1,4 +1,5 @@
 import { createClient } from "./supabase/server";
+import { ensureProfile } from "./auth";
 import {
   FALLBACK_PIPELINES,
   type Contact,
@@ -191,17 +192,7 @@ export async function getProfiles(): Promise<Profile[]> {
   return (data ?? []) as Profile[];
 }
 
+// Clerk-based: returns the signed-in user's profile, creating it on first login.
 export async function getCurrentProfile(): Promise<Profile | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle();
-  return (data as Profile | null) ?? null;
+  return ensureProfile();
 }

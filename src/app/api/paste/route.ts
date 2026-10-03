@@ -1,4 +1,5 @@
 import { generateObject, generateText } from "ai";
+import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { NO_AI_KEY_MESSAGE, pickModel } from "@/lib/ai";
 import {
@@ -115,11 +116,9 @@ function cleanWebsite(raw: string): string {
 }
 
 export async function POST(req: Request) {
+  const { userId } = await auth();
+  if (!userId) return new Response("Unauthorized", { status: 401 });
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return new Response("Unauthorized", { status: 401 });
 
   const body = (await req.json().catch(() => null)) as {
     url?: unknown;
@@ -142,7 +141,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "Unknown pipeline." }, { status: 400 });
   }
 
-  const model = pickModel(user.id);
+  const model = pickModel(userId);
   if (!model) {
     return Response.json({ error: NO_AI_KEY_MESSAGE }, { status: 503 });
   }

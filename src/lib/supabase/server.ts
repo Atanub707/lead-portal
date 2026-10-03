@@ -1,37 +1,16 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { auth } from "@clerk/nextjs/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
+// Supabase client bound to the signed-in Clerk user (Supabase third-party auth),
+// so Row-Level Security evaluates as that user.
 export async function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key =
+  const { getToken } = await auth();
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY " +
-        "(legacy NEXT_PUBLIC_SUPABASE_ANON_KEY also works). " +
-        "Copy .env.example to .env.local and fill in your Supabase project keys."
-    );
-  }
-
-  const cookieStore = await cookies();
-
-  return createServerClient(url, key, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          );
-        } catch {
-          // Called from a Server Component — safe to ignore when session refresh
-          // is handled by Server Actions / Route Handlers.
-        }
-      },
-    },
-  });
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      accessToken: async () => (await getToken()) ?? null,
+    }
+  );
 }
