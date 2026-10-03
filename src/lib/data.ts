@@ -352,6 +352,29 @@ export async function getEnrichmentRuns(
   return (data ?? []) as EnrichmentRun[];
 }
 
+export interface DeepResearchState {
+  activeRunId: number | null;
+  lastSuccessAt: string | null;
+  latest: EnrichmentRun | null;
+}
+
+export async function getDeepResearchState(orgId: number): Promise<DeepResearchState> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("enrichment_runs")
+    .select("*")
+    .eq("org_id", orgId)
+    .eq("kind", "deep_research")
+    .order("created_at", { ascending: false })
+    .limit(5);
+  const runs = (data ?? []) as EnrichmentRun[];
+  return {
+    activeRunId: runs.find((r) => r.status === "running")?.id ?? null,
+    lastSuccessAt: runs.find((r) => r.status === "ok")?.created_at ?? null,
+    latest: runs[0] ?? null,
+  };
+}
+
 export async function getInteractions(orgId: number): Promise<Interaction[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
