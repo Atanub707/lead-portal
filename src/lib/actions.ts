@@ -4,6 +4,7 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { logActivity } from "./activity";
 import { createAdminClient } from "./supabase/admin";
 import { clearClerkDirectoryCache } from "./clerk-directory";
 import { createClient } from "./supabase/server";
@@ -96,15 +97,25 @@ export async function createOrganization(formData: FormData) {
     .single();
 
   if (error) throw new Error(error.message);
+  await logActivity({
+    actorId: userId,
+    action: "company.create",
+    orgId: data.id,
+    targetType: "company",
+    targetId: data.id,
+    summary: `Added company “${name}”`,
+  });
   revalidateAll(data.id);
   redirect(`/companies/${data.id}`);
 }
 
 export async function updateOrganization(formData: FormData) {
+  const { userId } = await auth();
   const supabase = await createClient();
   const id = Number(field(formData, "id"));
   if (!id) throw new Error("Missing company id");
 
+  const name = field(formData, "name") ?? "Unnamed";
   const status = field(formData, "status");
   const kind = field(formData, "kind");
   const priority = field(formData, "priority");
@@ -112,7 +123,7 @@ export async function updateOrganization(formData: FormData) {
   const { error } = await supabase
     .from("organizations")
     .update({
-      name: field(formData, "name") ?? "Unnamed",
+      name,
       website: field(formData, "website"),
       linkedin_url: field(formData, "linkedin_url"),
       kind: (kind && KIND_OPTIONS.includes(kind as OrgKind)
@@ -134,6 +145,14 @@ export async function updateOrganization(formData: FormData) {
     .eq("id", id);
 
   if (error) throw new Error(error.message);
+  await logActivity({
+    actorId: userId,
+    action: "company.update",
+    orgId: id,
+    targetType: "company",
+    targetId: id,
+    summary: `Updated company “${name}”`,
+  });
   revalidateAll(id);
 }
 
@@ -145,11 +164,26 @@ export async function toggleBookmark(
   if (!userId) return { ok: false };
   const supabase = await createClient();
 
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("name")
+    .eq("id", orgId)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("organizations")
     .update({ bookmarked })
     .eq("id", orgId);
   if (error) return { ok: false };
+
+  await logActivity({
+    actorId: userId,
+    action: "company.bookmark",
+    orgId,
+    targetType: "company",
+    targetId: orgId,
+    summary: `${bookmarked ? "Starred" : "Unstarred"} “${org?.name ?? "Unknown"}”`,
+  });
 
   revalidateAll(orgId);
   return { ok: true };
@@ -164,6 +198,12 @@ export async function setFollowUp(
   if (!userId) return { ok: false, message: "Not signed in" };
   const supabase = await createClient();
 
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("name")
+    .eq("id", orgId)
+    .maybeSingle();
+
   const cleanDate =
     date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
   const { error } = await supabase
@@ -175,14 +215,42 @@ export async function setFollowUp(
     .eq("id", orgId);
   if (error) return { ok: false, message: error.message };
 
+  await logActivity({
+    actorId: userId,
+    action: "company.follow_up",
+    orgId,
+    targetType: "company",
+    targetId: orgId,
+    summary: cleanDate
+      ? `Set follow-up for “${org?.name ?? "Unknown"}” to ${cleanDate}`
+      : `Cleared follow-up for “${org?.name ?? "Unknown"}”`,
+  });
+
   revalidateAll(orgId);
   return { ok: true };
 }
 
 export async function deleteOrganization(formData: FormData) {
   const supabase = await assertOwner();
+  const { userId } = await auth();
   const id = Number(field(formData, "id"));
   if (!id) throw new Error("Missing company id");
+
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("name")
+    .eq("id", id)
+    .maybeSingle();
+
+  // Logged before the delete: the org_id FK would be gone afterwards.
+  await logActivity({
+    actorId: userId,
+    action: "company.delete",
+    orgId: id,
+    targetType: "company",
+    targetId: id,
+    summary: `Deleted company “${org?.name ?? "Unknown"}”`,
+  });
 
   const { error } = await supabase.from("organizations").delete().eq("id", id);
   if (error) throw new Error(error.message);
@@ -207,6 +275,7 @@ function slugify(name: string) {
 
 export async function createPipeline(formData: FormData) {
   const supabase = await assertOwner();
+  const { userId } = await auth();
 
   const name = field(formData, "name");
   if (!name) throw new Error("Pipeline name is required");
@@ -243,17 +312,32 @@ export async function createPipeline(formData: FormData) {
     .insert({ id, name, icon, sort_order });
   if (error) throw new Error(error.message);
 
+  await logActivity({
+    actorId: userId,
+    action: "pipeline.create",
+    targetType: "pipeline",
+    targetId: id,
+    summary: `Created pipeline “${name}”`,
+  });
+
   revalidatePath("/", "layout");
   redirect(`/companies?list=${id}`);
 }
 
 export async function renamePipeline(formData: FormData) {
   const supabase = await assertOwner();
+  const { userId } = await auth();
 
   const id = field(formData, "id");
   const name = field(formData, "name");
   if (!id) throw new Error("Missing pipeline id");
   if (!name) throw new Error("Pipeline name is required");
+
+  const { data: existing } = await supabase
+    .from("pipelines")
+    .select("name")
+    .eq("id", id)
+    .maybeSingle();
 
   const { error } = await supabase
     .from("pipelines")
@@ -261,15 +345,30 @@ export async function renamePipeline(formData: FormData) {
     .eq("id", id);
   if (error) throw new Error(error.message);
 
+  await logActivity({
+    actorId: userId,
+    action: "pipeline.rename",
+    targetType: "pipeline",
+    targetId: id,
+    summary: `Renamed pipeline “${existing?.name ?? "Unknown"}” → “${name.slice(0, 60)}”`,
+  });
+
   revalidatePath("/", "layout");
   redirect("/settings");
 }
 
 export async function deletePipeline(formData: FormData) {
   const supabase = await assertOwner();
+  const { userId } = await auth();
 
   const id = field(formData, "id");
   if (!id) throw new Error("Missing pipeline id");
+
+  const { data: pipeline } = await supabase
+    .from("pipelines")
+    .select("name")
+    .eq("id", id)
+    .maybeSingle();
 
   const [{ count: companies }, { count: total }] = await Promise.all([
     supabase
@@ -300,6 +399,14 @@ export async function deletePipeline(formData: FormData) {
   const { error } = await supabase.from("pipelines").delete().eq("id", id);
   if (error) throw new Error(error.message);
 
+  await logActivity({
+    actorId: userId,
+    action: "pipeline.delete",
+    targetType: "pipeline",
+    targetId: id,
+    summary: `Deleted pipeline “${pipeline?.name ?? "Unknown"}”`,
+  });
+
   revalidatePath("/", "layout");
   redirect("/settings?pipeline_removed=1");
 }
@@ -312,6 +419,12 @@ export async function addContact(formData: FormData) {
   const orgId = Number(field(formData, "org_id"));
   const name = field(formData, "name");
   if (!orgId || !name) throw new Error("Contact name is required");
+
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("name")
+    .eq("id", orgId)
+    .maybeSingle();
 
   const row = {
     org_id: orgId,
@@ -331,16 +444,39 @@ export async function addContact(formData: FormData) {
     ({ error } = await supabase.from("contacts").insert(rest));
   }
   if (error) throw new Error(error.message);
+  await logActivity({
+    actorId: userId,
+    action: "contact.add",
+    orgId,
+    targetType: "contact",
+    summary: `Added person “${name}” to “${org?.name ?? "Unknown"}”`,
+  });
   revalidateAll(orgId);
 }
 
 export async function deleteContact(formData: FormData) {
   const supabase = await assertOwner();
+  const { userId } = await auth();
   const id = Number(field(formData, "id"));
   const orgId = Number(field(formData, "org_id"));
 
+  const [{ data: contact }, { data: org }] = await Promise.all([
+    supabase.from("contacts").select("name").eq("id", id).maybeSingle(),
+    supabase.from("organizations").select("name").eq("id", orgId).maybeSingle(),
+  ]);
+
   const { error } = await supabase.from("contacts").delete().eq("id", id);
   if (error) throw new Error(error.message);
+
+  await logActivity({
+    actorId: userId,
+    action: "contact.delete",
+    orgId,
+    targetType: "contact",
+    targetId: id,
+    summary: `Removed person “${contact?.name ?? "Unknown"}” from “${org?.name ?? "Unknown"}”`,
+  });
+
   revalidateAll(orgId);
 }
 
@@ -387,6 +523,15 @@ export async function findContactLinkedIn(
     .eq("id", contactId);
   if (error) return { ok: false, message: error.message };
 
+  await logActivity({
+    actorId: userId,
+    action: "contact.linkedin",
+    orgId,
+    targetType: "contact",
+    targetId: contactId,
+    summary: `Found LinkedIn for “${contact.name}”`,
+  });
+
   revalidateAll(orgId);
   return { ok: true };
 }
@@ -418,7 +563,7 @@ export async function addInteraction(formData: FormData) {
   // Keep last_contact current when this interaction is newer.
   const { data: org } = await supabase
     .from("organizations")
-    .select("last_contact")
+    .select("name, last_contact")
     .eq("id", orgId)
     .maybeSingle();
 
@@ -429,6 +574,17 @@ export async function addInteraction(formData: FormData) {
       .update({ last_contact: occurredOn })
       .eq("id", orgId);
   }
+
+  await logActivity({
+    actorId: userId,
+    action: "company.interaction",
+    orgId,
+    targetType: "company",
+    targetId: orgId,
+    summary: `Logged an interaction with “${
+      (org as { name?: string | null } | null)?.name ?? "Unknown"
+    }”`,
+  });
 
   revalidateAll(orgId);
 }
@@ -532,6 +688,14 @@ export async function inviteUser(
     }
   }
 
+  await logActivity({
+    actorId: userId,
+    action: "user.invite",
+    targetType: "user",
+    targetId: email,
+    summary: `Invited ${email} as ${safeRole}`,
+  });
+
   clearClerkDirectoryCache();
   revalidatePath("/settings");
   return { ok: true, emailed: true, link: invitationUrl ?? undefined };
@@ -586,7 +750,7 @@ export async function removeUser(formData: FormData) {
 }
 
 async function removeUserInner(formData: FormData) {
-  await assertOwner();
+  const supabase = await assertOwner();
   const targetId = field(formData, "user_id");
   if (!targetId) redirect(`/settings?remove_error=${encodeURIComponent("Missing user")}`);
 
@@ -596,6 +760,12 @@ async function removeUserInner(formData: FormData) {
       `/settings?remove_error=${encodeURIComponent("You cannot remove your own account")}`
     );
   }
+
+  const { data: target } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", targetId)
+    .maybeSingle();
 
   let errorMessage: string | null = null;
   try {
@@ -613,6 +783,16 @@ async function removeUserInner(formData: FormData) {
   if (errorMessage) {
     redirect(`/settings?remove_error=${encodeURIComponent(errorMessage)}`);
   }
+
+  await logActivity({
+    actorId: userId,
+    action: "user.remove",
+    targetType: "user",
+    targetId,
+    summary: `Removed ${
+      (target as { email?: string | null } | null)?.email ?? targetId
+    }`,
+  });
   redirect("/settings?removed=1");
 }
 
@@ -625,11 +805,28 @@ export async function updateUserRole(
     return { ok: false, message: "Invalid role update" };
   }
 
+  const { userId: actorId } = await auth();
+  const { data: target } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", userId)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("profiles")
     .update({ role: role as UserRole })
     .eq("id", userId);
   if (error) return { ok: false, message: error.message };
+
+  await logActivity({
+    actorId,
+    action: "user.role",
+    targetType: "user",
+    targetId: userId,
+    summary: `Changed ${
+      (target as { email?: string | null } | null)?.email ?? userId
+    } to ${role}`,
+  });
   revalidatePath("/settings");
   return { ok: true };
 }
@@ -643,15 +840,25 @@ export async function updateMyName(formData: FormData): Promise<void> {
   const name = field(formData, "full_name");
   if (!name) throw new Error("Name is required");
 
+  const cleanName = name.slice(0, 80);
+
   // Admin client so a user can always set their OWN name even before the
   // row-level "update self" policy migration lands. Ownership is enforced here:
   // the update is hard-scoped to the signed-in user's id.
   const admin = createAdminClient();
   const { error } = await admin
     .from("profiles")
-    .update({ full_name: name.slice(0, 80) })
+    .update({ full_name: cleanName })
     .eq("id", userId);
   if (error) throw new Error(error.message);
+
+  await logActivity({
+    actorId: userId,
+    action: "profile.name",
+    targetType: "profile",
+    targetId: userId,
+    summary: `Set display name to “${cleanName}”`,
+  });
 
   revalidatePath("/settings");
   revalidateAll();

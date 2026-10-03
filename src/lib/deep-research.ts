@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { logActivity } from "./activity";
 import { getActorRun, getDatasetItems, startActorRun, type ActorRunInfo } from "./apify";
 import { matchEmailToContact } from "./match";
 import { isDecisionTitle, isGenericEmail } from "./people";
@@ -350,7 +351,7 @@ export async function startDeepResearch(
       kind: "deep_research",
       source: "apify",
       status: "running",
-      details: { actors: [] },
+      details: { actors: [], company_name: company.name },
       created_by: userId,
     })
     .select("id")
@@ -436,8 +437,17 @@ export async function startDeepResearch(
 
   await admin
     .from("enrichment_runs")
-    .update({ details: { actors } })
+    .update({ details: { actors, company_name: company.name } })
     .eq("id", run.id);
+
+  await logActivity({
+    actorId: userId,
+    action: "research.deep_start",
+    orgId,
+    targetType: "research",
+    targetId: run.id as number,
+    summary: `Started deep research for “${company.name}”`,
+  });
 
   return { ok: true, runId: run.id as number };
 }
@@ -811,6 +821,18 @@ export async function reconcileDeepResearch(
         })
         .eq("id", run.id);
       if (error) throw new Error(error.message);
+      await logActivity({
+        actorId: (run.created_by as string | null) ?? null,
+        action: "research.deep_done",
+        orgId: run.org_id as number,
+        targetType: "research",
+        targetId: run.id as number,
+        summary: `Deep research for “${
+          typeof details.company_name === "string"
+            ? details.company_name
+            : "Unknown company"
+        }” finished: ${state.people} people, ${state.emails} emails, $${cost.toFixed(2)}`,
+      });
       return {
         ok: true,
         status,

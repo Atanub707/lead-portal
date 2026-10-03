@@ -431,6 +431,43 @@ export async function getProfiles(): Promise<Profile[]> {
   return (data ?? []) as Profile[];
 }
 
+export interface ActivityRow {
+  id: number;
+  actor_id: string | null;
+  action: string;
+  org_id: number | null;
+  target_type: string | null;
+  target_id: string | null;
+  summary: string;
+  details: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export async function getActivityLog(opts: {
+  page?: number;
+  per?: number;
+  actorId?: string;
+  group?: string;
+}): Promise<{ rows: ActivityRow[]; count: number }> {
+  const supabase = await createClient();
+  const per = opts.per && opts.per > 0 ? opts.per : 20;
+  const page = opts.page && opts.page > 0 ? opts.page : 1;
+  const from = (page - 1) * per;
+
+  let query = supabase
+    .from("activity_log")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(from, from + per - 1);
+
+  if (opts.actorId) query = query.eq("actor_id", opts.actorId);
+  if (opts.group) query = query.like("action", `${opts.group}.%`);
+
+  const { data, error, count } = await query;
+  if (error) throw new Error(error.message);
+  return { rows: (data ?? []) as ActivityRow[], count: count ?? 0 };
+}
+
 // Clerk-based: returns the signed-in user's profile, creating it on first login.
 export async function getCurrentProfile(): Promise<Profile | null> {
   return ensureProfile();

@@ -2,6 +2,7 @@ import { generateObject, generateText } from "ai";
 import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { matchEmailToContact, matchLinkedInProfile } from "@/lib/match";
+import { logActivity } from "@/lib/activity";
 import { NO_AI_KEY_MESSAGE, pickModel } from "@/lib/ai";
 import { isDecisionTitle } from "@/lib/people";
 import {
@@ -507,6 +508,15 @@ export async function POST(req: Request) {
   if (!finalLinkedin) stillMissing.push("LinkedIn company URL");
   if (finalContactCount === 0) stillMissing.push("team members");
   if (finalEmails.length === 0) stillMissing.push("email addresses");
+
+  await logActivity({
+    actorId: userId,
+    action: "research.paste",
+    orgId,
+    targetType: "research",
+    summary: `Pasted URL: ${orgName} (${contactsAdded} people, ${finalEmails.length} emails)`,
+    details: { url, contactsAdded, emails: finalEmails.length },
+  });
 
   return Response.json({
     ok: true,

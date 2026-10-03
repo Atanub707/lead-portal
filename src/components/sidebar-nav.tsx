@@ -2,7 +2,12 @@
 
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { LayoutDashboard, Settings, type LucideIcon } from "lucide-react";
+import {
+  LayoutDashboard,
+  ScrollText,
+  Settings,
+  type LucideIcon,
+} from "lucide-react";
 import { NewPipelineButton } from "@/components/new-pipeline-dialog";
 import { pipelineIcon } from "@/components/pipeline-icon";
 import type { Pipeline } from "@/lib/types";
@@ -126,6 +131,14 @@ export function SidebarNav({
             collapsed={collapsed}
             onNavigate={onNavigate}
             prefetch="auto"
+          />
+          <NavItem
+            href="/audit"
+            label="Audit"
+            icon={ScrollText}
+            active={pathname.startsWith("/audit")}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
           />
         </>
       ) : null}
