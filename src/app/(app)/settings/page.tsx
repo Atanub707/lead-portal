@@ -3,6 +3,7 @@ import { UserAvatar } from "@/components/badges";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { InviteButton } from "@/components/invite-form";
 import { pipelineIcon } from "@/components/pipeline-icon";
+import { RenamePipelineDialog } from "@/components/rename-pipeline-dialog";
 import { RoleSelect } from "@/components/role-select";
 import { SubmitButton } from "@/components/submit-button";
 import {
@@ -331,40 +332,48 @@ export default async function SettingsPage({
                       </div>
                     </div>
 
-                    {blocked ? (
-                      <button
-                        type="button"
-                        disabled
-                        title={`${pipeline.count} ${
-                          pipeline.count === 1 ? "company is" : "companies are"
-                        } still in this pipeline — move or delete ${
-                          pipeline.count === 1 ? "it" : "them"
-                        } first`}
-                        aria-label={`Cannot delete ${pipeline.name} while it has companies`}
-                        className="flex h-7 w-7 cursor-not-allowed items-center justify-center rounded-md text-zinc-300"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                      </button>
-                    ) : (
-                      <form action={deletePipeline}>
-                        <input
-                          type="hidden"
-                          name="id"
-                          value={pipeline.id}
-                        />
-                        <ConfirmSubmit
-                          title={`Delete ${pipeline.name}?`}
-                          message="This removes the section for everyone. It can't be undone."
-                          confirmLabel="Delete"
-                          className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                    <div className="flex shrink-0 items-center gap-1">
+                      <RenamePipelineDialog
+                        id={pipeline.id}
+                        name={pipeline.name}
+                      />
+                      {blocked ? (
+                        <button
+                          type="button"
+                          disabled
+                          title={`${pipeline.count} ${
+                            pipeline.count === 1
+                              ? "company is"
+                              : "companies are"
+                          } still in this pipeline — move or delete ${
+                            pipeline.count === 1 ? "it" : "them"
+                          } first`}
+                          aria-label={`Cannot delete ${pipeline.name} while it has companies`}
+                          className="flex h-7 w-7 cursor-not-allowed items-center justify-center rounded-md text-zinc-300"
                         >
                           <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                          <span className="sr-only">
-                            Delete {pipeline.name}
-                          </span>
-                        </ConfirmSubmit>
-                      </form>
-                    )}
+                        </button>
+                      ) : (
+                        <form action={deletePipeline}>
+                          <input
+                            type="hidden"
+                            name="id"
+                            value={pipeline.id}
+                          />
+                          <ConfirmSubmit
+                            title={`Delete ${pipeline.name}?`}
+                            message="This removes the section for everyone. It can't be undone."
+                            confirmLabel="Delete"
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            <span className="sr-only">
+                              Delete {pipeline.name}
+                            </span>
+                          </ConfirmSubmit>
+                        </form>
+                      )}
+                    </div>
                   </li>
                 );
               })}

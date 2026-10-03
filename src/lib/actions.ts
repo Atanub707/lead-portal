@@ -247,6 +247,24 @@ export async function createPipeline(formData: FormData) {
   redirect(`/companies?list=${id}`);
 }
 
+export async function renamePipeline(formData: FormData) {
+  const supabase = await assertOwner();
+
+  const id = field(formData, "id");
+  const name = field(formData, "name");
+  if (!id) throw new Error("Missing pipeline id");
+  if (!name) throw new Error("Pipeline name is required");
+
+  const { error } = await supabase
+    .from("pipelines")
+    .update({ name: name.slice(0, 60) })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/", "layout");
+  redirect("/settings");
+}
+
 export async function deletePipeline(formData: FormData) {
   const supabase = await assertOwner();
 
