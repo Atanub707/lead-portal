@@ -535,6 +535,24 @@ export async function updateUserRole(
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
+export async function updateMyName(formData: FormData): Promise<void> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Not signed in");
+
+  const name = field(formData, "full_name");
+  if (!name) throw new Error("Name is required");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ full_name: name.slice(0, 80) })
+    .eq("id", userId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/settings");
+  revalidatePath("/", "layout");
+}
+
 export async function signOut() {
   const { sessionId } = await auth();
   if (sessionId) {

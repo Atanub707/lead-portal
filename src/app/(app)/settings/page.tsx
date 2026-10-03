@@ -3,7 +3,8 @@ import { Trash2 } from "lucide-react";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { InviteButton } from "@/components/invite-form";
 import { RoleSelect } from "@/components/role-select";
-import { removeUser } from "@/lib/actions";
+import { SubmitButton } from "@/components/submit-button";
+import { removeUser, updateMyName } from "@/lib/actions";
 import { getCurrentProfile, getProfiles } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
@@ -70,6 +71,27 @@ export default async function SettingsPage({
           {removeError}
         </p>
       ) : null}
+
+      <section className="card mt-6 p-5">
+        <h2 className="text-[13px] font-semibold text-zinc-900">
+          Your profile
+        </h2>
+        <p className="mt-1 text-[12px] text-zinc-500">
+          Shown as “Added by …” on records you create.
+        </p>
+        <form action={updateMyName} className="mt-3 flex items-center gap-2">
+          <input
+            name="full_name"
+            defaultValue={profile?.full_name ?? ""}
+            placeholder="Your name"
+            aria-label="Your display name"
+            required
+            maxLength={80}
+            className="input max-w-[240px]"
+          />
+          <SubmitButton pendingText="Saving…">Save</SubmitButton>
+        </form>
+      </section>
 
       <section className="card mt-6 overflow-hidden">
         <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-3">
