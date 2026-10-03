@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { SidebarNav } from "@/components/sidebar-nav";
+import { ConfirmSubmit } from "@/components/confirm-submit";
 import type { Pipeline } from "@/lib/types";
 import { signOut } from "@/lib/actions";
 
@@ -35,14 +36,15 @@ function UserBlock({
           {initial}
         </span>
         <form action={signOut}>
-          <button
-            type="submit"
-            title="Sign out"
+          <ConfirmSubmit
+            message="Sign out of Lead Portal?"
+            confirmLabel="Sign out"
+            tone="neutral"
             className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
           >
             <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
             <span className="sr-only">Sign out</span>
-          </button>
+          </ConfirmSubmit>
         </form>
       </div>
     );
@@ -58,14 +60,15 @@ function UserBlock({
         <p className="text-[11px] capitalize text-zinc-400">{role}</p>
       </div>
       <form action={signOut}>
-        <button
-          type="submit"
-          title="Sign out"
+        <ConfirmSubmit
+          message="Sign out of Lead Portal?"
+          confirmLabel="Sign out"
+          tone="neutral"
           className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
         >
           <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
           <span className="sr-only">Sign out</span>
-        </button>
+        </ConfirmSubmit>
       </form>
     </div>
   );

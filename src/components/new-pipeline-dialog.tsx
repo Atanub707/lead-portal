@@ -66,7 +66,7 @@ export function NewPipelineButton({ collapsed = false }: { collapsed?: boolean }
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
           <button
-            className="absolute inset-0 bg-zinc-900/30"
+            className="animate-overlay absolute inset-0 bg-zinc-900/30"
             aria-label="Close"
             onClick={() => setOpen(false)}
           />
@@ -74,7 +74,7 @@ export function NewPipelineButton({ collapsed = false }: { collapsed?: boolean }
             role="dialog"
             aria-modal="true"
             aria-label="New pipeline"
-            className="relative w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl"
+            className="animate-panel relative w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl"
           >
             <div className="flex items-center justify-between">
               <p className="text-[13px] font-semibold text-zinc-900">

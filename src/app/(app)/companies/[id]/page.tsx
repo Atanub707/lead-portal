@@ -5,6 +5,7 @@ import { CompanyAvatar, KindBadge, StatusDot } from "@/components/badges";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { FindLinkedInButton } from "@/components/find-linkedin-button";
 import { FollowUpControl } from "@/components/follow-up-control";
+import { SubmitButton } from "@/components/submit-button";
 import {
   addContact,
   addInteraction,
@@ -414,9 +415,7 @@ export default async function CompanyPage({
                     className="input"
                   />
                 </div>
-                <button type="submit" className="btn-primary">
-                  Add person
-                </button>
+                <SubmitButton pendingText="Adding…">Add person</SubmitButton>
               </form>
             </details>
           </Section>
@@ -595,9 +594,9 @@ export default async function CompanyPage({
                   </div>
                 </div>
                 <div className="flex justify-end">
-                  <button type="submit" className="btn-primary">
+                  <SubmitButton pendingText="Logging…">
                     Log interaction
-                  </button>
+                  </SubmitButton>
                 </div>
               </form>
             </details>
@@ -838,9 +837,7 @@ export default async function CompanyPage({
               </div>
 
               <div className="flex justify-end pt-1">
-                <button type="submit" className="btn-primary">
-                  Save changes
-                </button>
+                <SubmitButton pendingText="Saving…">Save changes</SubmitButton>
               </div>
             </form>
           </Section>

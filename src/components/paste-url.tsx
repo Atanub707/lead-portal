@@ -104,7 +104,7 @@ export function PasteUrl({
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
           <button
-            className="absolute inset-0 bg-zinc-900/30"
+            className="animate-overlay absolute inset-0 bg-zinc-900/30"
             aria-label="Close"
             onClick={() => setOpen(false)}
           />
@@ -112,7 +112,7 @@ export function PasteUrl({
             role="dialog"
             aria-modal="true"
             aria-label="Paste URL with AI"
-            className="relative w-full max-w-md overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl"
+            className="animate-panel relative w-full max-w-md overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl"
           >
             {/* Header */}
             <div className="flex items-center gap-3 border-b border-zinc-100 px-4 py-3">

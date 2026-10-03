@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { SubmitButton } from "@/components/submit-button";
 import { createOrganization } from "@/lib/actions";
 import { getPipelines } from "@/lib/data";
 import {
@@ -128,9 +129,7 @@ export default async function NewCompanyPage({
           <Link href={`/companies?list=${list}`} className="btn-ghost">
             Cancel
           </Link>
-          <button type="submit" className="btn-primary">
-            Create company
-          </button>
+          <SubmitButton pendingText="Creating…">Create company</SubmitButton>
         </div>
         </form>
       </div>

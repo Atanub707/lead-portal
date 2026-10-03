@@ -106,7 +106,7 @@ export function FollowUpControl({
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
           <button
-            className="absolute inset-0 bg-zinc-900/20"
+            className="animate-overlay absolute inset-0 bg-zinc-900/20"
             aria-label="Close"
             onClick={() => setOpen(false)}
           />
@@ -114,7 +114,7 @@ export function FollowUpControl({
             role="dialog"
             aria-modal="true"
             aria-label="Follow-up"
-            className="relative w-full max-w-xs rounded-2xl border border-zinc-200 bg-white p-4 shadow-2xl"
+            className="animate-panel relative w-full max-w-xs rounded-2xl border border-zinc-200 bg-white p-4 shadow-2xl"
           >
             <div className="flex items-center justify-between">
               <p className="text-[13px] font-semibold text-zinc-900">
