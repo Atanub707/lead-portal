@@ -17,6 +17,18 @@ function field(formData: FormData, key: string): string | null {
   return trimmed === "" ? null : trimmed;
 }
 
+function clerkErrorInfo(err: unknown): { code?: string; message?: string } {
+  const candidate = err as {
+    errors?: { code?: string; message?: string; longMessage?: string }[];
+    message?: string;
+  };
+  const first = candidate?.errors?.[0];
+  return {
+    code: first?.code,
+    message: first?.longMessage ?? first?.message ?? candidate?.message,
+  };
+}
+
 function revalidateAll(orgId?: number) {
   revalidatePath("/dashboard");
   revalidatePath("/companies");
@@ -405,21 +417,50 @@ export async function inviteUser(
 
   const base = await currentSiteUrl();
 
-  try {
+  const createInvite = async () => {
     const client = await clerkClient();
     await client.invitations.createInvitation({
       emailAddress: email,
       publicMetadata: { role: safeRole },
       redirectUrl: `${base}/dashboard`,
     });
-    revalidatePath("/settings");
-    return { ok: true, emailed: true };
+  };
+
+  try {
+    await createInvite();
   } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : "Invite failed",
-    };
+    const info = clerkErrorInfo(err);
+    if (info.code === "duplicate_record") {
+      // Resend: replace any pending invitation for this email with a fresh one.
+      try {
+        const client = await clerkClient();
+        const list = await client.invitations.getInvitationList({
+          status: "pending",
+          limit: 100,
+        });
+        for (const invitation of list.data ?? []) {
+          if (invitation.emailAddress?.toLowerCase() === email) {
+            await client.invitations.revokeInvitation(invitation.id);
+          }
+        }
+        await createInvite();
+      } catch (retryErr) {
+        const retryInfo = clerkErrorInfo(retryErr);
+        return { ok: false, error: retryInfo.message ?? "Invite failed" };
+      }
+    } else if (info.code === "form_identifier_exists") {
+      return {
+        ok: false,
+        error:
+          "This email already has an account — they can sign in directly (or use “Forgot password?”).",
+      };
+    } else {
+      return { ok: false, error: info.message ?? "Invite failed" };
+    }
   }
+
+  revalidatePath("/settings");
+  return { ok: true, emailed: true };
 }
 
 export async function removeUser(formData: FormData) {
