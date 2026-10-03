@@ -19,7 +19,27 @@ export async function GET(request: Request) {
 
   const supabase = await createClient();
   const state = await getDeepResearchState(orgId);
-  if (!state.activeRunId) return NextResponse.json({ ok: true, status: "idle" });
+  if (!state.activeRunId) {
+    // A run that just finished should report its final result once, so the UI
+    // can show "Found N people" instead of silently reverting to idle.
+    const latest = state.latest;
+    const recent =
+      latest &&
+      (latest.status === "ok" || latest.status === "failed") &&
+      Date.now() - new Date(latest.created_at).getTime() < 15 * 60_000;
+    if (recent) {
+      return NextResponse.json({
+        ok: true,
+        status: latest.status,
+        summary: {
+          people: Number(latest.people_found ?? 0),
+          emails: Number(latest.emails_found ?? 0),
+          cost: Number(latest.cost_usd ?? 0),
+        },
+      });
+    }
+    return NextResponse.json({ ok: true, status: "idle" });
+  }
 
   const { data: run } = await supabase
     .from("enrichment_runs")
