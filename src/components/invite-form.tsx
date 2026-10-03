@@ -10,12 +10,9 @@ export function InviteButton() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>("editor");
   const [pending, startTransition] = useTransition();
-  const [result, setResult] = useState<{
-    to: string;
-    emailed: boolean;
-    emailError?: string;
-    link?: string;
-  } | null>(null);
+  const [result, setResult] = useState<{ to: string; link?: string } | null>(
+    null
+  );
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -55,12 +52,7 @@ export function InviteButton() {
         setError(res.error ?? "Invite failed");
         return;
       }
-      setResult({
-        to: value,
-        emailed: Boolean(res.emailed),
-        emailError: res.emailError,
-        link: res.link,
-      });
+      setResult({ to: value, link: res.link });
       setEmail("");
     });
   }
@@ -116,44 +108,31 @@ export function InviteButton() {
                     <Check className="h-3.5 w-3.5" aria-hidden="true" />
                   </span>
                   <p className="min-w-0 truncate text-[13px] text-zinc-800">
-                    {result.emailed ? "Invitation emailed to " : "Invitation ready for "}
-                    <strong>{result.to}</strong>
+                    Invitation emailed to <strong>{result.to}</strong>
                   </p>
                 </div>
+                <p className="mt-2 text-[11px] text-zinc-500">
+                  If it doesn&apos;t arrive, check spam — or copy the link and
+                  send it yourself.
+                </p>
 
-                {result.emailed ? (
-                  <p className="mt-2 text-[11px] text-zinc-500">
-                    They accept it, set a password, and land in the dashboard.
-                  </p>
-                ) : (
-                  <>
-                    <p className="mt-2 text-[11px] text-zinc-500">
-                      {result.emailError
-                        ? `Email couldn't be sent (${result.emailError}) — share this link:`
-                        : "Share this link:"}
-                    </p>
-                    <div className="mt-1.5 flex items-center gap-2">
-                      <input
-                        readOnly
-                        value={result.link ?? ""}
-                        aria-label="Invitation link"
-                        onFocus={(event) => event.currentTarget.select()}
-                        className="input flex-1 bg-white font-mono text-[11px]"
+                {result.link ? (
+                  <button
+                    type="button"
+                    onClick={copy}
+                    className="btn-ghost mt-2"
+                  >
+                    {copied ? (
+                      <Check
+                        className="h-3.5 w-3.5 text-emerald-600"
+                        aria-hidden="true"
                       />
-                      <button type="button" onClick={copy} className="btn-ghost">
-                        {copied ? (
-                          <Check
-                            className="h-3.5 w-3.5 text-emerald-600"
-                            aria-hidden="true"
-                          />
-                        ) : (
-                          <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-                        )}
-                        {copied ? "Copied" : "Copy"}
-                      </button>
-                    </div>
-                  </>
-                )}
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                    {copied ? "Copied" : "Copy link"}
+                  </button>
+                ) : null}
 
                 <button
                   type="button"

@@ -389,58 +389,8 @@ async function currentSiteUrl() {
 export interface InviteResult {
   ok: boolean;
   emailed?: boolean;
-  emailError?: string;
   link?: string;
   error?: string;
-}
-
-// Clerk development instances only deliver mail to the developer's own address,
-// so invitations are delivered through Brevo (independent of Clerk's mailer).
-async function sendInviteEmail(
-  to: string,
-  link: string
-): Promise<{ sent: boolean; error?: string }> {
-  const apiKey = process.env.BREVO_API_KEY?.trim();
-  const senderEmail = process.env.BREVO_SENDER_EMAIL?.trim();
-  if (!apiKey || !senderEmail) return { sent: false, error: "Brevo is not configured" };
-
-  const senderName = process.env.BREVO_SENDER_NAME?.trim() || "Lead Portal";
-  try {
-    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: {
-        "api-key": apiKey,
-        "Content-Type": "application/json",
-        accept: "application/json",
-      },
-      body: JSON.stringify({
-        sender: { name: senderName, email: senderEmail },
-        to: [{ email: to }],
-        subject: "You've been invited to Lead Portal",
-        htmlContent: `<div style="font-family:Inter,Arial,sans-serif;font-size:14px;color:#27272a;line-height:1.6">
-<p>Hi,</p>
-<p>You've been invited to <strong>Lead Portal</strong> — the team's pipeline for company research and outreach.</p>
-<p><a href="${link}" style="display:inline-block;background:#18181b;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:8px">Accept invitation</a></p>
-<p style="color:#71717a;font-size:12px">This link is personal to this email address. If you weren't expecting this, you can ignore this email.</p>
-</div>`,
-        textContent: `You've been invited to Lead Portal.\n\nAccept the invitation:\n${link}\n`,
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      return {
-        sent: false,
-        error: `Email service ${res.status}: ${text.slice(0, 160)}`,
-      };
-    }
-    return { sent: true };
-  } catch (err) {
-    return {
-      sent: false,
-      error: err instanceof Error ? err.message : "Email could not be sent",
-    };
-  }
 }
 
 export async function inviteUser(
@@ -468,6 +418,7 @@ export async function inviteUser(
 
   const base = await currentSiteUrl();
 
+  // Clerk sends the invitation email itself (notify defaults to true).
   const createInvite = async (): Promise<string | null> => {
     const client = await clerkClient();
     const invitation = await client.invitations.createInvitation({
@@ -490,6 +441,7 @@ export async function inviteUser(
         const list = await client.invitations.getInvitationList({
           status: "pending",
           limit: 100,
+          query: email,
         });
         for (const invitation of list.data ?? []) {
           if (invitation.emailAddress?.toLowerCase() === email) {
@@ -512,17 +464,8 @@ export async function inviteUser(
     }
   }
 
-  const emailResult = invitationUrl
-    ? await sendInviteEmail(email, invitationUrl)
-    : { sent: false, error: "No invitation link was returned" };
-
   revalidatePath("/settings");
-  return {
-    ok: true,
-    emailed: emailResult.sent,
-    emailError: emailResult.error,
-    link: invitationUrl ?? undefined,
-  };
+  return { ok: true, emailed: true, link: invitationUrl ?? undefined };
 }
 
 export async function removeUser(formData: FormData) {
