@@ -521,7 +521,9 @@ export async function POST(req: Request) {
     unverifiedLinkedin,
     warning:
       research.needs_js && stillMissing.length > 0
-        ? "This site renders with JavaScript, so some details may still be missing. Add TINYFISH_API_KEY (free) for a full render."
+        ? tinyfishEnabled()
+          ? "This site renders with JavaScript. A full JS render ran, but the page still didn't expose more team details."
+          : "This site renders with JavaScript, so some details may still be missing. Add TINYFISH_API_KEY (free) for a full render."
         : undefined,
     stillMissing,
   });
