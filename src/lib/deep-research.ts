@@ -58,6 +58,35 @@ export function normalizeApolloLead(raw: unknown): NormalizedLead | null {
   };
 }
 
+export function needsDeepResearch(input: {
+  contacts: {
+    is_decision_maker: boolean;
+    email: string | null;
+    phone: string | null;
+    linkedin_url: string | null;
+  }[];
+  companyEmailCount: number;
+  activeRunId: number | null;
+  lastSuccessAt: string | null;
+}): boolean {
+  if (input.activeRunId) return true; // show the running card instead of the button
+  const decisionMaker = input.contacts.some((c) => c.is_decision_maker);
+  if (decisionMaker) return false;
+  const reachable = input.contacts.filter(
+    (c) => c.email || c.phone || c.linkedin_url
+  ).length;
+  const thin =
+    input.contacts.length === 0 || reachable === 0 || input.companyEmailCount === 0;
+  if (!thin) return false;
+  if (
+    input.lastSuccessAt &&
+    Date.now() - new Date(input.lastSuccessAt).getTime() < 7 * 86_400_000
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export function normalizeLinkedInEmployee(raw: unknown): NormalizedLead | null {
   const r = asRecord(raw);
   if (!r) return null;
