@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { startActorRun } from "./apify";
+import { createAdminClient } from "./supabase/admin";
 
 export interface NormalizedLead {
   name: string;
@@ -244,8 +245,13 @@ export async function startDeepResearch(
     };
   }
 
+  // Run-row writes use the admin client: enrichment_runs has no RLS UPDATE
+  // policy, so user-scoped updates would silently affect 0 rows. Guards above
+  // stay on the user client (select policy allows them).
+  const admin = createAdminClient();
+
   // Lock the company before spending: insert the running row first.
-  const { data: run, error: insertError } = await supabase
+  const { data: run, error: insertError } = await admin
     .from("enrichment_runs")
     .insert({
       org_id: orgId,
@@ -279,7 +285,7 @@ export async function startDeepResearch(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[deep-research] actor start failed:", message);
-    await supabase
+    await admin
       .from("enrichment_runs")
       .update({ status: "failed", details: { actors, error: message } })
       .eq("id", run.id);
@@ -289,7 +295,7 @@ export async function startDeepResearch(
     };
   }
 
-  await supabase
+  await admin
     .from("enrichment_runs")
     .update({ details: { actors } })
     .eq("id", run.id);
