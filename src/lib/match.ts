@@ -1,4 +1,24 @@
-// Matches a person's name to an email address found on the same site.
+// Matches a person's name to a LinkedIn profile URL published on their own site
+// (e.g. "Naji Mehdi" -> linkedin.com/in/naji-mehdi). Site links only — no guessing.
+export function matchLinkedInProfile(
+  name: string,
+  profiles: string[]
+): string | null {
+  const parts = name
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((part) => part.length >= 2);
+  if (parts.length === 0) return null;
+
+  for (const url of profiles) {
+    const slug = (url.split("/in/")[1] ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+    if (!slug) continue;
+    if (parts.every((part) => slug.includes(part))) return url;
+  }
+  return null;
+}
 // Deliberately conservative — only name-carrying locals match:
 //   dorian.ciavarella@… , dciavarella@… , dorianc@… , ciavarella@… (single-part names)
 // Generic inboxes (info@, sales@…) never match a person.

@@ -1,7 +1,7 @@
 import { generateObject, generateText } from "ai";
 import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
-import { matchEmailToContact } from "@/lib/match";
+import { matchEmailToContact, matchLinkedInProfile } from "@/lib/match";
 import { NO_AI_KEY_MESSAGE, pickModel } from "@/lib/ai";
 import {
   findLinkedInProfile,
@@ -279,6 +279,7 @@ export async function POST(req: Request) {
       title: contact.title.trim(),
       linkedin_url: contact.linkedin_url.trim(),
       email: contact.email.trim().toLowerCase(),
+      source: "website",
     }))
     .filter(
       (contact) =>
@@ -289,7 +290,23 @@ export async function POST(req: Request) {
     )
     .slice(0, 12);
 
-  // Free personal LinkedIn discovery (TinyFish Search) for people the site didn't link.
+  // Personal LinkedIn profiles published on the site itself come first (source of truth).
+  const claimedProfiles = new Set(
+    contacts.map((contact) => contact.linkedin_url).filter(Boolean)
+  );
+  for (const contact of contacts) {
+    if (contact.linkedin_url) continue;
+    const matched = matchLinkedInProfile(
+      contact.name,
+      research.links.linkedin_people
+    );
+    if (matched && !claimedProfiles.has(matched)) {
+      contact.linkedin_url = matched;
+      claimedProfiles.add(matched);
+    }
+  }
+
+  // Free search fills the rest (strict name + company verification).
   let linkedinProfilesFound = 0;
   if (tinyfishEnabled()) {
     const needProfiles = contacts.filter((contact) => !contact.linkedin_url);
@@ -300,6 +317,7 @@ export async function POST(req: Request) {
       const profile = found[index];
       if (profile) {
         contact.linkedin_url = profile;
+        contact.source = "search";
         linkedinProfilesFound += 1;
       }
     });
@@ -424,20 +442,29 @@ export async function POST(req: Request) {
 
   let contactsAdded = 0;
   if (toAdd.length > 0) {
-    const { error } = await supabase.from("contacts").insert(
-      toAdd.map((contact) => ({
-        org_id: orgId,
-        name: contact.name,
-        title: contact.title || null,
-        linkedin_url: contact.linkedin_url || null,
-        email: contact.email || null,
-        source: "website",
-        is_decision_maker: DECISION_TITLE.test(contact.title),
-        email_status: contact.email ? "found" : null,
-        created_by: userId,
-      }))
-    );
-    if (!error) contactsAdded = toAdd.length;
+    const rows = toAdd.map((contact) => ({
+      org_id: orgId,
+      name: contact.name,
+      title: contact.title || null,
+      linkedin_url: contact.linkedin_url || null,
+      email: contact.email || null,
+      source: contact.source,
+      is_decision_maker: DECISION_TITLE.test(contact.title),
+      email_status: contact.email ? "found" : null,
+      created_by: userId,
+    }));
+
+    let { error } = await supabase.from("contacts").insert(rows);
+    if (error && /created_by/.test(error.message)) {
+      // Attribution column not migrated yet — insert without it so people still land.
+      const stripped = rows.map(({ created_by, ...rest }) => rest);
+      ({ error } = await supabase.from("contacts").insert(stripped));
+    }
+    if (error) {
+      console.error("[paste] contact insert failed:", error.message);
+    } else {
+      contactsAdded = toAdd.length;
+    }
   }
 
   // Enrichment audit trail (what this run found, from where, at what cost).

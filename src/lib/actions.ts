@@ -255,7 +255,7 @@ export async function addContact(formData: FormData) {
   const name = field(formData, "name");
   if (!orgId || !name) throw new Error("Contact name is required");
 
-  const { error } = await supabase.from("contacts").insert({
+  const row = {
     org_id: orgId,
     name,
     title: field(formData, "title"),
@@ -264,8 +264,14 @@ export async function addContact(formData: FormData) {
     phone: field(formData, "phone"),
     notes: field(formData, "notes"),
     created_by: userId ?? null,
-  });
+  };
 
+  let { error } = await supabase.from("contacts").insert(row);
+  if (error && /created_by/.test(error.message)) {
+    // Attribution column not migrated yet — retry without it.
+    const { created_by, ...rest } = row;
+    ({ error } = await supabase.from("contacts").insert(rest));
+  }
   if (error) throw new Error(error.message);
   revalidateAll(orgId);
 }
