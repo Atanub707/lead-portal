@@ -112,8 +112,9 @@ export function InviteButton() {
                   </p>
                 </div>
                 <p className="mt-2 text-[11px] text-zinc-500">
-                  If it doesn&apos;t arrive, check spam — or copy the link and
-                  send it yourself.
+                  It now appears in the People list — you can revoke it anytime.
+                  If the email doesn&apos;t arrive, copy the link and send it
+                  yourself.
                 </p>
 
                 {result.link ? (

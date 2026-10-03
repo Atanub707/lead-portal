@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "./supabase/admin";
+import { clearClerkDirectoryCache } from "./clerk-directory";
 import { createClient } from "./supabase/server";
 import { findLinkedInProfile, tinyfishEnabled } from "./research";
 import type { OrgKind, OrgList, PipelineStage, UserRole } from "./types";
@@ -513,8 +514,40 @@ export async function inviteUser(
     }
   }
 
+  clearClerkDirectoryCache();
   revalidatePath("/settings");
   return { ok: true, emailed: true, link: invitationUrl ?? undefined };
+}
+
+export async function revokeInvitation(formData: FormData) {
+  await assertOwner();
+  const id = field(formData, "invitation_id");
+  if (!id) throw new Error("Missing invitation id");
+
+  const client = await clerkClient();
+  await client.invitations.revokeInvitation(id);
+  clearClerkDirectoryCache();
+  revalidatePath("/settings");
+}
+
+export async function deleteInvitation(formData: FormData) {
+  await assertOwner();
+  const id = field(formData, "invitation_id");
+  if (!id) throw new Error("Missing invitation id");
+
+  // The SDK has no delete for invitations; the REST API does.
+  const res = await fetch(
+    `https://api.clerk.com/v1/invitations/${encodeURIComponent(id)}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
+    }
+  );
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`Could not delete invitation (${res.status})`);
+  }
+  clearClerkDirectoryCache();
+  revalidatePath("/settings");
 }
 
 export async function removeUser(formData: FormData) {
@@ -554,6 +587,7 @@ async function removeUserInner(formData: FormData) {
     errorMessage = err instanceof Error ? err.message : "User could not be removed";
   }
 
+  clearClerkDirectoryCache();
   revalidatePath("/settings");
 
   if (errorMessage) {
