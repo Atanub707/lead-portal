@@ -6,7 +6,6 @@ import { NO_AI_KEY_MESSAGE, pickModel } from "@/lib/ai";
 import {
   findLinkedInProfile,
   researchWebsite,
-  searchVerifiedLinkedInCompany,
   tinyfishEnabled,
   verifyLinkedInCompany,
 } from "@/lib/research";
@@ -253,9 +252,11 @@ export async function POST(req: Request) {
   // 1) a link on the company's own site, if the slug matches name/domain
   // 2) a verified search result (name in snippet + matching slug)
   // Unverified candidates are reported, not saved.
+  // LinkedIn comes ONLY from the company's own website (the source of truth).
+  // If the site doesn't link it, it stays empty — we never search-guess.
   const siteCandidate = research.links.linkedin_company[0] ?? null;
   let linkedin: string | null = null;
-  let linkedinSource: "site" | "search" | null = null;
+  let linkedinSource: "site" | null = null;
   let unverifiedLinkedin: string | null = null;
 
   if (siteCandidate && verifyLinkedInCompany(siteCandidate, name, domain)) {
@@ -263,13 +264,6 @@ export async function POST(req: Request) {
     linkedinSource = "site";
   } else if (siteCandidate) {
     unverifiedLinkedin = siteCandidate;
-  }
-  if (!linkedin && tinyfishEnabled()) {
-    const found = await searchVerifiedLinkedInCompany(name, domain);
-    if (found) {
-      linkedin = found;
-      linkedinSource = "search";
-    }
   }
   const emails = [
     ...new Set(
@@ -345,9 +339,11 @@ export async function POST(req: Request) {
   if (existing) {
     const patch: Record<string, string> = {};
     if (!existing.website && website) patch.website = website;
-    if (!existing.linkedin_url && linkedin) {
+    // The website is the source of truth: a verified site link replaces a
+    // different stored value (this is how wrong search-guesses get corrected).
+    if (linkedin && existing.linkedin_url !== linkedin) {
       patch.linkedin_url = linkedin;
-      patch.linkedin_source = linkedinSource as string;
+      patch.linkedin_source = "site";
     }
     if (Object.keys(patch).length > 0) {
       await supabase.from("organizations").update(patch).eq("id", existing.id);

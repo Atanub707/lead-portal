@@ -535,7 +535,8 @@ function normaliseToken(value: string) {
 }
 
 // A LinkedIn company URL is only trusted when its slug relates to the company
-// name or domain (e.g. /company/reinolab for reinolab.tech).
+// name or domain (e.g. /company/reinolab for reinolab.tech). Only site-derived
+// links are ever passed through this — we never search-guess a company URL.
 export function verifyLinkedInCompany(
   url: string,
   name: string,
@@ -549,49 +550,6 @@ export function verifyLinkedInCompany(
     .some(
       (token) => slugToken.includes(token) || token.includes(slugToken)
     );
-}
-
-export async function searchVerifiedLinkedInCompany(
-  name: string,
-  domain: string
-): Promise<string | null> {
-  if (!tinyfishKey()) return null;
-  const query = name
-    ? `site:linkedin.com/company "${name}"`
-    : `site:linkedin.com/company ${domain}`;
-  const results = await tinyfishSearch(
-    query,
-    `Find the official LinkedIn company page for ${name || domain}`
-  );
-
-  const words = name
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter((word) => word.length >= 3);
-
-  const scored: { url: string; score: number }[] = [];
-  for (const result of results.slice(0, 8)) {
-    const clean = normaliseLinkedInUrl(result.url, "company");
-    if (!clean) continue;
-    if (!verifyLinkedInCompany(clean, name, domain)) continue;
-    const haystack = `${result.title ?? ""} ${
-      result.snippet ?? ""
-    }`.toLowerCase();
-    if (words.length > 0 && !words.every((word) => haystack.includes(word))) {
-      continue;
-    }
-    let score = 1;
-    if (
-      domain &&
-      haystack.includes(domain.replace(/^www\./, "").toLowerCase())
-    ) {
-      score += 2;
-    }
-    scored.push({ url: clean, score });
-  }
-
-  scored.sort((a, b) => b.score - a.score);
-  return scored[0]?.url ?? null;
 }
 
 export async function findLinkedInProfile(
@@ -691,18 +649,7 @@ async function researchWebsiteTinyfish(
     // Subpage failures are non-fatal.
   }
 
-  let notes = "Fetched with TinyFish (renders JavaScript-heavy pages).";
-  if (allLinks.linkedin_company.length === 0) {
-    const found = await searchVerifiedLinkedInCompany(
-      deriveSiteName(home.title, ""),
-      base.hostname
-    );
-    if (found) {
-      allLinks.linkedin_company = [found];
-      notes +=
-        " LinkedIn company URL recovered via TinyFish Search (name/domain verified).";
-    }
-  }
+  const notes = "Fetched with TinyFish (renders JavaScript-heavy pages).";
 
   return {
     requested_url: rawUrl,
@@ -768,15 +715,9 @@ export async function researchWebsite(rawUrl: string): Promise<WebsiteResearch> 
   if (tinyfishKey()) {
     try {
       const result = await researchWebsiteTinyfish(url, rawUrl);
-      const thin =
-        result.links.emails.length === 0 &&
-        result.links.linkedin_company.length === 0 &&
-        result.links.socials.length === 0;
-      if (!thin) return result;
-
-      // TinyFish rendered the page but surfaced nothing useful (some sites). Run
-      // the built-in enrichment (Cloudflare email decode + JS chunk mining) and
-      // merge, so a free source always contributes.
+      // The website itself is the source of truth: always also read the raw HTML
+      // (footer links, Cloudflare-obfuscated emails, JS chunks) and merge, since
+      // rendered markdown can drop exact hrefs.
       try {
         const direct = await researchWebsiteDirect(url, rawUrl);
         return mergeResearch(result, direct);
