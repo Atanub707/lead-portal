@@ -11,9 +11,35 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState<"" | "signin" | "magic">("");
+  const [busy, setBusy] = useState<"" | "signin" | "magic" | "reset">("");
   const [error, setError] = useState("");
   const [magicSent, setMagicSent] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+
+  async function handleForgotPassword() {
+    if (!email) {
+      setError("Enter your email above first.");
+      return;
+    }
+    setBusy("reset");
+    setError("");
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      });
+      if (error) {
+        setError(error.message);
+        setBusy("");
+        return;
+      }
+      setResetSent(true);
+      setBusy("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setBusy("");
+    }
+  }
 
   async function handleSignIn(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -161,6 +187,25 @@ export default function LoginPage() {
               >
                 {busy === "signin" ? "Signing in…" : "Sign in"}
               </button>
+
+              {resetSent ? (
+                <p
+                  role="status"
+                  className="rounded-md bg-emerald-50 px-3 py-2 text-[12px] text-emerald-800"
+                >
+                  Password reset link sent to <strong>{email}</strong> — check
+                  your inbox.
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={busy !== ""}
+                  className="w-full text-center text-[12px] text-zinc-500 transition-colors hover:text-zinc-900 disabled:opacity-50"
+                >
+                  {busy === "reset" ? "Sending…" : "Forgot password?"}
+                </button>
+              )}
 
               <p className="text-center text-[12px] text-zinc-500">
                 Invite-only — ask the admin for an invitation.
