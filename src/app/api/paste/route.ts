@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { matchEmailToContact, matchLinkedInProfile } from "@/lib/match";
 import { NO_AI_KEY_MESSAGE, pickModel } from "@/lib/ai";
+import { isDecisionTitle } from "@/lib/people";
 import {
   findLinkedInProfile,
   researchWebsite,
@@ -87,9 +88,6 @@ function errorMessage(err: unknown) {
 function sanitize(query: string) {
   return query.replace(/[%(),]/g, " ").trim();
 }
-
-const DECISION_TITLE =
-  /(founder|co-?founder|ceo|cto|coo|cfo|cmo|owner|president|partner|head of|director)/i;
 
 function normalise(value: string | null | undefined) {
   return (value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -449,7 +447,7 @@ export async function POST(req: Request) {
       linkedin_url: contact.linkedin_url || null,
       email: contact.email || null,
       source: contact.source,
-      is_decision_maker: DECISION_TITLE.test(contact.title),
+      is_decision_maker: isDecisionTitle(contact.title),
       email_status: contact.email ? "found" : null,
       created_by: userId,
     }));
