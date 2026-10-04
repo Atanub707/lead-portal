@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import { cookies } from "next/headers";
 import { createClient } from "./supabase/server";
 import { ensureProfile } from "./auth";
 import {
@@ -48,11 +49,21 @@ export async function getDashboardStats(): Promise<{
   const soon = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
+  const workspaceId = await activeWorkspaceId();
 
   const [orgs, contacts, companyEmails] = await Promise.all([
-    supabase.from("organizations").select("list, follow_up_on"),
-    supabase.from("contacts").select("email, is_decision_maker"),
-    supabase.from("company_emails").select("id"),
+    supabase
+      .from("organizations")
+      .select("list, follow_up_on")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("contacts")
+      .select("email, is_decision_maker")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("company_emails")
+      .select("id")
+      .eq("workspace_id", workspaceId),
   ]);
 
   const orgRows = (orgs.data ?? []) as {
@@ -100,9 +111,11 @@ export async function getUpcomingFollowUps(
   limit = 6
 ): Promise<FollowUpItem[]> {
   const supabase = await createClient();
+  const workspaceId = await activeWorkspaceId();
   const { data, error } = await supabase
     .from("organizations")
     .select("id, name, list, follow_up_on, follow_up_note")
+    .eq("workspace_id", workspaceId)
     .not("follow_up_on", "is", null)
     .order("follow_up_on")
     .limit(limit);
@@ -112,9 +125,11 @@ export async function getUpcomingFollowUps(
 
 export async function getRecentRuns(limit = 5): Promise<EnrichmentRunWithOrg[]> {
   const supabase = await createClient();
+  const workspaceId = await activeWorkspaceId();
   const { data, error } = await supabase
     .from("enrichment_runs")
     .select("*, organizations!inner(name, list)")
+    .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw new Error(error.message);
@@ -123,9 +138,11 @@ export async function getRecentRuns(limit = 5): Promise<EnrichmentRunWithOrg[]> 
 
 export async function getPipelines(): Promise<Pipeline[]> {
   const supabase = await createClient();
+  const workspaceId = await activeWorkspaceId();
   const { data, error } = await supabase
     .from("pipelines")
     .select("*")
+    .eq("workspace_id", workspaceId)
     .order("sort_order")
     .order("created_at");
   if (error || !data || data.length === 0) return FALLBACK_PIPELINES;
@@ -149,15 +166,20 @@ export interface PipelineUsage {
 
 export async function getPipelineUsage(): Promise<PipelineUsage[]> {
   const supabase = await createClient();
+  const workspaceId = await activeWorkspaceId();
   const [{ data: pipelines }, { data: orgs }] = await Promise.all([
     supabase
       .from("pipelines")
       .select(
         "id, name, icon, pitch, value_props, proof_points, cta, default_flavor"
       )
+      .eq("workspace_id", workspaceId)
       .order("sort_order")
       .order("created_at"),
-    supabase.from("organizations").select("list"),
+    supabase
+      .from("organizations")
+      .select("list")
+      .eq("workspace_id", workspaceId),
   ]);
   const counts = new Map<string, number>();
   for (const org of orgs ?? []) {
@@ -207,9 +229,11 @@ export async function getCompanies(opts: {
     .toISOString()
     .slice(0, 10);
 
+  const workspaceId = await activeWorkspaceId();
   let query = supabase
     .from("organizations")
     .select("*", { count: "exact" })
+    .eq("workspace_id", workspaceId)
     .eq("list", opts.list)
     .order("name")
     .range(from, from + per - 1);
@@ -249,11 +273,17 @@ export async function getCompanies(opts: {
         supabase
           .from("contacts")
           .select("org_id, email, is_decision_maker")
+          .eq("workspace_id", workspaceId)
           .in("org_id", ids),
-        supabase.from("company_emails").select("org_id, email").in("org_id", ids),
+        supabase
+          .from("company_emails")
+          .select("org_id, email")
+          .eq("workspace_id", workspaceId)
+          .in("org_id", ids),
         supabase
           .from("sent_emails")
           .select("org_id, sent_by, subject, created_at")
+          .eq("workspace_id", workspaceId)
           .in("org_id", ids)
           .order("created_at", { ascending: false }),
       ]);
@@ -333,9 +363,11 @@ export async function getStatusCounts(
   list: OrgList
 ): Promise<Record<string, number>> {
   const supabase = await createClient();
+  const workspaceId = await activeWorkspaceId();
   const { data, error } = await supabase
     .from("organizations")
     .select("status")
+    .eq("workspace_id", workspaceId)
     .eq("list", list);
   if (error) throw new Error(error.message);
 
@@ -349,10 +381,12 @@ export async function getStatusCounts(
 
 export async function getCompany(id: number): Promise<Organization | null> {
   const supabase = await createClient();
+  const workspaceId = await activeWorkspaceId();
   const { data, error } = await supabase
     .from("organizations")
     .select("*")
     .eq("id", id)
+    .eq("workspace_id", workspaceId)
     .maybeSingle();
   if (error) throw new Error(error.message);
   return (data as Organization | null) ?? null;
@@ -360,10 +394,12 @@ export async function getCompany(id: number): Promise<Organization | null> {
 
 export async function getContacts(orgId: number): Promise<Contact[]> {
   const supabase = await createClient();
+  const workspaceId = await activeWorkspaceId();
   const { data, error } = await supabase
     .from("contacts")
     .select("*")
     .eq("org_id", orgId)
+    .eq("workspace_id", workspaceId)
     .order("is_decision_maker", { ascending: false })
     .order("name");
   if (error) throw new Error(error.message);
@@ -372,10 +408,12 @@ export async function getContacts(orgId: number): Promise<Contact[]> {
 
 export async function getCompanyEmails(orgId: number): Promise<CompanyEmail[]> {
   const supabase = await createClient();
+  const workspaceId = await activeWorkspaceId();
   const { data, error } = await supabase
     .from("company_emails")
     .select("*")
     .eq("org_id", orgId)
+    .eq("workspace_id", workspaceId)
     .order("created_at");
   if (error) throw new Error(error.message);
   return (data ?? []) as CompanyEmail[];
@@ -389,6 +427,7 @@ export async function getEnrichmentRuns(
     .from("enrichment_runs")
     .select("*")
     .eq("org_id", orgId)
+    .eq("workspace_id", await activeWorkspaceId())
     .order("created_at", { ascending: false })
     .limit(20);
   if (error) throw new Error(error.message);
@@ -407,6 +446,7 @@ export async function getDeepResearchState(orgId: number): Promise<DeepResearchS
     .from("enrichment_runs")
     .select("*")
     .eq("org_id", orgId)
+    .eq("workspace_id", await activeWorkspaceId())
     .eq("kind", "deep_research")
     .order("created_at", { ascending: false })
     .limit(5);
@@ -428,6 +468,7 @@ export async function getDeepResearchMonthSpend(): Promise<number> {
   const { data } = await supabase
     .from("enrichment_runs")
     .select("cost_usd")
+    .eq("workspace_id", await activeWorkspaceId())
     .eq("kind", "deep_research")
     .gte("created_at", monthStart.toISOString());
   return (data ?? []).reduce(
@@ -442,6 +483,7 @@ export async function getInteractions(orgId: number): Promise<Interaction[]> {
     .from("interactions")
     .select("*")
     .eq("org_id", orgId)
+    .eq("workspace_id", await activeWorkspaceId())
     .order("occurred_on", { ascending: false })
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
@@ -457,6 +499,7 @@ export async function getRecentInteractions(
     .from("interactions")
     .select("*, organizations!inner(name, list)")
     .eq("organizations.list", list)
+    .eq("workspace_id", await activeWorkspaceId())
     .order("occurred_on", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -469,6 +512,7 @@ export async function getProfiles(): Promise<Profile[]> {
   const { data, error } = await supabase
     .from("profiles")
     .select("*")
+    .eq("workspace_id", await activeWorkspaceId())
     .order("created_at");
   if (error) throw new Error(error.message);
   return (data ?? []) as Profile[];
@@ -500,6 +544,7 @@ export async function getActivityLog(opts: {
   let query = supabase
     .from("activity_log")
     .select("*", { count: "exact" })
+    .eq("workspace_id", await activeWorkspaceId())
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .range(from, from + per - 1);
@@ -526,6 +571,22 @@ export async function requireWorkspaceId(): Promise<string> {
   return profile.workspace_id;
 }
 
+// The workspace the current view is scoped to. Super-admins can point the
+// view_workspace cookie at any workspace (read-only by policy); everyone else
+// is fixed to their own.
+export async function activeWorkspaceId(): Promise<string> {
+  const profile = await getCurrentProfile();
+  if (!profile?.workspace_id) {
+    throw new Error("No workspace on this profile");
+  }
+  if (profile.is_super_admin) {
+    const store = await cookies();
+    const viewed = store.get("view_workspace")?.value;
+    if (viewed && /^[0-9a-fA-F-]{36}$/.test(viewed)) return viewed;
+  }
+  return profile.workspace_id;
+}
+
 // Workspace + permissions context (Plan 2 consumes canWrite for trial locks
 // and the super-admin read-only mode).
 export async function getWorkspaceContext(): Promise<{
@@ -533,6 +594,8 @@ export async function getWorkspaceContext(): Promise<{
   workspace: Workspace | null;
   isSuperAdmin: boolean;
   canWrite: boolean;
+  trialDaysLeft: number | null;
+  trialEnded: boolean;
 } | null> {
   const profile = await getCurrentProfile();
   if (!profile) return null;
@@ -554,12 +617,36 @@ export async function getWorkspaceContext(): Promise<{
       (workspace.trial_ends_at !== null &&
         new Date(workspace.trial_ends_at) > new Date()));
 
+  const trialDaysLeft =
+    workspace?.trial_ends_at && workspace.plan !== "active"
+      ? Math.ceil(
+          (new Date(workspace.trial_ends_at).getTime() - Date.now()) / 86_400_000
+        )
+      : null;
+  const trialEnded =
+    !!workspace && workspace.plan !== "active" && trialOk === false;
+
   return {
     profile,
     workspace,
     isSuperAdmin: profile.is_super_admin,
-    canWrite: !profile.is_super_admin && trialOk,
+    canWrite: trialOk,
+    trialDaysLeft,
+    trialEnded,
   };
+}
+
+// All workspaces — super-admin only (RLS select allows them; others get []).
+export async function getAllWorkspaces(): Promise<Workspace[]> {
+  const profile = await getCurrentProfile();
+  if (!profile?.is_super_admin) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("workspaces")
+    .select("id, name, plan, trial_ends_at, created_at")
+    .order("created_at");
+  if (error) return [];
+  return (data as Workspace[]) ?? [];
 }
 
 // Own email sending settings, safe for the client: the encrypted SMTP password

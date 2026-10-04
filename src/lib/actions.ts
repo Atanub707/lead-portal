@@ -4,11 +4,11 @@ import { generateObject, generateText } from "ai";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { logActivity } from "./activity";
 import { NO_AI_KEY_MESSAGE, pickModel } from "./ai";
-import { requireWorkspaceId } from "./data";
+import { getCurrentProfile, requireWorkspaceId } from "./data";
 import { encryptSecret } from "./crypto";
 import { createAdminClient } from "./supabase/admin";
 import { clearClerkDirectoryCache } from "./clerk-directory";
@@ -575,6 +575,69 @@ export async function generatePipelinePitch(
 }
 
 // ─── Workspaces ──────────────────────────────────────────────────────────────
+
+export async function switchWorkspace(formData: FormData) {
+  const profile = await getCurrentProfile();
+  if (!profile?.is_super_admin) {
+    throw new Error("Only the operator can switch workspaces");
+  }
+
+  const target = field(formData, "workspace_id");
+  const store = await cookies();
+
+  if (!target || target === profile.workspace_id) {
+    store.delete("view_workspace");
+    revalidatePath("/", "layout");
+    redirect("/dashboard");
+  }
+
+  store.set("view_workspace", target, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+  });
+
+  await logActivity({
+    actorId: profile.id,
+    workspaceId: target,
+    action: "superadmin.view",
+    targetType: "workspace",
+    targetId: target,
+    summary: "HI Labs viewed this workspace",
+    details: { via: "switch" },
+  });
+
+  revalidatePath("/", "layout");
+  redirect("/dashboard");
+}
+
+export async function renameWorkspace(formData: FormData) {
+  const supabase = await assertOwner();
+  const { userId } = await auth();
+
+  const name = field(formData, "name");
+  if (!name) throw new Error("Workspace name is required");
+  const workspaceId = await requireWorkspaceId();
+
+  const { error } = await supabase
+    .from("workspaces")
+    .update({ name: name.slice(0, 60) })
+    .eq("id", workspaceId);
+  if (error) throw new Error(error.message);
+
+  await logActivity({
+    actorId: userId,
+    workspaceId,
+    action: "workspace.rename",
+    targetType: "workspace",
+    targetId: workspaceId,
+    summary: `Renamed workspace to “${name}”`,
+  });
+
+  revalidatePath("/", "layout");
+  redirect("/settings");
+}
 
 export async function createWorkspace(formData: FormData) {
   const { userId } = await auth();

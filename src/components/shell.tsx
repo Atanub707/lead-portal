@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { SidebarNav } from "@/components/sidebar-nav";
+import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { UserAvatar } from "@/components/badges";
 import type { Pipeline } from "@/lib/types";
@@ -76,6 +77,8 @@ export function Shell({
   email,
   role,
   pipelines,
+  switcher = null,
+  banner = null,
   children,
 }: {
   userId: string;
@@ -83,6 +86,12 @@ export function Shell({
   email: string;
   role: string;
   pipelines: Pipeline[];
+  switcher?: {
+    workspaces: { id: string; name: string }[];
+    currentId: string;
+    viewingId: string;
+  } | null;
+  banner?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -180,6 +189,14 @@ export function Shell({
           </button>
         ) : null}
 
+        {collapsed ? null : switcher ? (
+          <WorkspaceSwitcher
+            workspaces={switcher.workspaces}
+            currentId={switcher.currentId}
+            viewingId={switcher.viewingId}
+          />
+        ) : null}
+
         <SidebarNav isOwner={isOwner} pipelines={pipelines} collapsed={collapsed} />
 
         <div className="shrink-0 border-t border-zinc-200/80">
@@ -248,6 +265,7 @@ export function Shell({
           collapsed ? "lg:pl-16" : "lg:pl-[220px]"
         }`}
       >
+        {banner}
         {children}
       </main>
     </div>

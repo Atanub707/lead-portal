@@ -1,5 +1,20 @@
 import { createAdminClient } from "./supabase/admin";
 
+// Throttle for superadmin.view logs (prefetches render layouts repeatedly).
+// Lives outside components so the render-purity rule stays satisfied.
+const viewLogTimes = new Map<string, number>();
+
+export function shouldLogSuperadminView(
+  actorId: string,
+  workspaceId: string
+): boolean {
+  const key = `${actorId}:${workspaceId}`;
+  const last = viewLogTimes.get(key) ?? 0;
+  if (Date.now() - last < 5 * 60_000) return false;
+  viewLogTimes.set(key, Date.now());
+  return true;
+}
+
 export interface ActivityEntry {
   actorId?: string | null;
   action: string;          // e.g. "company.create"
