@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Mail, Trash2 } from "lucide-react";
 import { UserAvatar } from "@/components/badges";
 import { ConfirmSubmit } from "@/components/confirm-submit";
@@ -14,7 +15,12 @@ import {
   updateMyName,
 } from "@/lib/actions";
 import { getClerkDirectory } from "@/lib/clerk-directory";
-import { getCurrentProfile, getPipelineUsage, getProfiles } from "@/lib/data";
+import {
+  getCurrentProfile,
+  getMyEmailSettings,
+  getPipelineUsage,
+  getProfiles,
+} from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
@@ -31,10 +37,11 @@ export default async function SettingsPage({
   const pipelineRemoved =
     typeof sp.pipeline_removed === "string" ? sp.pipeline_removed : "";
 
-  const [profile, users, directory] = await Promise.all([
+  const [profile, users, directory, emailSettings] = await Promise.all([
     getCurrentProfile(),
     getProfiles(),
     getClerkDirectory(),
+    getMyEmailSettings(),
   ]);
   const isOwner = profile?.role === "owner";
   const pipelines = isOwner ? await getPipelineUsage() : [];
@@ -88,6 +95,33 @@ export default async function SettingsPage({
 
       <div className="mt-6 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-5">
+          <section className="card p-5">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-[13px] font-semibold text-zinc-900">
+                Email sending
+              </h2>
+              <span
+                className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+                  emailSettings.configured
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-amber-200 bg-amber-50 text-amber-700"
+                }`}
+              >
+                {emailSettings.configured ? "Configured ✓" : "Not set up"}
+              </span>
+            </div>
+            <p className="mt-1 text-[12px] text-zinc-500">
+              {emailSettings.configured && emailSettings.from_email
+                ? `Sending as ${emailSettings.from_email}. `
+                : ""}
+              Send outreach from your own mailbox — only you can see these
+              settings.
+            </p>
+            <Link href="/settings/email" className="btn-ghost mt-3">
+              Open email settings
+            </Link>
+          </section>
+
           <section className="card p-5">
             <h2 className="text-[13px] font-semibold text-zinc-900">
               Your profile
