@@ -247,11 +247,11 @@ export function DeepResearch({
     <>
       <div className="card animate-rise animate-rise-1 p-5">
         <p className="text-[13px] font-semibold text-zinc-900">
-          No founder or contact info found on their website.
+          Deep Research
         </p>
         <p className="mt-1 text-[13px] leading-relaxed text-zinc-600">
-          Deep research searches premium B2B data sources for decision makers,
-          emails and phone numbers.
+          Searches premium B2B data sources for decision makers only —
+          founders and executives — with their emails and phone numbers.
         </p>
         <div className="mt-3.5 flex flex-wrap items-center gap-3">
           <button

@@ -65,37 +65,6 @@ export function normalizeApolloLead(raw: unknown): NormalizedLead | null {
   };
 }
 
-export function needsDeepResearch(input: {
-  contacts: {
-    is_decision_maker: boolean;
-    email: string | null;
-    phone: string | null;
-    linkedin_url: string | null;
-  }[];
-  companyEmailCount: number;
-  activeRunId: number | null;
-  lastSuccessAt: string | null;
-  isOwner?: boolean;
-}): boolean {
-  if (input.activeRunId) return true; // show the running card instead of the button
-  const decisionMaker = input.contacts.some((c) => c.is_decision_maker);
-  const anyoneHasEmail = input.contacts.some((c) => c.email);
-  // Show when we can't reach a decision maker: no decision maker found, or
-  // people exist but none of them has an email yet (emails are the goal).
-  const thin = !decisionMaker || !anyoneHasEmail;
-  if (!thin) return false;
-  // Cooldown after a successful run — owners may spend their own budget and
-  // re-run immediately (e.g. after an upgrade).
-  if (
-    !input.isOwner &&
-    input.lastSuccessAt &&
-    Date.now() - new Date(input.lastSuccessAt).getTime() < 7 * 86_400_000
-  ) {
-    return false;
-  }
-  return true;
-}
-
 export function normalizeLinkedInEmployee(raw: unknown): NormalizedLead | null {
   const r = asRecord(raw);
   if (!r) return null;
@@ -276,7 +245,7 @@ interface DeepResearchCompany {
   linkedin_url: string | null;
 }
 
-const DAY_MS = 86_400_000;
+// (Per-run caps and the monthly budget below bound all spending.)
 
 export async function startDeepResearch(
   supabase: SupabaseClient,
@@ -299,41 +268,8 @@ export async function startDeepResearch(
     };
   }
 
-  // Guard 2: 7-day cooldown after the last successful run — but only when that
-  // run actually found people, and never for workspace owners (they can spend
-  // their own budget to re-run immediately, e.g. after a mode upgrade).
-  const { data: callerProfile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .maybeSingle();
-  const callerIsOwner =
-    (callerProfile as { role: string } | null)?.role === "owner";
-
-  const { data: successRuns } = await supabase
-    .from("enrichment_runs")
-    .select("created_at, people_found")
-    .eq("org_id", orgId)
-    .eq("kind", "deep_research")
-    .eq("status", "ok")
-    .order("created_at", { ascending: false })
-    .limit(1);
-  const lastSuccess = successRuns?.[0] as
-    | { created_at: string; people_found: number }
-    | undefined;
-  if (!callerIsOwner && lastSuccess && Number(lastSuccess.people_found ?? 0) > 0) {
-    const remaining =
-      7 * DAY_MS - (Date.now() - new Date(lastSuccess.created_at).getTime());
-    if (remaining > 0) {
-      const days = Math.ceil(remaining / DAY_MS);
-      return {
-        ok: false,
-        error: `Deep research ran recently — try again in ${days} day${
-          days === 1 ? "" : "s"
-        }.`,
-      };
-    }
-  }
+  // Guard 2 (7-day cooldown) was removed: the Deep Research button is always
+  // available. Spend is bounded by the per-run caps and the monthly budget.
 
   // Guard 3: hard monthly budget across all companies.
   const monthStart = new Date();

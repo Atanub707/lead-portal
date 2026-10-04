@@ -31,7 +31,7 @@ import {
   getPipelines,
   getProfiles,
 } from "@/lib/data";
-import { needsDeepResearch, reconcileIfStale } from "@/lib/deep-research";
+import { reconcileIfStale } from "@/lib/deep-research";
 import { createClient } from "@/lib/supabase/server";
 import {
   CHANNELS,
@@ -191,14 +191,9 @@ export default async function CompanyPage({
   const decisionMakers = contacts.filter(
     (contact) => contact.is_decision_maker
   ).length;
-  const showDeepResearch = needsDeepResearch({
-    contacts,
-    companyEmailCount: companyEmails.length,
-    activeRunId: deepResearchState.activeRunId,
-    lastSuccessAt: deepResearchState.lastSuccessAt,
-    isOwner,
-  });
-  const monthSpend = showDeepResearch ? await getDeepResearchMonthSpend() : 0;
+  // Deep Research is always available (one run at a time, monthly cap
+  // enforced server-side).
+  const monthSpend = await getDeepResearchMonthSpend();
   const companyFacts =
     deepResearchState.latest?.status === "ok"
       ? deepResearchCompanyFacts(deepResearchState.latest.details)
@@ -343,13 +338,11 @@ export default async function CompanyPage({
           </Section>
 
           {/* Deep research */}
-          {showDeepResearch ? (
-            <DeepResearch
-              orgId={company.id}
-              initialActiveRun={deepResearchState.activeRunId !== null}
-              monthSpend={monthSpend}
-            />
-          ) : null}
+          <DeepResearch
+            orgId={company.id}
+            initialActiveRun={deepResearchState.activeRunId !== null}
+            monthSpend={monthSpend}
+          />
 
           {/* Reach */}
           <Section
