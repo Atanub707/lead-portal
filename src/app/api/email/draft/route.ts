@@ -8,7 +8,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Not signed in" }, { status: 401 });
   }
 
-  let body: { orgId?: number; contactId?: number | null; flavor?: string };
+  let body: {
+    orgId?: number;
+    contactId?: number | null;
+    flavor?: string;
+    to?: string | null;
+  };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -25,6 +30,7 @@ export async function POST(request: Request) {
     orgId,
     contactId: body.contactId ?? null,
     flavor: body.flavor ?? "",
+    to: body.to ?? null,
   });
 
   if (!result.ok) {

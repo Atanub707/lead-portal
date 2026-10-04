@@ -71,7 +71,7 @@ export function EmailComposer({
       const res = await fetch("/api/email/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgId, contactId, flavor }),
+        body: JSON.stringify({ orgId, contactId, flavor, to: to || null }),
       });
       const data = (await res.json()) as {
         ok: boolean;

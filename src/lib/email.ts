@@ -87,6 +87,10 @@ function greetingName(to: string, contactName: string | null): string {
   if (fromContact) return fromContact;
   const local = to.split("@")[0]?.replace(/[._-]+/g, " ").trim() ?? "";
   if (!local || isGenericEmail(local.split(/\s+/)[0] ?? "")) return "";
+  // Only treat the local part as a name when it clearly looks like one
+  // (letters with separators, e.g. "dana.smith") — never machine-ish strings.
+  const rawLocal = to.split("@")[0] ?? "";
+  if (!/^[a-zA-Z]+([._-][a-zA-Z]+){1,3}$/.test(rawLocal)) return "";
   const first = local.split(/\s+/)[0] ?? "";
   if (first.length < 4) return "";
   return firstNameFrom(first);
@@ -97,6 +101,7 @@ export async function generateEmailDraft(opts: {
   orgId: number;
   contactId?: number | null;
   flavor: string;
+  to?: string | null;
 }): Promise<EmailDraftResult> {
   const flavor = FLAVORS.find((entry) => entry.id === opts.flavor);
   if (!flavor) return { ok: false, error: "Pick a flavor first." };
@@ -152,7 +157,7 @@ export async function generateEmailDraft(opts: {
     email: string | null;
   } | null;
   const to =
-    contact?.email ?? emailsResult.data?.[0]?.email ?? null;
+    opts.to?.trim() || contact?.email || emailsResult.data?.[0]?.email || null;
   if (!to) {
     return { ok: false, error: "No email address on this company — add one first." };
   }
