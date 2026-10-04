@@ -240,7 +240,10 @@ export function linkedinEmployeesInput(companyLinkedinUrl: string) {
   return {
     companies: [companyLinkedinUrl],
     maxItems: 25,
-    profileScraperMode: "Short ($4 per 1k)",
+    // Email search tries to find each person's email (SMTP-validated) — not
+    // guaranteed per profile, and the actor skips the charge when a profile
+    // is too thin to search. ~$12/1k profiles, still inside the run cap.
+    profileScraperMode: "Full + email search ($12 per 1k)",
   };
 }
 
