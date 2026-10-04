@@ -4,6 +4,7 @@ import { z } from "zod";
 import { matchEmailToContact, matchLinkedInProfile } from "@/lib/match";
 import { logActivity } from "@/lib/activity";
 import { NO_AI_KEY_MESSAGE, pickModel } from "@/lib/ai";
+import { requireWorkspaceId } from "@/lib/data";
 import { isDecisionTitle } from "@/lib/people";
 import {
   findLinkedInProfile,
@@ -121,6 +122,7 @@ export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return new Response("Unauthorized", { status: 401 });
   const supabase = await createClient();
+  const workspaceId = await requireWorkspaceId();
 
   const body = (await req.json().catch(() => null)) as {
     url?: unknown;
@@ -373,6 +375,7 @@ export async function POST(req: Request) {
       .from("organizations")
       .insert({
         list,
+        workspace_id: workspaceId,
         name,
         website,
         linkedin_url: linkedin,
@@ -400,6 +403,7 @@ export async function POST(req: Request) {
     await supabase.from("company_emails").upsert(
       generalEmails.map((email) => ({
         org_id: orgId,
+        workspace_id: workspaceId,
         email,
         kind: "general",
         source: tinyfishEnabled() ? "tinyfish" : "website",
@@ -443,6 +447,7 @@ export async function POST(req: Request) {
   if (toAdd.length > 0) {
     const rows = toAdd.map((contact) => ({
       org_id: orgId,
+      workspace_id: workspaceId,
       name: contact.name,
       title: contact.title || null,
       linkedin_url: contact.linkedin_url || null,
@@ -469,6 +474,7 @@ export async function POST(req: Request) {
   // Enrichment audit trail (what this run found, from where, at what cost).
   await supabase.from("enrichment_runs").insert({
     org_id: orgId,
+    workspace_id: workspaceId,
     kind: "website_research",
     source: tinyfishEnabled() ? "tinyfish" : "builtin",
     status: "ok",

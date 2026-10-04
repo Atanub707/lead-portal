@@ -14,6 +14,7 @@ import {
   type Organization,
   type Pipeline,
   type Profile,
+  type Workspace,
 } from "./types";
 
 // id -> display label for attribution ("who added this").
@@ -514,6 +515,51 @@ export async function getActivityLog(opts: {
 // Clerk-based: returns the signed-in user's profile, creating it on first login.
 export async function getCurrentProfile(): Promise<Profile | null> {
   return ensureProfile();
+}
+
+// The acting user's workspace id — required for every data insert.
+export async function requireWorkspaceId(): Promise<string> {
+  const profile = await getCurrentProfile();
+  if (!profile?.workspace_id) {
+    throw new Error("No workspace on this profile");
+  }
+  return profile.workspace_id;
+}
+
+// Workspace + permissions context (Plan 2 consumes canWrite for trial locks
+// and the super-admin read-only mode).
+export async function getWorkspaceContext(): Promise<{
+  profile: Profile | null;
+  workspace: Workspace | null;
+  isSuperAdmin: boolean;
+  canWrite: boolean;
+} | null> {
+  const profile = await getCurrentProfile();
+  if (!profile) return null;
+
+  let workspace: Workspace | null = null;
+  if (profile.workspace_id) {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("workspaces")
+      .select("id, name, plan, trial_ends_at, created_at")
+      .eq("id", profile.workspace_id)
+      .maybeSingle();
+    workspace = (data as Workspace | null) ?? null;
+  }
+
+  const trialOk =
+    !!workspace &&
+    (workspace.plan === "active" ||
+      (workspace.trial_ends_at !== null &&
+        new Date(workspace.trial_ends_at) > new Date()));
+
+  return {
+    profile,
+    workspace,
+    isSuperAdmin: profile.is_super_admin,
+    canWrite: !profile.is_super_admin && trialOk,
+  };
 }
 
 // Own email sending settings, safe for the client: the encrypted SMTP password

@@ -8,6 +8,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { logActivity } from "./activity";
 import { NO_AI_KEY_MESSAGE, pickModel } from "./ai";
+import { requireWorkspaceId } from "./data";
 import { encryptSecret } from "./crypto";
 import { createAdminClient } from "./supabase/admin";
 import { clearClerkDirectoryCache } from "./clerk-directory";
@@ -86,11 +87,13 @@ export async function createOrganization(formData: FormData) {
 
   const kind = field(formData, "kind");
   const priority = field(formData, "priority");
+  const workspaceId = await requireWorkspaceId();
 
   const { data, error } = await supabase
     .from("organizations")
     .insert({
       list,
+      workspace_id: workspaceId,
       name,
       website: field(formData, "website"),
       linkedin_url: field(formData, "linkedin_url"),
@@ -318,11 +321,13 @@ export async function createPipeline(formData: FormData) {
     .limit(1)
     .maybeSingle();
   const sort_order = ((last?.sort_order as number | undefined) ?? -1) + 1;
+  const workspaceId = await requireWorkspaceId();
 
   const { error } = await supabase
     .from("pipelines")
     .insert({
       id,
+      workspace_id: workspaceId,
       name,
       icon,
       sort_order,
@@ -640,6 +645,7 @@ export async function addContact(formData: FormData) {
 
   const row = {
     org_id: orgId,
+    workspace_id: await requireWorkspaceId(),
     name,
     title: field(formData, "title"),
     linkedin_url: field(formData, "linkedin_url"),
@@ -760,9 +766,11 @@ export async function addInteraction(formData: FormData) {
   if (!orgId || !summary) throw new Error("Summary is required");
 
   const contactIdRaw = field(formData, "contact_id");
+  const workspaceId = await requireWorkspaceId();
 
   const { error } = await supabase.from("interactions").insert({
     org_id: orgId,
+    workspace_id: workspaceId,
     contact_id: contactIdRaw ? Number(contactIdRaw) : null,
     occurred_on: occurredOn,
     channel: field(formData, "channel"),

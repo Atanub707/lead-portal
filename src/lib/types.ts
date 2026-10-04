@@ -196,6 +196,19 @@ export interface Profile {
   email: string | null;
   full_name: string | null;
   role: UserRole;
+  workspace_id: string | null;
+  is_super_admin: boolean;
+  created_at: string;
+}
+
+// Fixed id of the internal workspace that owns all pre-multi-tenant data.
+export const HI_LABS_WORKSPACE_ID = "00000000-0000-4000-8000-000000000001";
+
+export interface Workspace {
+  id: string;
+  name: string;
+  plan: string;
+  trial_ends_at: string | null;
   created_at: string;
 }
 

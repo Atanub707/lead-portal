@@ -344,10 +344,16 @@ export async function startDeepResearch(
   const admin = createAdminClient();
 
   // Lock the company before spending: insert the running row first.
+  const { data: orgWorkspace } = await admin
+    .from("organizations")
+    .select("workspace_id")
+    .eq("id", orgId)
+    .maybeSingle();
   const { data: run, error: insertError } = await admin
     .from("enrichment_runs")
     .insert({
       org_id: orgId,
+      workspace_id: (orgWorkspace as { workspace_id: string } | null)?.workspace_id,
       kind: "deep_research",
       source: "apify",
       status: "running",
@@ -1043,7 +1049,11 @@ export async function mergeLeads(
   const [contactsRes, companyEmailsRes, orgRes] = await Promise.all([
     supabase.from("contacts").select("name, linkedin_url, email").eq("org_id", orgId),
     supabase.from("company_emails").select("email").eq("org_id", orgId),
-    supabase.from("organizations").select("linkedin_url").eq("id", orgId).maybeSingle(),
+    supabase
+      .from("organizations")
+      .select("linkedin_url, workspace_id")
+      .eq("id", orgId)
+      .maybeSingle(),
   ]);
 
   const failedRead = [
@@ -1119,6 +1129,7 @@ export async function mergeLeads(
       const contactEmail = email && !generic ? email : null;
       newContacts.push({
         org_id: orgId,
+        workspace_id: (orgRes.data as { workspace_id: string } | null)?.workspace_id,
         name: lead.name,
         title: lead.title,
         linkedin_url: lead.linkedinUrl,
@@ -1171,6 +1182,7 @@ export async function mergeLeads(
   if (newCompanyEmails.size > 0) {
     const rows = [...newCompanyEmails].map(([email, kind]) => ({
       org_id: orgId,
+      workspace_id: (orgRes.data as { workspace_id: string } | null)?.workspace_id,
       email,
       kind,
       source: "apollo",

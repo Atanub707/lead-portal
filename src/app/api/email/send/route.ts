@@ -55,7 +55,7 @@ export async function POST(request: Request) {
 
   const { data: org } = await supabase
     .from("organizations")
-    .select("name")
+    .select("name, workspace_id")
     .eq("id", orgId)
     .maybeSingle();
 
@@ -88,8 +88,10 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
+  const workspaceId = (org as { workspace_id: string } | null)?.workspace_id;
   const { error: recordError } = await admin.from("sent_emails").insert({
     org_id: orgId,
+    workspace_id: workspaceId,
     contact_id: body.contactId ?? null,
     sent_by: userId,
     to_email: to,
@@ -111,6 +113,7 @@ export async function POST(request: Request) {
 
   const { error: interactionError } = await supabase.from("interactions").insert({
     org_id: orgId,
+    workspace_id: workspaceId,
     contact_id: body.contactId ?? null,
     channel: "email",
     summary: `Email sent: ${subject}`,
