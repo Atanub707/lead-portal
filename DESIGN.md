@@ -132,6 +132,14 @@ per-contact emails).
   free (TinyFish, or the built-in fetcher). Deep Research is the only paid tool —
   manual, input-capped, and budget-stopped. Personal emails are otherwise manual — no
   safe free public source exists.
+- **Outreach (Email Composer):** drafts are generated from the pipeline's pitch
+  (what we're offering) + the company's researched profile + a required flavor
+  (six styles). Generation follows humanized rules (short, no AI phrases, no
+  em-dashes, signature appended server-side, real facts only). Sending is
+  per-member via their own SMTP on Settings → Email sending (AES-256-GCM
+  encrypted passwords, write-only). Every send is audited (`email.sent`),
+  recorded in `sent_emails`, shown on the company timeline, and surfaced as
+  "Sent by <name>" in the companies table. Copy-only works without SMTP.
 - **Laya ([convaiinnovations/laya](https://huggingface.co/convaiinnovations/laya)) has
   no role here:** it is a ~400M-param non-autoregressive *classifier* (calibrated
   choice/score/yes-no decisions, ~33 ms/pass, Apache-2.0) — not a web or enrichment
