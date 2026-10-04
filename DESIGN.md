@@ -132,14 +132,18 @@ per-contact emails).
   free (TinyFish, or the built-in fetcher). Deep Research is the only paid tool —
   manual, input-capped, and budget-stopped. Personal emails are otherwise manual — no
   safe free public source exists.
-- **Multi-tenancy (foundation):** every record belongs to a `workspace`
+- **Multi-tenancy (live):** every record belongs to a `workspace`
   (`workspaces` table; `workspace_id` on all data tables; per-workspace
   pipelines). Isolation is enforced by Postgres RLS (`workspace_id =
   my_workspace()`), including a trial gate (`trial_active()`) on writes;
   `is_owner()` means owner of the caller's own workspace; `is_super_admin()`
   grants read-only cross-workspace access (atanub707). All HI Labs data lives
   in workspace `00000000-0000-4000-8000-000000000001` (plan `active`).
-  Signup/onboarding/trial UI arrives in Plan 2.
+  Self-serve signup (Clerk public) → `/onboarding` creates a workspace with a
+  14-day trial and a starter pipeline; invites carry `workspace_id`; trial
+  banners + DB-enforced write lock when expired; super-admin gets a sidebar
+  workspace switcher (read-only views, every visit logged into the viewed
+  workspace's audit). BYO-Supabase and Stripe billing are future tiers.
 - **Outreach (Email Composer):** drafts are generated from the pipeline's pitch
   (what we're offering) + the company's researched profile + a required flavor
   (six styles). Generation follows humanized rules (short, no AI phrases, no
