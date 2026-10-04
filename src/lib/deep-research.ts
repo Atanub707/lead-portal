@@ -246,7 +246,23 @@ export function apolloInput(company: { name: string; website: string | null }) {
 export function linkedinEmployeesInput(companyLinkedinUrl: string) {
   return {
     companies: [companyLinkedinUrl],
-    maxItems: 25,
+    maxItems: 10,
+    // Decision makers only — the strict title filter means we scrape (and pay
+    // for) founders/execs, not the whole team.
+    jobTitles: [
+      "Founder",
+      "Co-Founder",
+      "CEO",
+      "Chief Executive Officer",
+      "Owner",
+      "President",
+      "Managing Director",
+      "CTO",
+      "COO",
+      "CFO",
+      "Partner",
+      "General Manager",
+    ],
     // Email search tries to find each person's email (SMTP-validated) — not
     // guaranteed per profile, and the actor skips the charge when a profile
     // is too thin to search. ~$12/1k profiles, still inside the run cap.
@@ -1063,7 +1079,11 @@ export async function mergeLeads(
   supabase: SupabaseClient,
   opts: { orgId: number; userId: string | null; leads: DeepResearchLead[] }
 ): Promise<MergeLeadsResult> {
-  const { orgId, userId, leads } = opts;
+  const { orgId, userId } = opts;
+  // Decision makers only — rank-and-file employees never land in People.
+  const leads = opts.leads.filter((entry) =>
+    isDecisionTitle(entry.lead.title)
+  );
 
   const [contactsRes, companyEmailsRes, orgRes] = await Promise.all([
     supabase.from("contacts").select("name, linkedin_url, email").eq("org_id", orgId),
