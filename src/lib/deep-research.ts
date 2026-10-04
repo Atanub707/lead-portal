@@ -295,7 +295,16 @@ export async function startDeepResearch(
   }
 
   // Guard 2: 7-day cooldown after the last successful run — but only when that
-  // run actually found people. A zero-result success may be retried anytime.
+  // run actually found people, and never for workspace owners (they can spend
+  // their own budget to re-run immediately, e.g. after a mode upgrade).
+  const { data: callerProfile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+  const callerIsOwner =
+    (callerProfile as { role: string } | null)?.role === "owner";
+
   const { data: successRuns } = await supabase
     .from("enrichment_runs")
     .select("created_at, people_found")
@@ -307,7 +316,7 @@ export async function startDeepResearch(
   const lastSuccess = successRuns?.[0] as
     | { created_at: string; people_found: number }
     | undefined;
-  if (lastSuccess && Number(lastSuccess.people_found ?? 0) > 0) {
+  if (!callerIsOwner && lastSuccess && Number(lastSuccess.people_found ?? 0) > 0) {
     const remaining =
       7 * DAY_MS - (Date.now() - new Date(lastSuccess.created_at).getTime());
     if (remaining > 0) {
