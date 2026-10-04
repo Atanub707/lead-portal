@@ -1,18 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Pencil, Sparkles, X } from "lucide-react";
-import { generatePipelinePitch, updatePipeline } from "@/lib/actions";
+import { Pencil, X } from "lucide-react";
+import { updatePipeline } from "@/lib/actions";
 import { PIPELINE_ICONS } from "@/lib/types";
-import { FLAVORS } from "@/lib/flavors";
 import { PipelineIcon } from "@/components/pipeline-icon";
+import { PipelinePitchFields } from "@/components/pipeline-pitch-fields";
 import { SubmitButton } from "@/components/submit-button";
-
-const FLAVOR_OPTIONS = FLAVORS;
-
-function flavorOrDefault(value: string | null): string {
-  return FLAVOR_OPTIONS.some((flavor) => flavor.id === value) ? (value ?? "") : "";
-}
 
 export function EditPipelineDialog({
   id,
@@ -34,17 +28,7 @@ export function EditPipelineDialog({
   default_flavor: string | null;
 }) {
   const [open, setOpen] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fields, setFields] = useState({
-    name,
-    icon,
-    pitch: pitch ?? "",
-    value_props: value_props.join("\n"),
-    proof_points: proof_points.join("\n"),
-    cta: cta ?? "",
-    default_flavor: flavorOrDefault(default_flavor),
-  });
+  const [fields, setFields] = useState({ name, icon });
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -59,47 +43,9 @@ export function EditPipelineDialog({
   }, [open]);
 
   function openDialog() {
-    setFields({
-      name,
-      icon,
-      pitch: pitch ?? "",
-      value_props: value_props.join("\n"),
-      proof_points: proof_points.join("\n"),
-      cta: cta ?? "",
-      default_flavor: flavorOrDefault(default_flavor),
-    });
-    setError(null);
+    setFields({ name, icon });
     setOpen(true);
   }
-
-  function set(key: keyof typeof fields, value: string) {
-    setFields((prev) => ({ ...prev, [key]: value }));
-  }
-
-  async function autoGenerate() {
-    setGenerating(true);
-    setError(null);
-    try {
-      const result = await generatePipelinePitch(fields.pitch, fields.name);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      setFields((prev) => ({
-        ...prev,
-        pitch: result.pitch,
-        value_props: result.value_props.join("\n"),
-        proof_points: result.proof_points.join("\n"),
-        cta: result.cta,
-      }));
-    } catch {
-      setError("Couldn't generate a pitch — try again.");
-    } finally {
-      setGenerating(false);
-    }
-  }
-
-  const notesEmpty = fields.pitch.trim() === "";
 
   return (
     <>
@@ -155,7 +101,9 @@ export function EditPipelineDialog({
                   required
                   maxLength={40}
                   value={fields.name}
-                  onChange={(event) => set("name", event.target.value)}
+                  onChange={(event) =>
+                    setFields((prev) => ({ ...prev, name: event.target.value }))
+                  }
                   className="input"
                 />
               </div>
@@ -168,7 +116,9 @@ export function EditPipelineDialog({
                     <button
                       key={iconName}
                       type="button"
-                      onClick={() => set("icon", iconName)}
+                      onClick={() =>
+                        setFields((prev) => ({ ...prev, icon: iconName }))
+                      }
                       aria-label={iconName}
                       aria-pressed={fields.icon === iconName}
                       className={`flex h-9 items-center justify-center rounded-md border transition-colors ${
@@ -183,115 +133,17 @@ export function EditPipelineDialog({
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <label
-                    htmlFor={`pipeline-pitch-${id}`}
-                    className="label mb-0"
-                  >
-                    Pitch
-                  </label>
-                  <button
-                    type="button"
-                    onClick={autoGenerate}
-                    disabled={generating || notesEmpty}
-                    className="inline-flex items-center gap-1 text-[12px] font-medium text-zinc-500 transition-colors hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {generating ? (
-                      <Loader2
-                        className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
-                        aria-hidden="true"
-                      />
-                    ) : (
-                      <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-                    )}
-                    {generating ? "Generating…" : "Auto-generate"}
-                  </button>
-                </div>
-                <textarea
-                  id={`pipeline-pitch-${id}`}
-                  name="pitch"
-                  rows={3}
-                  value={fields.pitch}
-                  onChange={(event) => set("pitch", event.target.value)}
-                  placeholder="Rough notes — what are you offering?"
-                  className="input resize-none"
-                />
-                {error ? (
-                  <p role="alert" className="mt-1 text-[12px] text-rose-600">
-                    {error}
-                  </p>
-                ) : null}
-              </div>
-
-              <div>
-                <label
-                  htmlFor={`pipeline-value-props-${id}`}
-                  className="label"
-                >
-                  Value props
-                </label>
-                <textarea
-                  id={`pipeline-value-props-${id}`}
-                  name="value_props"
-                  rows={3}
-                  value={fields.value_props}
-                  onChange={(event) => set("value_props", event.target.value)}
-                  placeholder="One per line"
-                  className="input resize-none"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor={`pipeline-proof-points-${id}`}
-                  className="label"
-                >
-                  Proof points
-                </label>
-                <textarea
-                  id={`pipeline-proof-points-${id}`}
-                  name="proof_points"
-                  rows={3}
-                  value={fields.proof_points}
-                  onChange={(event) => set("proof_points", event.target.value)}
-                  placeholder="One per line"
-                  className="input resize-none"
-                />
-              </div>
-
-              <div>
-                <label htmlFor={`pipeline-cta-${id}`} className="label">
-                  CTA
-                </label>
-                <input
-                  id={`pipeline-cta-${id}`}
-                  name="cta"
-                  value={fields.cta}
-                  onChange={(event) => set("cta", event.target.value)}
-                  className="input"
-                />
-              </div>
-
-              <div>
-                <label htmlFor={`pipeline-flavor-${id}`} className="label">
-                  Default flavor
-                </label>
-                <select
-                  id={`pipeline-flavor-${id}`}
-                  name="default_flavor"
-                  value={fields.default_flavor}
-                  onChange={(event) => set("default_flavor", event.target.value)}
-                  className="input"
-                >
-                  <option value="">No default</option>
-                  {FLAVOR_OPTIONS.map((flavor) => (
-                    <option key={flavor.id} value={flavor.id}>
-                      {flavor.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <PipelinePitchFields
+                idSuffix={id}
+                pipelineName={fields.name}
+                initial={{
+                  pitch,
+                  value_props,
+                  proof_points,
+                  cta,
+                  default_flavor,
+                }}
+              />
 
               <SubmitButton className="btn-primary w-full justify-center">
                 Save pipeline

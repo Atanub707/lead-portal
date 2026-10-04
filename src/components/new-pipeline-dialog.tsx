@@ -6,6 +6,7 @@ import { Plus, X } from "lucide-react";
 import { createPipeline } from "@/lib/actions";
 import { PIPELINE_ICONS } from "@/lib/types";
 import { PipelineIcon } from "@/components/pipeline-icon";
+import { PipelinePitchFields } from "@/components/pipeline-pitch-fields";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -23,6 +24,7 @@ function SubmitButton() {
 export function NewPipelineButton({ collapsed = false }: { collapsed?: boolean }) {
   const [open, setOpen] = useState(false);
   const [icon, setIcon] = useState<string>("layers");
+  const [name, setName] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -46,6 +48,7 @@ export function NewPipelineButton({ collapsed = false }: { collapsed?: boolean }
         type="button"
         onClick={() => {
           setIcon("layers");
+          setName("");
           setOpen(true);
         }}
         title="New pipeline"
@@ -74,7 +77,7 @@ export function NewPipelineButton({ collapsed = false }: { collapsed?: boolean }
             role="dialog"
             aria-modal="true"
             aria-label="New pipeline"
-            className="animate-panel relative w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl"
+            className="animate-panel relative max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl"
           >
             <div className="flex items-center justify-between">
               <p className="text-[13px] font-semibold text-zinc-900">
@@ -100,6 +103,8 @@ export function NewPipelineButton({ collapsed = false }: { collapsed?: boolean }
                   name="name"
                   required
                   maxLength={40}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
                   placeholder="e.g. Partners"
                   className="input"
                 />
@@ -128,10 +133,13 @@ export function NewPipelineButton({ collapsed = false }: { collapsed?: boolean }
                 </div>
               </div>
 
+              <PipelinePitchFields idSuffix="new" pipelineName={name} />
+
               <p className="text-[11px] leading-relaxed text-zinc-500">
                 Creates a section in the sidebar with the standard stages (New →
-                Contacted → Proposal → Won/Lost). You can add companies and paste
-                URLs into it right away. Only the owner can create pipelines.
+                Contacted → Proposal → Won/Lost). The pitch above tells the
+                email composer what we&apos;re offering to companies in this
+                pipeline. Only the owner can create pipelines.
               </p>
 
               <SubmitButton />

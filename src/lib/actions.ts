@@ -321,7 +321,17 @@ export async function createPipeline(formData: FormData) {
 
   const { error } = await supabase
     .from("pipelines")
-    .insert({ id, name, icon, sort_order });
+    .insert({
+      id,
+      name,
+      icon,
+      sort_order,
+      pitch: field(formData, "pitch"),
+      value_props: splitLines(field(formData, "value_props")),
+      proof_points: splitLines(field(formData, "proof_points")),
+      cta: field(formData, "cta"),
+      default_flavor: field(formData, "default_flavor"),
+    });
   if (error) throw new Error(error.message);
 
   await logActivity({
