@@ -247,22 +247,10 @@ export function linkedinEmployeesInput(companyLinkedinUrl: string) {
   return {
     companies: [companyLinkedinUrl],
     maxItems: 10,
-    // Decision makers only — the strict title filter means we scrape (and pay
-    // for) founders/execs, not the whole team.
-    jobTitles: [
-      "Founder",
-      "Co-Founder",
-      "CEO",
-      "Chief Executive Officer",
-      "Owner",
-      "President",
-      "Managing Director",
-      "CTO",
-      "COO",
-      "CFO",
-      "Partner",
-      "General Manager",
-    ],
+    // Decision makers only — fuzzy title search (strict jobTitles proved too
+    // literal and returned nothing). Merge also drops non-DM titles.
+    searchQuery:
+      'Founder OR "Co-Founder" OR CEO OR Owner OR President OR "Managing Director" OR CTO',
     // Email search tries to find each person's email (SMTP-validated) — not
     // guaranteed per profile, and the actor skips the charge when a profile
     // is too thin to search. ~$12/1k profiles, still inside the run cap.
