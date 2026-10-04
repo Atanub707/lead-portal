@@ -4,7 +4,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
-  Mail,
   Search,
   Trash2,
 } from "lucide-react";
@@ -14,9 +13,15 @@ import { FollowUpControl } from "@/components/follow-up-control";
 import { PasteUrl } from "@/components/paste-url";
 import { KindBadge, UserAvatar } from "@/components/badges";
 import { CompanyMark } from "@/components/company-mark";
+import { EmailComposer } from "@/components/email-composer";
 import { LinkedInBadge } from "@/components/icons";
 import { deleteOrganization } from "@/lib/actions";
-import { getCompanies, getCurrentProfile, getPipelines } from "@/lib/data";
+import {
+  getCompanies,
+  getCurrentProfile,
+  getMyEmailSettings,
+  getPipelines,
+} from "@/lib/data";
 import {
   KIND_LABEL,
   KIND_OPTIONS,
@@ -73,6 +78,7 @@ export default async function CompaniesPage({
   const profile = await getCurrentProfile();
   const isOwner = profile?.role === "owner";
   const pipelines = await getPipelines();
+  const emailSettings = await getMyEmailSettings();
   if (!pipelines.some((pipeline) => pipeline.id === list)) notFound();
 
   let result = await getCompanies({
@@ -337,25 +343,29 @@ export default async function CompaniesPage({
                     />
                   </td>
                   <td className="td pr-4 text-right">
-                    {company.first_email ? (
-                      <a
-                        href={`mailto:${company.first_email}`}
-                        title={company.first_email}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
-                      >
-                        <Mail className="h-3.5 w-3.5" aria-hidden="true" />
-                        <span className="sr-only">
-                          Email {company.first_email}
+                    <div className="flex flex-col items-end gap-0.5">
+                      <EmailComposer
+                        orgId={company.id}
+                        defaultTo={company.first_email}
+                        smtpConfigured={emailSettings.configured}
+                        trigger="icon"
+                      />
+                      {company.last_sent_by_name ? (
+                        <span
+                          className="inline-flex items-center gap-1"
+                          title={`${company.last_sent_at?.slice(0, 10) ?? ""} · ${company.last_sent_subject ?? ""}`}
+                        >
+                          <UserAvatar
+                            seed={company.last_sent_by_name}
+                            name={company.last_sent_by_name}
+                            size={14}
+                          />
+                          <span className="text-[11px] text-zinc-500">
+                            Sent by {company.last_sent_by_name}
+                          </span>
                         </span>
-                      </a>
-                    ) : (
-                      <span
-                        className="text-[12px] text-zinc-300"
-                        aria-hidden="true"
-                      >
-                        —
-                      </span>
-                    )}
+                      ) : null}
+                    </div>
                   </td>
                   <td className="td pr-4">
                     {isOwner ? (

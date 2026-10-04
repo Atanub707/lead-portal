@@ -2,48 +2,13 @@ import { generateObject, generateText } from "ai";
 import nodemailer from "nodemailer";
 import { z } from "zod";
 import { NO_AI_KEY_MESSAGE, pickModel } from "./ai";
+import { FLAVORS } from "./flavors";
 import { isGenericEmail } from "./people";
 import { createClient } from "./supabase/server";
 
-// The six outreach flavors. Ids are binding — the composer and pipeline
-// default-flavor select use them verbatim.
-export const FLAVORS = [
-  {
-    id: "short-direct",
-    label: "Short & direct",
-    brief: "One value prop, straight to the point. 60-80 words.",
-  },
-  {
-    id: "pain-first",
-    label: "Pain-first",
-    brief:
-      "Open with a problem they likely have, tie it to the pitch. 70-90 words.",
-  },
-  {
-    id: "insight-authority",
-    label: "Insight & authority",
-    brief:
-      "Lead with an insight or deadline relevant to their space, position expertise. 70-90 words.",
-  },
-  {
-    id: "warm-intro",
-    label: "Warm intro",
-    brief:
-      "Reference something specific from their website or profile. Friendly. 70-90 words.",
-  },
-  {
-    id: "founder-founder",
-    label: "Founder-to-founder",
-    brief: "Peer tone, casual, low-pressure. 50-70 words.",
-  },
-  {
-    id: "follow-up",
-    label: "Follow-up",
-    brief:
-      "Gentle bump. If a prior sent email is provided, reference it; otherwise a short intro. 30-50 words.",
-  },
-] as const;
-
+// Re-exported for server-side consumers; the source lives in ./flavors so
+// client components can import it without pulling server code.
+export { FLAVORS };
 export type FlavorId = (typeof FLAVORS)[number]["id"];
 
 const DraftSchema = z.object({

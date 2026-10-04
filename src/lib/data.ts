@@ -182,6 +182,9 @@ export interface CompanyRow extends Organization {
   first_email: string | null;
   created_by_name: string | null;
   created_by_email: string | null;
+  last_sent_by_name: string | null;
+  last_sent_at: string | null;
+  last_sent_subject: string | null;
 }
 
 export async function getCompanies(opts: {
@@ -234,15 +237,35 @@ export async function getCompanies(opts: {
   >();
   const ids = rows.map((row) => row.id);
 
+  const sentByOrg = new Map<
+    number,
+    { sent_by: string | null; subject: string; created_at: string }
+  >();
+
   if (ids.length > 0) {
-    const [{ data: contactRows }, { data: companyEmailRows }] =
+    const [{ data: contactRows }, { data: companyEmailRows }, { data: sentRows }] =
       await Promise.all([
         supabase
           .from("contacts")
           .select("org_id, email, is_decision_maker")
           .in("org_id", ids),
         supabase.from("company_emails").select("org_id, email").in("org_id", ids),
+        supabase
+          .from("sent_emails")
+          .select("org_id, sent_by, subject, created_at")
+          .in("org_id", ids)
+          .order("created_at", { ascending: false }),
       ]);
+
+    for (const sent of sentRows ?? []) {
+      if (!sentByOrg.has(sent.org_id)) {
+        sentByOrg.set(sent.org_id, {
+          sent_by: sent.sent_by,
+          subject: sent.subject,
+          created_at: sent.created_at,
+        });
+      }
+    }
 
     for (const contact of contactRows ?? []) {
       const entry = stats.get(contact.org_id) ?? {
@@ -294,6 +317,11 @@ export async function getCompanies(opts: {
       created_by_email: row.created_by
         ? (labels.get(row.created_by)?.email ?? null)
         : null,
+      last_sent_by_name: sentByOrg.get(row.id)?.sent_by
+        ? (labels.get(sentByOrg.get(row.id)?.sent_by ?? "")?.label ?? null)
+        : null,
+      last_sent_at: sentByOrg.get(row.id)?.created_at ?? null,
+      last_sent_subject: sentByOrg.get(row.id)?.subject ?? null,
     };
   });
 

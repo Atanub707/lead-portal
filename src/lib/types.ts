@@ -17,6 +17,11 @@ export interface Pipeline {
   icon: string;
   stages: PipelineStage[];
   sort_order: number;
+  pitch: string | null;
+  value_props: string[] | null;
+  proof_points: string[] | null;
+  cta: string | null;
+  default_flavor: string | null;
 }
 
 export const DEFAULT_STAGES: PipelineStage[] = [
@@ -55,6 +60,11 @@ export const FALLBACK_PIPELINES: Pipeline[] = [
     icon: "store",
     stages: ["new", "contacted", "demo", "proposal", "won", "lost"],
     sort_order: 0,
+    pitch: null,
+    value_props: null,
+    proof_points: null,
+    cta: null,
+    default_flavor: null,
   },
   {
     id: "compliance",
@@ -62,6 +72,11 @@ export const FALLBACK_PIPELINES: Pipeline[] = [
     icon: "shield-check",
     stages: ["new", "contacted", "scoping", "proposal", "won", "lost"],
     sort_order: 1,
+    pitch: null,
+    value_props: null,
+    proof_points: null,
+    cta: null,
+    default_flavor: null,
   },
 ];
 

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ExternalLink, Mail, Plus, Star } from "lucide-react";
 import { KindBadge, StatusDot, UserAvatar } from "@/components/badges";
 import { CompanyMark } from "@/components/company-mark";
+import { EmailComposer } from "@/components/email-composer";
 import { LinkedInBadge } from "@/components/icons";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { DeepResearch } from "@/components/deep-research";
@@ -26,6 +27,7 @@ import {
   getDeepResearchState,
   getEnrichmentRuns,
   getInteractions,
+  getMyEmailSettings,
   getPipelines,
   getProfiles,
 } from "@/lib/data";
@@ -155,6 +157,7 @@ export default async function CompanyPage({
     companyEmails,
     enrichmentRuns,
     profiles,
+    emailSettings,
   ] = await Promise.all([
     getCompany(companyId),
     getContacts(companyId),
@@ -164,6 +167,7 @@ export default async function CompanyPage({
     getCompanyEmails(companyId),
     getEnrichmentRuns(companyId),
     getProfiles(),
+    getMyEmailSettings(),
   ]);
 
   if (!company) notFound();
@@ -180,6 +184,8 @@ export default async function CompanyPage({
   const isOwner = profile?.role === "owner";
   const pipelineLabel = pipelineName(pipelines, company.list);
   const stages = pipelineStages(pipelines, company.list);
+  const defaultFlavor =
+    pipelines.find((entry) => entry.id === company.list)?.default_flavor ?? null;
   const today = new Date().toISOString().slice(0, 10);
   const decisionMakers = contacts.filter(
     (contact) => contact.is_decision_maker
@@ -381,6 +387,14 @@ export default async function CompanyPage({
                     <span className="text-[11px] text-zinc-400">
                       via {email.source}
                     </span>
+                    <EmailComposer
+                      trigger="button"
+                      triggerLabel="Draft"
+                      orgId={company.id}
+                      defaultTo={email.email}
+                      defaultFlavor={defaultFlavor}
+                      smtpConfigured={emailSettings.configured}
+                    />
                   </li>
                 ))}
               </ul>
@@ -474,6 +488,18 @@ export default async function CompanyPage({
                             {contact.phone}
                           </span>
                         ) : null}
+                        <EmailComposer
+                          trigger="button"
+                          triggerLabel="Draft email"
+                          orgId={company.id}
+                          contactId={contact.id}
+                          contactLabel={`${contact.name}${
+                            contact.title ? ` · ${contact.title}` : ""
+                          }`}
+                          defaultTo={contact.email ?? null}
+                          defaultFlavor={defaultFlavor}
+                          smtpConfigured={emailSettings.configured}
+                        />
                       </div>
                       {!contact.linkedin_url ? (
                         <div className="mt-1">

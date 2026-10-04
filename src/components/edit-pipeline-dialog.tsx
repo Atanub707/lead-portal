@@ -4,18 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, Pencil, Sparkles, X } from "lucide-react";
 import { generatePipelinePitch, updatePipeline } from "@/lib/actions";
 import { PIPELINE_ICONS } from "@/lib/types";
+import { FLAVORS } from "@/lib/flavors";
 import { PipelineIcon } from "@/components/pipeline-icon";
 import { SubmitButton } from "@/components/submit-button";
 
-// Mirrors the six flavor ids reserved for the email composer (Task 4 owns FLAVORS).
-const FLAVOR_OPTIONS = [
-  { id: "short-direct", label: "Short & direct" },
-  { id: "pain-first", label: "Pain-first" },
-  { id: "insight-authority", label: "Insight & authority" },
-  { id: "warm-intro", label: "Warm intro" },
-  { id: "founder-founder", label: "Founder-to-founder" },
-  { id: "follow-up", label: "Follow-up" },
-] as const;
+const FLAVOR_OPTIONS = FLAVORS;
 
 function flavorOrDefault(value: string | null): string {
   return FLAVOR_OPTIONS.some((flavor) => flavor.id === value) ? (value ?? "") : "";
