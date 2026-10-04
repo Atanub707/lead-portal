@@ -31,10 +31,11 @@ export async function logActivity(entry: ActivityEntry): Promise<void> {
   try {
     const admin = createAdminClient();
 
-    // Resolve the workspace: actor's profile first, then the org's, then the
-    // explicit override — activity_log.workspace_id is NOT NULL.
-    let workspaceId: string | null = null;
-    if (entry.actorId) {
+    // Resolve the workspace: explicit override first (e.g. super-admin viewing
+    // a customer workspace), then the actor's profile, then the org's.
+    // activity_log.workspace_id is NOT NULL.
+    let workspaceId: string | null = entry.workspaceId ?? null;
+    if (!workspaceId && entry.actorId) {
       const { data: profile } = await admin
         .from("profiles")
         .select("workspace_id")
@@ -50,7 +51,6 @@ export async function logActivity(entry: ActivityEntry): Promise<void> {
         .maybeSingle();
       workspaceId = (org?.workspace_id as string | null) ?? null;
     }
-    if (!workspaceId) workspaceId = entry.workspaceId ?? null;
 
     const { error } = await admin.from("activity_log").insert({
       actor_id: entry.actorId ?? null,
