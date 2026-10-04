@@ -246,14 +246,13 @@ export function apolloInput(company: { name: string; website: string | null }) {
 export function linkedinEmployeesInput(companyLinkedinUrl: string) {
   return {
     companies: [companyLinkedinUrl],
+    // Cap the scrape: worst case we pay for 10 profiles (~$0.12) and the
+    // merge keeps only decision-maker titles — never the whole team.
+    // (Actor-side title filters were tried and returned zero profiles.)
     maxItems: 10,
-    // Decision makers only — fuzzy title search (strict jobTitles proved too
-    // literal and returned nothing). Merge also drops non-DM titles.
-    searchQuery:
-      'Founder OR "Co-Founder" OR CEO OR Owner OR President OR "Managing Director" OR CTO',
     // Email search tries to find each person's email (SMTP-validated) — not
     // guaranteed per profile, and the actor skips the charge when a profile
-    // is too thin to search. ~$12/1k profiles, still inside the run cap.
+    // is too thin to search.
     profileScraperMode: "Full + email search ($12 per 1k)",
   };
 }
