@@ -75,17 +75,19 @@ export function needsDeepResearch(input: {
   companyEmailCount: number;
   activeRunId: number | null;
   lastSuccessAt: string | null;
+  isOwner?: boolean;
 }): boolean {
   if (input.activeRunId) return true; // show the running card instead of the button
   const decisionMaker = input.contacts.some((c) => c.is_decision_maker);
-  if (decisionMaker) return false;
-  const reachable = input.contacts.filter(
-    (c) => c.email || c.phone || c.linkedin_url
-  ).length;
-  const thin =
-    input.contacts.length === 0 || reachable === 0 || input.companyEmailCount === 0;
+  const anyoneHasEmail = input.contacts.some((c) => c.email);
+  // Show when we can't reach a decision maker: no decision maker found, or
+  // people exist but none of them has an email yet (emails are the goal).
+  const thin = !decisionMaker || !anyoneHasEmail;
   if (!thin) return false;
+  // Cooldown after a successful run — owners may spend their own budget and
+  // re-run immediately (e.g. after an upgrade).
   if (
+    !input.isOwner &&
     input.lastSuccessAt &&
     Date.now() - new Date(input.lastSuccessAt).getTime() < 7 * 86_400_000
   ) {

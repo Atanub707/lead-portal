@@ -196,6 +196,7 @@ export default async function CompanyPage({
     companyEmailCount: companyEmails.length,
     activeRunId: deepResearchState.activeRunId,
     lastSuccessAt: deepResearchState.lastSuccessAt,
+    isOwner,
   });
   const monthSpend = showDeepResearch ? await getDeepResearchMonthSpend() : 0;
   const companyFacts =
