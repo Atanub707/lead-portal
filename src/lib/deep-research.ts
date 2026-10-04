@@ -112,7 +112,12 @@ export function normalizeLinkedInEmployee(raw: unknown): NormalizedLead | null {
       fromRecord(r.experience, ["position", "title"]) ??
       str(r.position) ??
       str(r.headline),
-    email: str(r.email)?.toLowerCase() ?? null,
+    email:
+      str(r.email)?.toLowerCase() ??
+      str(r.emailAddress)?.toLowerCase() ??
+      (Array.isArray(r.emails)
+        ? (str((r.emails as unknown[])[0])?.toLowerCase() ?? null)
+        : null),
     phone: str(r.phone) ?? str(r.mobilePhone) ?? null,
     linkedinUrl: str(r.linkedinUrl) ?? str(r.profileUrl) ?? str(r.linkedin_url),
     companyLinkedinUrl:
