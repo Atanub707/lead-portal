@@ -574,6 +574,60 @@ export async function generatePipelinePitch(
   return { ok: true, ...generated };
 }
 
+// ─── Workspaces ──────────────────────────────────────────────────────────────
+
+export async function createWorkspace(formData: FormData) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Not signed in");
+
+  const name = field(formData, "name");
+  if (!name) throw new Error("Workspace name is required");
+
+  // The user has no workspace yet, so every write here uses the admin client.
+  const admin = createAdminClient();
+  const trialEndsAt = new Date(Date.now() + 14 * 86_400_000).toISOString();
+
+  const { data: workspace, error } = await admin
+    .from("workspaces")
+    .insert({
+      name: name.slice(0, 60),
+      created_by: userId,
+      plan: "trial",
+      trial_ends_at: trialEndsAt,
+    })
+    .select("id")
+    .single();
+  if (error || !workspace) {
+    throw new Error(error?.message ?? "Could not create the workspace");
+  }
+
+  await admin.from("pipelines").insert({
+    id: "leads",
+    workspace_id: workspace.id,
+    name: "Leads",
+    icon: "layers",
+    stages: ["new", "contacted", "proposal", "won", "lost"],
+    sort_order: 0,
+  });
+
+  await admin
+    .from("profiles")
+    .update({ workspace_id: workspace.id, role: "owner" })
+    .eq("id", userId);
+
+  await logActivity({
+    actorId: userId,
+    workspaceId: workspace.id,
+    action: "workspace.create",
+    targetType: "workspace",
+    targetId: workspace.id,
+    summary: `Created workspace “${name}”`,
+  });
+
+  revalidatePath("/", "layout");
+  redirect("/dashboard");
+}
+
 export async function deletePipeline(formData: FormData) {
   const supabase = await assertOwner();
   const { userId } = await auth();
@@ -859,6 +913,7 @@ export async function inviteUser(
   }
 
   const base = await currentSiteUrl();
+  const workspaceId = await requireWorkspaceId();
 
   // Clerk sends the invitation email itself (notify defaults to true).
   // expiresInDays: 1 — short-lived invites (Clerk's minimum unit is days).
@@ -866,7 +921,7 @@ export async function inviteUser(
     const client = await clerkClient();
     const invitation = await client.invitations.createInvitation({
       emailAddress: email,
-      publicMetadata: { role: safeRole },
+      publicMetadata: { role: safeRole, workspace_id: workspaceId },
       redirectUrl: `${base}/dashboard`,
       expiresInDays: 1,
     });

@@ -10,14 +10,17 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [profile, pipelines] = await Promise.all([
-    ensureProfile(),
-    getPipelines(),
-  ]);
+  const profile = await ensureProfile();
 
   if (!profile) {
     redirect("/sign-in");
   }
+  // Signed in but not in a workspace yet → create-your-workspace onboarding.
+  if (!profile.workspace_id) {
+    redirect("/onboarding");
+  }
+
+  const pipelines = await getPipelines();
 
   return (
     <Shell
