@@ -1,9 +1,11 @@
+import { auth } from "@clerk/nextjs/server";
 import { createClient } from "./supabase/server";
 import { ensureProfile } from "./auth";
 import {
   FALLBACK_PIPELINES,
   type CompanyEmail,
   type Contact,
+  type EmailSettings,
   type EnrichmentRun,
   type EnrichmentRunWithOrg,
   type Interaction,
@@ -472,4 +474,53 @@ export async function getActivityLog(opts: {
 // Clerk-based: returns the signed-in user's profile, creating it on first login.
 export async function getCurrentProfile(): Promise<Profile | null> {
   return ensureProfile();
+}
+
+// Own email sending settings, safe for the client: the encrypted SMTP password
+// is never fetched. `configured` comes from a filtered count so the ciphertext
+// never leaves the database.
+export async function getMyEmailSettings(): Promise<EmailSettings> {
+  const empty: EmailSettings = {
+    configured: false,
+    from_name: null,
+    from_email: null,
+    smtp_host: null,
+    smtp_port: null,
+    smtp_secure: false,
+    smtp_user: null,
+    signature_phone: null,
+    signature_link: null,
+  };
+
+  const { userId } = await auth();
+  if (!userId) return empty;
+
+  const supabase = await createClient();
+  const [{ data }, { count }] = await Promise.all([
+    supabase
+      .from("user_email_settings")
+      .select(
+        "from_name, from_email, smtp_host, smtp_port, smtp_secure, smtp_user, signature_phone, signature_link"
+      )
+      .eq("user_id", userId)
+      .maybeSingle(),
+    supabase
+      .from("user_email_settings")
+      .select("user_id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .not("smtp_password_enc", "is", null),
+  ]);
+  if (!data) return empty;
+
+  return {
+    configured: Boolean(data.smtp_host && data.smtp_user) && (count ?? 0) > 0,
+    from_name: data.from_name ?? null,
+    from_email: data.from_email ?? null,
+    smtp_host: data.smtp_host ?? null,
+    smtp_port: data.smtp_port ?? null,
+    smtp_secure: data.smtp_secure ?? true,
+    smtp_user: data.smtp_user ?? null,
+    signature_phone: data.signature_phone ?? null,
+    signature_link: data.signature_link ?? null,
+  };
 }

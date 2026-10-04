@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { logActivity } from "./activity";
+import { encryptSecret } from "./crypto";
 import { createAdminClient } from "./supabase/admin";
 import { clearClerkDirectoryCache } from "./clerk-directory";
 import { createClient } from "./supabase/server";
@@ -828,6 +829,53 @@ export async function updateUserRole(
   });
   revalidatePath("/settings");
   return { ok: true };
+}
+
+// ─── Email settings ──────────────────────────────────────────────────────────
+
+export async function saveEmailSettings(formData: FormData) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Not signed in");
+
+  const portRaw = field(formData, "smtp_port");
+  const port = portRaw ? Number.parseInt(portRaw, 10) : null;
+  const secureField = field(formData, "smtp_secure");
+  const smtpSecure =
+    secureField === null
+      ? port === 465
+      : secureField === "true" || secureField === "on" || secureField === "1";
+
+  const payload: Record<string, unknown> = {
+    user_id: userId,
+    from_name: field(formData, "from_name"),
+    from_email: field(formData, "from_email"),
+    smtp_host: field(formData, "smtp_host"),
+    smtp_port: port !== null && Number.isFinite(port) ? port : null,
+    smtp_secure: smtpSecure,
+    smtp_user: field(formData, "smtp_user"),
+    signature_phone: field(formData, "signature_phone"),
+    signature_link: field(formData, "signature_link"),
+    updated_at: new Date().toISOString(),
+  };
+
+  const password = field(formData, "password");
+  if (password) payload.smtp_password_enc = encryptSecret(password);
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("user_email_settings")
+    .upsert(payload, { onConflict: "user_id" });
+  if (error) throw new Error(error.message);
+
+  await logActivity({
+    actorId: userId,
+    action: "email.settings_update",
+    summary: "Updated email sending settings",
+  });
+
+  revalidatePath("/settings/email");
+  revalidatePath("/settings");
+  redirect("/settings/email");
 }
 
 // ─── Auth ────────────────────────────────────────────────────────────────────

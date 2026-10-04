@@ -165,6 +165,18 @@ export interface Profile {
   created_at: string;
 }
 
+export interface EmailSettings {
+  configured: boolean;
+  from_name: string | null;
+  from_email: string | null;
+  smtp_host: string | null;
+  smtp_port: number | null;
+  smtp_secure: boolean;
+  smtp_user: string | null;
+  signature_phone: string | null;
+  signature_link: string | null;
+}
+
 export const STATUS_LABEL: Record<PipelineStage, string> = {
   new: "New",
   contacted: "Contacted",
