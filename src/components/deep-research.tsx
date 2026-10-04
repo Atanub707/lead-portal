@@ -250,8 +250,8 @@ export function DeepResearch({
           No founder or contact info found on their website.
         </p>
         <p className="mt-1 text-[13px] leading-relaxed text-zinc-600">
-          Deep research searches paid B2B sources (Apollo-style database +
-          LinkedIn) for decision makers, emails and phones.
+          Deep research searches premium B2B data sources for decision makers,
+          emails and phone numbers.
         </p>
         <div className="mt-3.5 flex flex-wrap items-center gap-3">
           <button
@@ -265,7 +265,7 @@ export function DeepResearch({
             Deep Research
           </button>
           <p className="text-[11px] text-zinc-400">
-            Runs on paid Apify actors — capped at ~$0.15 per run.
+            Runs on premium data sources — capped at ~$0.15 per run.
           </p>
         </div>
       </div>
@@ -291,10 +291,10 @@ export function DeepResearch({
                   Run deep research?
                 </h2>
                 <p className="mt-1 text-[13px] leading-relaxed text-zinc-600">
-                  Deep research searches paid B2B sources (Apollo-style database
-                  + LinkedIn) for decision makers, emails and phones. It usually
-                  takes 1–3 minutes. Runs on paid Apify actors — capped at
-                  ~$0.15 per run.
+                  Deep research searches premium B2B data sources for decision
+                  makers, emails and phone numbers. It usually takes 1–3
+                  minutes. Runs on premium data sources — capped at ~$0.15 per
+                  run.
                 </p>
                 <p className="mt-3 text-[12px] text-zinc-500 tabular-nums">
                   {`This month's deep research spend: $${monthSpend.toFixed(2)} of $5.00`}

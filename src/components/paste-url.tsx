@@ -301,10 +301,9 @@ export function PasteUrl({
                 </div>
 
                 <p className="text-[11px] leading-relaxed text-zinc-500">
-                  The assistant fetches the site (plus /about, /team, /contact),
-                  extracts the company, LinkedIn URL, emails and published team
-                  members — and finds each person&apos;s LinkedIn profile (free)
-                  — then saves everything. Duplicates are skipped.
+                  The assistant researches the website, finds the company
+                  profile, emails and team members, then saves everything.
+                  Duplicates are skipped.
                 </p>
 
                 {error ? (

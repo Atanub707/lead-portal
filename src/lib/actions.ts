@@ -703,7 +703,7 @@ export async function findContactLinkedIn(
   if (!tinyfishEnabled()) {
     return {
       ok: false,
-      message: "Add a free TINYFISH_API_KEY to enable this",
+      message: "LinkedIn lookup isn't available right now — try again later.",
     };
   }
 

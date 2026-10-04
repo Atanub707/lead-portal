@@ -41,6 +41,7 @@ import {
   STATUS_LABEL,
   pipelineName,
   pipelineStages,
+  sourceLabel,
 } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +51,7 @@ const RUN_KIND_LABEL: Record<string, string> = {
   linkedin_roster: "LinkedIn team roster",
   linkedin_profile: "LinkedIn profile details",
   email_search: "Email search",
-  deep_research: "Deep research (Apify)",
+  deep_research: "Deep research",
   manual: "Manual entry",
 };
 
@@ -304,7 +305,7 @@ export default async function CompanyPage({
                       </div>
                     ))}
                 </dl>
-                <p className="mt-2 text-[11px] text-zinc-400">via Apify</p>
+                <p className="mt-2 text-[11px] text-zinc-400">via deep research</p>
               </div>
             ) : null}
             <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-5">
@@ -385,7 +386,7 @@ export default async function CompanyPage({
                       </span>
                     ) : null}
                     <span className="text-[11px] text-zinc-400">
-                      via {email.source}
+                      via {sourceLabel(email.source)}
                     </span>
                     <EmailComposer
                       trigger="button"
@@ -649,7 +650,7 @@ export default async function CompanyPage({
                       <p className="text-[13px] text-zinc-800">
                         {RUN_KIND_LABEL[run.kind] ?? run.kind}
                         <span className="ml-2 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] text-zinc-500">
-                          {run.source}
+                          {sourceLabel(run.source)}
                         </span>
                         {run.kind === "deep_research" &&
                         run.status === "running" ? (

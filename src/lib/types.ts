@@ -53,6 +53,25 @@ export const PIPELINE_ICONS = [
 ] as const;
 
 // Used when the pipelines table is unreachable (e.g. before the migration applies).
+// Display names for enrichment sources — vendor and technique names stay out
+// of the UI so the internals aren't exposed to app users.
+export function sourceLabel(source: string): string {
+  switch (source) {
+    case "tinyfish":
+    case "builtin":
+    case "website":
+      return "website";
+    case "apify":
+    case "apollo":
+    case "linkedin":
+      return "research";
+    case "manual":
+      return "manual";
+    default:
+      return "research";
+  }
+}
+
 export const FALLBACK_PIPELINES: Pipeline[] = [
   {
     id: "pos",

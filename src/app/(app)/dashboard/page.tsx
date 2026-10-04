@@ -8,7 +8,7 @@ import {
   getStatusCounts,
   getUpcomingFollowUps,
 } from "@/lib/data";
-import { STATUS_LABEL } from "@/lib/types";
+import { sourceLabel, STATUS_LABEL } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ const RUN_KIND_LABEL: Record<string, string> = {
   linkedin_roster: "LinkedIn team roster",
   linkedin_profile: "LinkedIn profile details",
   email_search: "Email search",
-  deep_research: "Deep research (Apify)",
+  deep_research: "Deep research",
   manual: "Manual entry",
 };
 
@@ -333,7 +333,7 @@ export default async function DashboardPage() {
                       <p className="text-[13px] text-zinc-800">
                         {RUN_KIND_LABEL[run.kind] ?? run.kind}
                         <span className="ml-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] text-zinc-500">
-                          {run.source}
+                          {sourceLabel(run.source)}
                         </span>
                       </p>
                       <p className="mt-0.5 truncate text-[12px] text-zinc-500">
