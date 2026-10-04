@@ -138,6 +138,11 @@ export interface PipelineUsage {
   id: string;
   name: string;
   icon: string;
+  pitch: string | null;
+  value_props: string[];
+  proof_points: string[];
+  cta: string | null;
+  default_flavor: string | null;
   count: number;
 }
 
@@ -146,7 +151,9 @@ export async function getPipelineUsage(): Promise<PipelineUsage[]> {
   const [{ data: pipelines }, { data: orgs }] = await Promise.all([
     supabase
       .from("pipelines")
-      .select("id, name, icon")
+      .select(
+        "id, name, icon, pitch, value_props, proof_points, cta, default_flavor"
+      )
       .order("sort_order")
       .order("created_at"),
     supabase.from("organizations").select("list"),
@@ -159,6 +166,11 @@ export async function getPipelineUsage(): Promise<PipelineUsage[]> {
     id: pipeline.id,
     name: pipeline.name,
     icon: pipeline.icon,
+    pitch: pipeline.pitch ?? null,
+    value_props: pipeline.value_props ?? [],
+    proof_points: pipeline.proof_points ?? [],
+    cta: pipeline.cta ?? null,
+    default_flavor: pipeline.default_flavor ?? null,
     count: counts.get(pipeline.id) ?? 0,
   }));
 }

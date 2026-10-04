@@ -1,10 +1,13 @@
 "use server";
 
+import { generateObject, generateText } from "ai";
 import { auth, clerkClient } from "@clerk/nextjs/server";
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { logActivity } from "./activity";
+import { NO_AI_KEY_MESSAGE, pickModel } from "./ai";
 import { encryptSecret } from "./crypto";
 import { createAdminClient } from "./supabase/admin";
 import { clearClerkDirectoryCache } from "./clerk-directory";
@@ -18,6 +21,15 @@ function field(formData: FormData, key: string): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed === "" ? null : trimmed;
+}
+
+// Textarea value → trimmed, non-empty lines (one bullet per line).
+function splitLines(value: string | null): string[] {
+  if (!value) return [];
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
 }
 
 function clerkErrorInfo(err: unknown): { code?: string; message?: string } {
@@ -355,6 +367,196 @@ export async function renamePipeline(formData: FormData) {
 
   revalidatePath("/", "layout");
   redirect("/settings");
+}
+
+export async function updatePipeline(formData: FormData) {
+  const supabase = await assertOwner();
+  const { userId } = await auth();
+
+  const id = field(formData, "id");
+  const name = field(formData, "name");
+  if (!id) throw new Error("Missing pipeline id");
+  if (!name) throw new Error("Pipeline name is required");
+
+  const iconRaw = field(formData, "icon") ?? "layers";
+  const icon = (PIPELINE_ICONS as readonly string[]).includes(iconRaw)
+    ? iconRaw
+    : "layers";
+
+  const { error } = await supabase
+    .from("pipelines")
+    .update({
+      name,
+      icon,
+      pitch: field(formData, "pitch"),
+      value_props: splitLines(field(formData, "value_props")),
+      proof_points: splitLines(field(formData, "proof_points")),
+      cta: field(formData, "cta"),
+      default_flavor: field(formData, "default_flavor"),
+    })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await logActivity({
+    actorId: userId,
+    action: "pipeline.update",
+    targetType: "pipeline",
+    targetId: id,
+    summary: `Updated pipeline “${name}”`,
+  });
+
+  revalidatePath("/", "layout");
+  redirect("/settings");
+}
+
+// ─── Pipeline pitch (AI) ─────────────────────────────────────────────────────
+
+const PitchSchema = z.object({
+  pitch: z.string(),
+  value_props: z.array(z.string()),
+  proof_points: z.array(z.string()),
+  cta: z.string(),
+});
+
+const PITCH_SYSTEM =
+  "You sharpen the user's rough notes into a concise B2B service pitch. NEVER invent certifications, client names, numbers, or claims that are not present in the notes. Return JSON only: { pitch: string (2-3 sentences), value_props: string[] (3-5 short bullets), proof_points: string[] (0-3, only when grounded in the notes), cta: string (one short ask) }";
+
+const PITCH_JSON_SHAPE = `Return a single JSON object with exactly these keys:
+{
+  "pitch": string (2-3 sentences),
+  "value_props": string[] (3-5 short bullets),
+  "proof_points": string[] (0-3, [] when nothing in the notes grounds them),
+  "cta": string (one short ask)
+}
+Return ONLY the JSON object — no markdown fences, no commentary.`;
+
+function parseJsonObject(text: string): unknown {
+  const cleaned = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/```\s*$/, "")
+    .trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    // fall through to brace slicing
+  }
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    try {
+      return JSON.parse(cleaned.slice(start, end + 1));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+interface GeneratedPitch {
+  pitch: string;
+  value_props: string[];
+  proof_points: string[];
+  cta: string;
+}
+
+function cleanPitch(value: z.infer<typeof PitchSchema>): GeneratedPitch | null {
+  const pitch = value.pitch.trim();
+  if (!pitch) return null;
+  return {
+    pitch,
+    value_props: value.value_props
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
+      .slice(0, 5),
+    proof_points: value.proof_points
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
+      .slice(0, 3),
+    cta: value.cta.trim(),
+  };
+}
+
+export async function generatePipelinePitch(
+  notes: string,
+  pipelineName: string
+): Promise<
+  | {
+      ok: true;
+      pitch: string;
+      value_props: string[];
+      proof_points: string[];
+      cta: string;
+    }
+  | { ok: false; error: string }
+> {
+  const { userId } = await auth();
+  if (!userId) return { ok: false, error: "Not signed in" };
+
+  const roughNotes = notes.trim();
+  if (!roughNotes) return { ok: false, error: "Add a few rough notes first" };
+
+  const model = pickModel(userId);
+  if (!model) return { ok: false, error: NO_AI_KEY_MESSAGE };
+
+  const prompt = `Pipeline: ${
+    pipelineName.trim() || "Untitled pipeline"
+  }\n\nRough notes:\n${roughNotes}`;
+
+  // Plain-text generation first (same reliability pattern as /api/paste):
+  // no JSON mode, with generateObject as the second chance.
+  let generated: GeneratedPitch | null = null;
+  const failures: string[] = [];
+
+  try {
+    const { text } = await generateText({
+      model,
+      system: `${PITCH_SYSTEM}\n\n${PITCH_JSON_SHAPE}`,
+      prompt,
+    });
+    const parsed = parseJsonObject(text);
+    if (parsed) {
+      const result = PitchSchema.safeParse(parsed);
+      if (result.success) {
+        generated = cleanPitch(result.data);
+        if (!generated) failures.push("text: empty pitch");
+      } else {
+        failures.push(
+          `text: ${result.error.issues[0]?.message ?? "schema mismatch"}`
+        );
+      }
+    } else {
+      failures.push("text: no JSON object in the model output");
+    }
+  } catch (err) {
+    failures.push(`text: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  if (!generated) {
+    try {
+      const { object } = await generateObject({
+        model,
+        schema: PitchSchema,
+        system: PITCH_SYSTEM,
+        prompt,
+      });
+      generated = cleanPitch(object);
+    } catch (err) {
+      failures.push(
+        `object: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  if (!generated) {
+    console.error("[pipeline.pitch] generation failed:", failures.join(" | "));
+    return {
+      ok: false,
+      error: "The AI couldn't sharpen those notes. Please try again.",
+    };
+  }
+
+  return { ok: true, ...generated };
 }
 
 export async function deletePipeline(formData: FormData) {

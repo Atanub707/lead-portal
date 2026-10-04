@@ -1,9 +1,9 @@
 import { Mail, Trash2 } from "lucide-react";
 import { UserAvatar } from "@/components/badges";
 import { ConfirmSubmit } from "@/components/confirm-submit";
+import { EditPipelineDialog } from "@/components/edit-pipeline-dialog";
 import { InviteButton } from "@/components/invite-form";
 import { pipelineIcon } from "@/components/pipeline-icon";
-import { RenamePipelineDialog } from "@/components/rename-pipeline-dialog";
 import { RoleSelect } from "@/components/role-select";
 import { SubmitButton } from "@/components/submit-button";
 import {
@@ -333,9 +333,15 @@ export default async function SettingsPage({
                     </div>
 
                     <div className="flex shrink-0 items-center gap-1">
-                      <RenamePipelineDialog
+                      <EditPipelineDialog
                         id={pipeline.id}
                         name={pipeline.name}
+                        icon={pipeline.icon}
+                        pitch={pipeline.pitch}
+                        value_props={pipeline.value_props}
+                        proof_points={pipeline.proof_points}
+                        cta={pipeline.cta}
+                        default_flavor={pipeline.default_flavor}
                       />
                       {blocked ? (
                         <button
