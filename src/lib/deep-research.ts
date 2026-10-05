@@ -249,11 +249,11 @@ export function linkedinEmployeesInput(companyLinkedinUrl: string) {
     companies: [sanitizeLinkedinCompanyUrl(companyLinkedinUrl)],
     // Cap the scrape: worst case we pay for 10 profiles (~$0.12) and the
     // merge keeps only decision-maker titles — never the whole team.
-    // (A bare jobTitles filter returned too few profiles; searchQuery is the
-    // actor's proven title prefilter and returns decision makers first.)
+    // (A bare jobTitles filter returned too few profiles; this exact
+    // searchQuery is proven on the actor — broader OR lists returned zero.)
     maxItems: 10,
     searchQuery:
-      'Founder OR "Co-Founder" OR CEO OR CTO OR COO OR CFO OR CMO OR Owner OR President OR Partner OR "Head of" OR Director OR "Managing Director"',
+      'Founder OR "Co-Founder" OR CEO OR Owner OR President OR "Managing Director" OR CTO',
     // Email search tries to find each person's email (SMTP-validated) — not
     // guaranteed per profile, and the actor skips the charge when a profile
     // is too thin to search.
