@@ -188,7 +188,8 @@ export function DeepResearch({
   }
 
   if (phase === "done") {
-    const foundNothing = summary !== null && summary.people === 0;
+    const foundNothing =
+      summary !== null && summary.people === 0 && summary.emails === 0;
     return (
       <div className="card animate-rise animate-rise-1 p-5" aria-live="polite">
         {foundNothing ? (
@@ -208,6 +209,24 @@ export function DeepResearch({
               : "Deep research finished."}
           </p>
         )}
+        <div className="mt-3">
+          <button
+            type="button"
+            disabled={posting}
+            onClick={() => startRun(false)}
+            className="btn-ghost"
+          >
+            {posting ? (
+              <span className="inline-flex h-3.5 w-3.5 items-center justify-center">
+                <Loader2
+                  className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+              </span>
+            ) : null}
+            Run again
+          </button>
+        </div>
       </div>
     );
   }
