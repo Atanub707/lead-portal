@@ -34,6 +34,8 @@ export function BillingPanel({ overview }: { overview: BillingOverview | null })
     (workspace.plan === "trial" &&
       workspace.trial_ends_at !== null &&
       new Date(workspace.trial_ends_at) > new Date());
+  const paidActive = workspace.plan === "paid" && entitled;
+  const trialActive = workspace.plan === "trial" && entitled;
 
   async function subscribe() {
     setError("");
@@ -84,10 +86,18 @@ export function BillingPanel({ overview }: { overview: BillingOverview | null })
   function cancel() {
     setError("");
     startPosting(async () => {
-      const res = await fetch("/api/billing/cancel", { method: "POST" });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
-      if (data.ok) router.refresh();
-      else setError(data.error ?? "Couldn't cancel right now.");
+      try {
+        const res = await fetch("/api/billing/cancel", { method: "POST" });
+        if (!res.ok) {
+          setError("Couldn't cancel right now.");
+          return;
+        }
+        const data = (await res.json()) as { ok?: boolean; error?: string };
+        if (data.ok) router.refresh();
+        else setError(data.error ?? "Couldn't cancel right now.");
+      } catch {
+        setError("Couldn't cancel right now. Try again.");
+      }
     });
   }
 
@@ -108,12 +118,18 @@ export function BillingPanel({ overview }: { overview: BillingOverview | null })
     <div className="space-y-5">
       <section className="card p-5">
         <h1 className="text-[15px] font-semibold tracking-tight text-zinc-900">
-          {entitled ? "Billing" : "Your trial has ended"}
+          {paidActive
+            ? "Billing"
+            : trialActive
+              ? "Your trial is running"
+              : "Your trial has ended"}
         </h1>
         <p className="mt-1 text-[13px] leading-relaxed text-zinc-600">
-          {entitled
+          {paidActive
             ? `You're on the monthly plan — ${rupees(PRICE_PAISE)} per user per month.`
-            : `Subscribe to keep using Lead Portal — ${rupees(PRICE_PAISE)} per user per month.`}
+            : trialActive && workspace.trial_ends_at
+              ? `Your trial ends ${workspace.trial_ends_at.slice(0, 10)} — subscribe to keep using Lead Portal after it ends.`
+              : `Subscribe to keep using Lead Portal — ${rupees(PRICE_PAISE)} per user per month.`}
         </p>
         <dl className="mt-4 grid grid-cols-2 gap-4">
           <div>
@@ -134,11 +150,13 @@ export function BillingPanel({ overview }: { overview: BillingOverview | null })
 
         {!isOwner ? (
           <p className="mt-4 text-[12px] text-zinc-500">
-            Ask your workspace owner to activate the plan.
+            {entitled
+              ? "Billing is managed by your workspace owner."
+              : "Ask your workspace owner to activate the plan."}
           </p>
         ) : (
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            {entitled ? (
+            {paidActive ? (
               <button type="button" onClick={cancel} disabled={posting} className="btn-ghost">
                 {posting ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}
                 Cancel subscription
@@ -171,8 +189,14 @@ export function BillingPanel({ overview }: { overview: BillingOverview | null })
                   <span className="mx-1.5 text-zinc-300">·</span>
                   {payment.kind === "seat" ? "Seat" : "Subscription"}
                 </span>
-                <span className="flex items-center gap-1.5 text-[13px] text-zinc-800 tabular-nums">
-                  <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
+                <span
+                  className={`flex items-center gap-1.5 text-[13px] tabular-nums ${
+                    payment.status === "captured" ? "text-zinc-800" : "text-zinc-500"
+                  }`}
+                >
+                  {payment.status === "captured" ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
+                  ) : null}
                   {rupees(payment.amount_paise)}
                 </span>
               </li>

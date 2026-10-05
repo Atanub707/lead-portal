@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AvatarPicker } from "@/components/avatar-picker";
 import { SubmitButton } from "@/components/submit-button";
 import { renameWorkspace, updateMyName } from "@/lib/actions";
+import { PRICE_PAISE } from "@/lib/billing";
 import { getCurrentProfile, getWorkspaceContext } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
@@ -70,7 +71,7 @@ export default async function SettingsGeneralPage() {
                   ? "Comped — no billing."
                   : `${workspaceCtx.workspace.seats} seat${
                       workspaceCtx.workspace.seats === 1 ? "" : "s"
-                    } · ₹499/month`}
+                    } · ₹${(PRICE_PAISE / 100).toLocaleString("en-IN")}/month`}
               </p>
               <Link
                 href="/billing"
