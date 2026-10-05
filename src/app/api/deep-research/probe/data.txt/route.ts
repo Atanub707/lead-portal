@@ -32,6 +32,18 @@ export async function GET(request: Request) {
     });
   }
 
+  for (const datasetId of url.searchParams.getAll("dsFull")) {
+    const items = await (
+      await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}&limit=50&clean=true`, { cache: "no-store" })
+    ).json();
+    out.push({
+      datasetId,
+      items: Array.isArray(items)
+        ? items.map((i) => JSON.stringify(i).slice(0, 4000))
+        : items,
+    });
+  }
+
   for (const runId of url.searchParams.getAll("run")) {
     const run = await (
       await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${token}`, { cache: "no-store" })
