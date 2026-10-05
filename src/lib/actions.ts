@@ -654,7 +654,7 @@ export async function createWorkspace(formData: FormData) {
 
   // The user has no workspace yet, so every write here uses the admin client.
   const admin = createAdminClient();
-  const trialEndsAt = new Date(Date.now() + 14 * 86_400_000).toISOString();
+  const trialEndsAt = new Date(Date.now() + 86_400_000).toISOString();
 
   const { data: workspace, error } = await admin
     .from("workspaces")

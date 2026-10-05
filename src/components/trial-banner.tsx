@@ -32,7 +32,7 @@ export function TrialBanner({
           : "border-amber-200 bg-amber-50 text-amber-800"
       }`}
     >
-      {urgent ? "Trial: last day" : `Trial: ${trialDaysLeft} days left`} —{" "}
+      {urgent ? "Trial: ends today" : `Trial: ${trialDaysLeft} days left`} —{" "}
       <a className="underline" href={`mailto:${CONTACT_EMAIL}`}>
         contact us to continue
       </a>

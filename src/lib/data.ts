@@ -611,6 +611,7 @@ export async function getWorkspaceContext(): Promise<{
   workspace: Workspace | null;
   isSuperAdmin: boolean;
   canWrite: boolean;
+  entitled: boolean;
   trialDaysLeft: number | null;
   trialEnded: boolean;
 } | null> {
@@ -622,7 +623,9 @@ export async function getWorkspaceContext(): Promise<{
     const supabase = await createClient();
     const { data } = await supabase
       .from("workspaces")
-      .select("id, name, plan, trial_ends_at, created_at")
+      .select(
+        "id, name, plan, trial_ends_at, created_at, seats, subscription_status, current_period_end"
+      )
       .eq("id", profile.workspace_id)
       .maybeSingle();
     workspace = (data as Workspace | null) ?? null;
@@ -630,24 +633,33 @@ export async function getWorkspaceContext(): Promise<{
 
   const trialOk =
     !!workspace &&
+    workspace.plan === "trial" &&
+    workspace.trial_ends_at !== null &&
+    new Date(workspace.trial_ends_at) > new Date();
+
+  const entitled =
+    !!workspace &&
     (workspace.plan === "active" ||
-      (workspace.trial_ends_at !== null &&
-        new Date(workspace.trial_ends_at) > new Date()));
+      trialOk ||
+      (workspace.plan === "paid" &&
+        workspace.subscription_status === "active" &&
+        workspace.current_period_end !== null &&
+        new Date(workspace.current_period_end) > new Date()));
 
   const trialDaysLeft =
-    workspace?.trial_ends_at && workspace.plan !== "active"
+    workspace?.trial_ends_at && workspace.plan === "trial"
       ? Math.ceil(
           (new Date(workspace.trial_ends_at).getTime() - Date.now()) / 86_400_000
         )
       : null;
-  const trialEnded =
-    !!workspace && workspace.plan !== "active" && trialOk === false;
+  const trialEnded = !!workspace && workspace.plan === "trial" && !trialOk;
 
   return {
     profile,
     workspace,
     isSuperAdmin: profile.is_super_admin,
-    canWrite: trialOk,
+    canWrite: entitled,
+    entitled,
     trialDaysLeft,
     trialEnded,
   };

@@ -244,6 +244,9 @@ export interface Workspace {
   plan: string;
   trial_ends_at: string | null;
   created_at: string;
+  seats: number;
+  subscription_status: string | null;
+  current_period_end: string | null;
 }
 
 export interface EmailSettings {
