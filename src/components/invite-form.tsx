@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Check, Copy, Loader2, UserPlus, X } from "lucide-react";
 import { inviteUser } from "@/lib/actions";
 import type { UserRole } from "@/lib/types";
+import { AddSeatDialog } from "@/components/add-seat-dialog";
 
 export function InviteButton() {
   const [open, setOpen] = useState(false);
@@ -15,6 +16,7 @@ export function InviteButton() {
   );
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [seatRequired, setSeatRequired] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -49,6 +51,10 @@ export function InviteButton() {
     startTransition(async () => {
       const res = await inviteUser(value, role);
       if (!res.ok) {
+        if (res.code === "seat_required") {
+          setSeatRequired(true);
+          return;
+        }
         setError(res.error ?? "Invite failed");
         return;
       }
@@ -212,6 +218,15 @@ export function InviteButton() {
           </div>
         </div>
       ) : null}
+
+      <AddSeatDialog
+        open={seatRequired}
+        onClose={() => setSeatRequired(false)}
+        onPaid={() => {
+          setSeatRequired(false);
+          submit();
+        }}
+      />
     </>
   );
 }

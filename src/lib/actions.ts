@@ -956,6 +956,7 @@ export interface InviteResult {
   emailed?: boolean;
   link?: string;
   error?: string;
+  code?: "seat_required";
 }
 
 export async function inviteUser(
@@ -983,6 +984,22 @@ export async function inviteUser(
 
   const base = await currentSiteUrl();
   const workspaceId = await requireWorkspaceId();
+
+  const [{ count: memberCount }, { data: seatRow }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId),
+    supabase.from("workspaces").select("seats").eq("id", workspaceId).maybeSingle(),
+  ]);
+  const seats = (seatRow as { seats: number } | null)?.seats ?? 1;
+  if ((memberCount ?? 0) >= seats) {
+    return {
+      ok: false,
+      error: "Seats are full — add a seat to invite more people.",
+      code: "seat_required",
+    };
+  }
 
   // Clerk sends the invitation email itself (notify defaults to true).
   // expiresInDays: 1 — short-lived invites (Clerk's minimum unit is days).
