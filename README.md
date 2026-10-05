@@ -83,6 +83,34 @@ files (members + interaction logs). Safe to re-run — existing companies are sk
 3. Manage roles or remove users anytime in **Settings** — owner only. Editors can
    add/edit pipeline data; the database (RLS) blocks deletes and role changes.
 
+## Billing (Razorpay)
+
+New workspaces get a **1-day free trial**; once it ends (or a paid subscription
+lapses) the app is gated until the owner subscribes. The plan is **₹499 per user
+per month** — one seat per member, billed automatically each month. The internal
+HI Labs workspace is comped (`plan='active'`) and never sees the paywall.
+
+Add these five variables to `.env.local` and Vercel:
+
+| Variable | Where to get it |
+| --- | --- |
+| `RAZORPAY_KEY_ID` | Razorpay Dashboard → **Settings → API Keys** → Generate |
+| `RAZORPAY_KEY_SECRET` | Same page — shown once when the key is generated |
+| `RAZORPAY_PLAN_ID` | The `plan_…` id of the Plan you create below |
+| `RAZORPAY_WEBHOOK_SECRET` | The secret you choose when adding the webhook below |
+| `NEXT_PUBLIC_RAZORPAY_KEY_ID` | Same value as `RAZORPAY_KEY_ID` (public — the checkout uses it) |
+
+Setup on [razorpay.com](https://razorpay.com):
+
+1. Complete **KYC** and activate the account (test-mode keys work before KYC).
+2. **Subscriptions → Plans → Create Plan** — monthly, **₹499** — and put the
+   resulting `plan_…` id in `RAZORPAY_PLAN_ID`.
+3. **Settings → Webhooks → Add New Webhook** — URL
+   `https://<your-app>.vercel.app/api/billing/webhook`, set a secret (paste it
+   into `RAZORPAY_WEBHOOK_SECRET`) and subscribe to `subscription.*` plus
+   `payment.captured`. The webhook flips a workspace active after payment,
+   applies cancellations at cycle end, and records receipts.
+
 ## AI assistant ("Paste URL with AI")
 
 Each pipeline page has a **Paste URL with AI** button next to "Add company". Paste a
