@@ -1506,3 +1506,11 @@ git add -A && git commit -m "feat(billing): cancel-at-period-end, receipts, docs
 
 - Spec coverage: trial 1-day ✓ (Task 1), ₹499/seat ✓ (Task 2/5), owner-pays ✓ (Task 5), auto-renew ✓ (Task 4), comped HI Labs ✓ (Task 3 panel + entitlement), gate ✓ (Task 3), webhooks ✓ (Task 4), cancel ✓ (Task 6), receipts ✓ (Task 3/6), anti-abuse (trial length only) ✓.
 - Types: `BillingOverview` used by panel is produced by Task 3's data function; `InviteResult.code` produced in Task 5 matches the client check; `cancel_at_period_end` column created in Task 1 and set in Task 6.
+
+---
+
+## Amendments after Task 4 review
+
+- `verify` now requires configured Razorpay keys (503 otherwise), binds the checkout subscription to the workspace's stored `razorpay_subscription_id` (400 on mismatch), and no-ops (`{ ok: true }`) when the workspace is already `paid`/`active` with a future `current_period_end`, so replays cannot extend access.
+- `webhook` only writes `subscription_status` for the allow-listed events `subscription.activated`, `subscription.charged`, `subscription.pending`, `subscription.halted`, `subscription.cancelled`, `subscription.completed`; the subscription entity of any other event is ignored. A failed workspace update or `payments` upsert now returns 500 so Razorpay retries.
+- `subscribe` now fails loudly (500, no checkout params) if the created subscription id cannot be persisted to the workspace.

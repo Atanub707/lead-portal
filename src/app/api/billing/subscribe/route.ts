@@ -40,13 +40,20 @@ export async function POST() {
       seats: workspace.seats ?? 1,
       workspaceId: workspace.id,
     });
-    await supabase
+    const { error: persistError } = await supabase
       .from("workspaces")
       .update({
         razorpay_subscription_id: subscription.id,
         subscription_status: subscription.status ?? "created",
       })
       .eq("id", workspace.id);
+    if (persistError) {
+      console.error("[billing] failed to persist subscription id:", persistError);
+      return NextResponse.json(
+        { error: "Couldn't start checkout. Try again." },
+        { status: 500 }
+      );
+    }
     return NextResponse.json({
       keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? process.env.RAZORPAY_KEY_ID,
       subscriptionId: subscription.id,

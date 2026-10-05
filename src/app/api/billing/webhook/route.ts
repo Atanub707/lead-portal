@@ -4,6 +4,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
+const SUBSCRIPTION_STATUS_EVENTS = new Set([
+  "subscription.activated",
+  "subscription.charged",
+  "subscription.pending",
+  "subscription.halted",
+  "subscription.cancelled",
+  "subscription.completed",
+]);
+
 interface RazorpayWebhook {
   event?: string;
   payload?: {
@@ -25,7 +34,11 @@ export async function POST(request: Request) {
   const payment = event.payload?.payment?.entity;
 
   try {
-    if (subscription?.id) {
+    if (
+      subscription?.id &&
+      event.event &&
+      SUBSCRIPTION_STATUS_EVENTS.has(event.event)
+    ) {
       const { data: workspace } = await admin
         .from("workspaces")
         .select("id")
@@ -45,7 +58,14 @@ export async function POST(request: Request) {
           patch.current_period_end = new Date(subscription.current_end * 1000).toISOString();
           if (typeof subscription.quantity === "number") patch.seats = subscription.quantity;
         }
-        await admin.from("workspaces").update(patch).eq("id", workspace.id);
+        const { error } = await admin
+          .from("workspaces")
+          .update(patch)
+          .eq("id", workspace.id);
+        if (error) {
+          console.error("[billing] workspace update failed:", error);
+          return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
+        }
       }
     }
 
@@ -60,7 +80,7 @@ export async function POST(request: Request) {
       const workspaceId =
         workspace?.id ?? (payment.notes?.workspace_id as string | undefined);
       if (workspaceId) {
-        await admin.from("payments").upsert(
+        const { error } = await admin.from("payments").upsert(
           {
             workspace_id: workspaceId,
             razorpay_payment_id: payment.id,
@@ -75,6 +95,10 @@ export async function POST(request: Request) {
           },
           { onConflict: "razorpay_payment_id", ignoreDuplicates: true }
         );
+        if (error) {
+          console.error("[billing] payment upsert failed:", error);
+          return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
+        }
       }
     }
 
