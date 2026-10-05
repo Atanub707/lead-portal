@@ -41,6 +41,32 @@ function fromRecord(value: unknown, keys: string[]): string | null {
   return null;
 }
 
+// Actors return emails in several shapes: a plain string, or an array of
+// objects like { email, status, qualityScore } (LinkedIn email search) or
+// strings. Entries explicitly marked invalid are skipped.
+function extractEmail(record: Record<string, unknown>): string | null {
+  const direct = str(record.email) ?? str(record.emailAddress);
+  if (direct) return direct.toLowerCase();
+  const list = record.emails;
+  if (!Array.isArray(list)) return null;
+  for (const entry of list) {
+    if (typeof entry === "string") {
+      const found = str(entry);
+      if (found) return found.toLowerCase();
+      continue;
+    }
+    const emailRecord = asRecord(entry);
+    if (!emailRecord) continue;
+    if (str(emailRecord.status)?.toLowerCase() === "invalid") continue;
+    const found =
+      str(emailRecord.email) ??
+      str(emailRecord.emailAddress) ??
+      str(emailRecord.address);
+    if (found) return found.toLowerCase();
+  }
+  return null;
+}
+
 export function normalizeApolloLead(raw: unknown): NormalizedLead | null {
   const r = asRecord(raw);
   if (!r) return null;
@@ -52,7 +78,7 @@ export function normalizeApolloLead(raw: unknown): NormalizedLead | null {
   return {
     name,
     title: str(r.title) ?? str(r.jobTitle) ?? str(r.headline),
-    email: str(r.email)?.toLowerCase() ?? null,
+    email: extractEmail(r),
     phone: str(r.phone) ?? str(r.mobilePhone) ?? null,
     linkedinUrl: str(r.linkedinUrl) ?? str(r.linkedin) ?? str(r.linkedin_url),
     companyLinkedinUrl:
@@ -79,16 +105,11 @@ export function normalizeLinkedInEmployee(raw: unknown): NormalizedLead | null {
     title:
       str(r.title) ??
       str(r.jobTitle) ??
-      fromRecord(positions, ["title"]) ??
+      fromRecord(positions, ["position", "title"]) ??
       fromRecord(r.experience, ["position", "title"]) ??
       str(r.position) ??
       str(r.headline),
-    email:
-      str(r.email)?.toLowerCase() ??
-      str(r.emailAddress)?.toLowerCase() ??
-      (Array.isArray(r.emails)
-        ? (str((r.emails as unknown[])[0])?.toLowerCase() ?? null)
-        : null),
+    email: extractEmail(r),
     phone: str(r.phone) ?? str(r.mobilePhone) ?? null,
     linkedinUrl: str(r.linkedinUrl) ?? str(r.profileUrl) ?? str(r.linkedin_url),
     companyLinkedinUrl:
@@ -212,13 +233,27 @@ export function apolloInput(company: { name: string; website: string | null }) {
   };
 }
 
+// Company URLs saved from websites often carry suffixes the actor rejects
+// (e.g. /posts). Keep only the canonical /company/<slug> form.
+export function sanitizeLinkedinCompanyUrl(raw: string): string {
+  const match = raw.match(
+    /https?:\/\/(?:[a-z]{2,3}\.)?linkedin\.com\/company\/([^/?#]+)/i
+  );
+  return match
+    ? `https://www.linkedin.com/company/${match[1]}`
+    : raw;
+}
+
 export function linkedinEmployeesInput(companyLinkedinUrl: string) {
   return {
-    companies: [companyLinkedinUrl],
+    companies: [sanitizeLinkedinCompanyUrl(companyLinkedinUrl)],
     // Cap the scrape: worst case we pay for 10 profiles (~$0.12) and the
     // merge keeps only decision-maker titles — never the whole team.
-    // (Actor-side title filters were tried and returned zero profiles.)
+    // (A bare jobTitles filter returned too few profiles; searchQuery is the
+    // actor's proven title prefilter and returns decision makers first.)
     maxItems: 10,
+    searchQuery:
+      'Founder OR "Co-Founder" OR CEO OR CTO OR COO OR CFO OR CMO OR Owner OR President OR Partner OR "Head of" OR Director OR "Managing Director"',
     // Email search tries to find each person's email (SMTP-validated) — not
     // guaranteed per profile, and the actor skips the charge when a profile
     // is too thin to search.
@@ -778,7 +813,11 @@ export async function reconcileDeepResearch(
             actors: state.actors,
             merged_slugs: [...state.mergedSlugs],
             company: state.companyFacts,
-            employees_started: state.employeesStarted,
+            employees_started:
+              state.employeesStarted ||
+              state.actors.some(
+                (actor) => actor.slug === LINKEDIN_EMPLOYEES_ACTOR
+              ),
             found: { people: state.people, emails: state.emails },
             claim_at: null,
           },
@@ -1009,7 +1048,10 @@ export async function mergeLeads(
   );
 
   const [contactsRes, companyEmailsRes, orgRes] = await Promise.all([
-    supabase.from("contacts").select("name, linkedin_url, email").eq("org_id", orgId),
+    supabase
+      .from("contacts")
+      .select("id, name, linkedin_url, email")
+      .eq("org_id", orgId),
     supabase.from("company_emails").select("email").eq("org_id", orgId),
     supabase
       .from("organizations")
@@ -1032,6 +1074,7 @@ export async function mergeLeads(
   }
 
   const existingContacts = (contactsRes.data ?? []) as {
+    id: number;
     name: string;
     linkedin_url: string | null;
     email: string | null;
@@ -1051,6 +1094,17 @@ export async function mergeLeads(
     ...contactEmails,
     ...existingCompanyEmails.map((row) => row.email.toLowerCase()),
   ]);
+
+  // Existing contacts keyed for email backfill: a re-run that finally finds a
+  // person's email should fill it in, not just park it in company emails.
+  const existingByLink = new Map<string, { id: number; email: string | null }>();
+  const existingByName = new Map<string, { id: number; email: string | null }>();
+  for (const contact of existingContacts) {
+    const link = linkKey(contact.linkedin_url);
+    if (link) existingByLink.set(link, { id: contact.id, email: contact.email });
+    existingByName.set(nameKey(contact.name), { id: contact.id, email: contact.email });
+  }
+  const emailBackfills = new Map<number, string>();
 
   // Firmographic extras ride on the run details only; first non-null wins.
   const company: MergedCompanyFacts = {
@@ -1121,6 +1175,18 @@ export async function mergeLeads(
       newCompanyEmails.set(email, generic ? "general" : "personal");
       knownEmails.add(email);
     }
+
+    // Backfill the person's own email when we finally found it and they had
+    // none on file (a re-run should repair contacts saved before email
+    // extraction worked).
+    if (email && !generic) {
+      const target =
+        (byLink !== "" ? existingByLink.get(byLink) : undefined) ??
+        existingByName.get(byName);
+      if (target && !target.email && !emailBackfills.has(target.id)) {
+        emailBackfills.set(target.id, email);
+      }
+    }
   }
 
   if (newContacts.length > 0) {
@@ -1138,6 +1204,19 @@ export async function mergeLeads(
       console.error("[deep-research] contact insert failed:", error.message);
       throw new Error("Couldn't save researched contacts.");
     }
+  }
+
+  for (const [contactId, email] of emailBackfills) {
+    const { error } = await supabase
+      .from("contacts")
+      .update({ email, email_status: "found" })
+      .eq("id", contactId)
+      .eq("org_id", orgId);
+    if (error) {
+      console.error("[deep-research] email backfill failed:", error.message);
+      continue;
+    }
+    contactEmailCount += 1;
   }
 
   let companyEmailCount = 0;
