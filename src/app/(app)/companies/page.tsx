@@ -347,8 +347,8 @@ export default async function CompaniesPage({
                       note={company.follow_up_note}
                     />
                   </td>
-                  <td className="td pr-4 text-right">
-                    <div className="flex flex-col items-end gap-0.5">
+                  <td className="td pr-4">
+                    <div className="flex items-center justify-end gap-2.5">
                       <EmailComposer
                         orgId={company.id}
                         defaultTo={company.first_email}
@@ -357,15 +357,15 @@ export default async function CompaniesPage({
                       />
                       {company.last_sent_by_name ? (
                         <span
-                          className="inline-flex items-center gap-1"
+                          className="inline-flex items-center gap-1.5 whitespace-nowrap"
                           title={`${company.last_sent_at?.slice(0, 10) ?? ""} · ${company.last_sent_subject ?? ""}`}
                         >
                           <UserAvatar
                             seed={company.last_sent_by_name}
                             name={company.last_sent_by_name}
-                            size={14}
+                            size={18}
                           />
-                          <span className="text-[11px] text-zinc-500">
+                          <span className="text-[12px] text-zinc-600">
                             Sent by {company.last_sent_by_name}
                           </span>
                         </span>
