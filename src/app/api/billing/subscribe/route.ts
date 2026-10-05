@@ -62,6 +62,7 @@ export async function POST() {
       .update({
         razorpay_subscription_id: subscription.id,
         subscription_status: subscription.status ?? "created",
+        cancel_at_period_end: false,
       })
       .eq("id", workspace.id);
     if (persistError) {

@@ -79,7 +79,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    if (workspace.last_verified_payment_id === body.razorpay_payment_id) {
+    const { data: consumed, error: consumedError } = await admin
+      .from("checkout_verifications")
+      .insert({
+        razorpay_payment_id: body.razorpay_payment_id,
+        workspace_id: me.workspace_id,
+      })
+      .select("razorpay_payment_id");
+    if (consumedError) {
+      if (consumedError.code === "23505") {
+        return NextResponse.json(
+          { error: "This payment was already used to activate the plan." },
+          { status: 409 }
+        );
+      }
+      console.error("[billing] failed to record consumed payment:", consumedError);
+      return NextResponse.json({ error: "Couldn't activate the plan" }, { status: 500 });
+    }
+    if (!consumed || consumed.length === 0) {
       return NextResponse.json(
         { error: "This payment was already used to activate the plan." },
         { status: 409 }
@@ -93,6 +110,7 @@ export async function POST(request: Request) {
         plan: "paid",
         subscription_status: "active",
         current_period_end: nextPeriodEnd,
+        cancel_at_period_end: false,
         last_verified_payment_id: body.razorpay_payment_id,
       })
       .eq("id", me.workspace_id);

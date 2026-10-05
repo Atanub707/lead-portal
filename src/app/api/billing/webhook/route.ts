@@ -92,7 +92,7 @@ export async function POST(request: Request) {
             status: payment.status ?? "captured",
             seats: payment.notes?.seats_after
               ? Number(payment.notes.seats_after)
-              : (workspace?.seats ?? null),
+              : null,
             raw: event as unknown as Record<string, unknown>,
           },
           { onConflict: "razorpay_payment_id", ignoreDuplicates: true }
