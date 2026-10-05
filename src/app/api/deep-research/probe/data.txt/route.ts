@@ -60,10 +60,31 @@ export async function GET(request: Request) {
   }
 
   // Generic read-only Apify API passthrough for diagnostics.
+  const slice = Math.min(Number(url.searchParams.get("slice") ?? 6000) || 6000, 30000);
   for (const path of url.searchParams.getAll("apifyPath")) {
     const res = await fetch(`https://api.apify.com/v2/${path}${path.includes("?") ? "&" : "?"}token=${token}`, { cache: "no-store" });
     const text = await res.text();
-    out.push({ apifyPath: path, status: res.status, body: text.slice(0, 6000) });
+    out.push({ apifyPath: path, status: res.status, body: text.slice(0, slice) });
+  }
+
+  // Start an actor run with a JSON input (diagnostics only).
+  for (const actorSlug of url.searchParams.getAll("start")) {
+    const inputRaw = url.searchParams.get("startInput") ?? "{}";
+    const res = await fetch(`https://api.apify.com/v2/acts/${actorSlug.replace("/", "~")}/runs?token=${token}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: inputRaw,
+      cache: "no-store",
+    });
+    const json = await res.json().catch(() => null);
+    out.push({
+      startedActor: actorSlug,
+      status: res.status,
+      runId: json?.data?.id ?? null,
+      datasetId: json?.data?.defaultDatasetId ?? null,
+      kvStoreId: json?.data?.defaultKeyValueStoreId ?? null,
+      error: json?.error ?? null,
+    });
   }
 
   return NextResponse.json(out);
