@@ -1233,12 +1233,16 @@ export async function updateMyName(formData: FormData): Promise<void> {
 
   const cleanName = name.slice(0, 80);
 
-  // Avatar: a preset id from the picker, or null for auto-generated.
+  // Avatar: a preset id from the picker, a stored uploaded image URL, or
+  // null for auto-generated.
   const avatarRaw = field(formData, "avatar");
-  const avatar =
-    avatarRaw && AVATAR_PRESETS.some((preset) => preset.id === avatarRaw)
-      ? avatarRaw
-      : null;
+  const isPreset =
+    avatarRaw && AVATAR_PRESETS.some((preset) => preset.id === avatarRaw);
+  const isStoredImage =
+    avatarRaw &&
+    avatarRaw.length <= 600 &&
+    avatarRaw.includes("/storage/v1/object/public/avatars/");
+  const avatar = isPreset ? avatarRaw : isStoredImage ? avatarRaw : null;
 
   // Admin client so a user can always set their OWN name even before the
   // row-level "update self" policy migration lands. Ownership is enforced here:
@@ -1261,6 +1265,66 @@ export async function updateMyName(formData: FormData): Promise<void> {
   revalidatePath("/settings");
   revalidateAll();
   revalidatePath("/", "layout");
+}
+
+// Custom display picture: the client crops to a 256×256 JPEG data URL, this
+// stores it in the public `avatars` bucket (one file per user) and points the
+// profile at it.
+const AVATAR_DATA_RE = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/;
+
+export async function uploadAvatar(
+  dataUrl: string
+): Promise<{ ok: boolean; url?: string; error?: string }> {
+  const { userId } = await auth();
+  if (!userId) return { ok: false, error: "Not signed in" };
+
+  const match = AVATAR_DATA_RE.exec(dataUrl);
+  if (!match) return { ok: false, error: "Use a PNG, JPEG, or WebP image." };
+
+  const ext = match[1] === "jpeg" ? "jpg" : match[1];
+  const contentType = `image/${match[1]}`;
+  const buffer = Buffer.from(match[2], "base64");
+  if (buffer.length === 0 || buffer.length > 400_000) {
+    return { ok: false, error: "That image is too large — try a smaller one." };
+  }
+
+  const admin = createAdminClient();
+  const path = `${userId}/avatar.${ext}`;
+  let { error } = await admin.storage
+    .from("avatars")
+    .upload(path, buffer, { contentType, upsert: true });
+  if (error && /bucket/i.test(error.message)) {
+    await admin.storage.createBucket("avatars", { public: true });
+    ({ error } = await admin.storage
+      .from("avatars")
+      .upload(path, buffer, { contentType, upsert: true }));
+  }
+  if (error) {
+    console.error("[avatar] upload failed:", error.message);
+    return { ok: false, error: "Couldn't upload the picture. Try again." };
+  }
+
+  const { data } = admin.storage.from("avatars").getPublicUrl(path);
+  const url = `${data.publicUrl}?v=${Date.now()}`;
+  const { error: dbError } = await admin
+    .from("profiles")
+    .update({ avatar: url })
+    .eq("id", userId);
+  if (dbError) {
+    console.error("[avatar] profile update failed:", dbError.message);
+    return { ok: false, error: "Couldn't save the picture." };
+  }
+
+  await logActivity({
+    actorId: userId,
+    action: "profile.name",
+    targetType: "profile",
+    targetId: userId,
+    summary: "Updated profile picture",
+  });
+  revalidatePath("/settings");
+  revalidatePath("/", "layout");
+  return { ok: true, url };
 }
 
 export async function signOut() {

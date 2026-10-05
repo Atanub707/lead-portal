@@ -206,21 +206,36 @@ export interface Profile {
 export const HI_LABS_WORKSPACE_ID = "00000000-0000-4000-8000-000000000001";
 
 // Selectable display pictures. A user picks one in Settings → General; the id
-// is stored on profiles.avatar and rendered everywhere they appear.
+// is stored on profiles.avatar and rendered everywhere they appear. A stored
+// value that is a URL (instead of a preset id) is a custom uploaded image.
 export const AVATAR_PRESETS: { id: string; emoji: string; gradient: string }[] =
   [
     { id: "lion", emoji: "🦁", gradient: "from-amber-400 to-amber-600" },
     { id: "fox", emoji: "🦊", gradient: "from-orange-400 to-orange-600" },
     { id: "cat", emoji: "🐱", gradient: "from-pink-400 to-pink-600" },
+    { id: "dog", emoji: "🐶", gradient: "from-amber-400 to-orange-600" },
     { id: "panda", emoji: "🐼", gradient: "from-cyan-400 to-cyan-600" },
+    { id: "koala", emoji: "🐨", gradient: "from-sky-400 to-cyan-600" },
+    { id: "tiger", emoji: "🐯", gradient: "from-amber-400 to-amber-600" },
+    { id: "rabbit", emoji: "🐰", gradient: "from-pink-400 to-rose-600" },
+    { id: "hamster", emoji: "🐹", gradient: "from-orange-400 to-amber-600" },
+    { id: "raccoon", emoji: "🦝", gradient: "from-zinc-400 to-zinc-600" },
+    { id: "bear", emoji: "🐻", gradient: "from-amber-400 to-orange-600" },
+    { id: "wolf", emoji: "🐺", gradient: "from-sky-400 to-blue-600" },
+    { id: "monkey", emoji: "🐵", gradient: "from-orange-400 to-rose-600" },
     { id: "frog", emoji: "🐸", gradient: "from-emerald-400 to-emerald-600" },
+    { id: "penguin", emoji: "🐧", gradient: "from-cyan-400 to-blue-600" },
     { id: "owl", emoji: "🦉", gradient: "from-violet-400 to-violet-600" },
+    { id: "dolphin", emoji: "🐬", gradient: "from-sky-400 to-cyan-600" },
     { id: "octopus", emoji: "🐙", gradient: "from-rose-400 to-rose-600" },
+    { id: "butterfly", emoji: "🦋", gradient: "from-violet-400 to-pink-600" },
+    { id: "dragon", emoji: "🐲", gradient: "from-emerald-400 to-cyan-600" },
     { id: "unicorn", emoji: "🦄", gradient: "from-sky-400 to-blue-600" },
     { id: "robot", emoji: "🤖", gradient: "from-cyan-400 to-blue-600" },
-    { id: "tiger", emoji: "🐯", gradient: "from-amber-400 to-orange-600" },
-    { id: "koala", emoji: "🐨", gradient: "from-sky-400 to-cyan-600" },
-    { id: "dragon", emoji: "🐲", gradient: "from-emerald-400 to-cyan-600" },
+    { id: "alien", emoji: "👽", gradient: "from-emerald-400 to-emerald-600" },
+    { id: "ninja", emoji: "🥷", gradient: "from-zinc-400 to-zinc-600" },
+    { id: "cowboy", emoji: "🤠", gradient: "from-amber-400 to-orange-600" },
+    { id: "wizard", emoji: "🧙", gradient: "from-violet-400 to-violet-600" },
   ];
 
 export interface Workspace {

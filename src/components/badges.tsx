@@ -117,6 +117,12 @@ const PERSON_EMOJIS = [
   "🐵",
 ];
 
+export function isCustomAvatar(
+  avatar: string | null | undefined
+): avatar is string {
+  return !!avatar && /^https?:\/\//.test(avatar);
+}
+
 export function UserAvatar({
   seed,
   name,
@@ -130,9 +136,11 @@ export function UserAvatar({
   size?: number;
   title?: string;
 }) {
-  const preset = avatar
-    ? AVATAR_PRESETS.find((entry) => entry.id === avatar)
-    : undefined;
+  const custom = isCustomAvatar(avatar);
+  const preset =
+    avatar && !custom
+      ? AVATAR_PRESETS.find((entry) => entry.id === avatar)
+      : undefined;
   const key = seed || name || "?";
   const hash = hashString(key);
   const emoji = preset?.emoji ?? PERSON_EMOJIS[hash % PERSON_EMOJIS.length];
@@ -141,12 +149,22 @@ export function UserAvatar({
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br shadow-sm ring-1 ring-black/10 ${gradient}`}
+      className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br shadow-sm ring-1 ring-black/10 ${gradient}`}
       style={{ width: size, height: size, fontSize: Math.round(size * 0.52) }}
       title={title ?? name ?? undefined}
       aria-hidden="true"
     >
-      <span className="translate-y-[0.5px] leading-none">{emoji}</span>
+      {custom ? (
+        // eslint-disable-next-line @next/next/no-img-element -- tiny user-uploaded avatar, sizing handled here
+        <img
+          src={avatar}
+          alt=""
+          className="h-full w-full object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <span className="translate-y-[0.5px] leading-none">{emoji}</span>
+      )}
     </span>
   );
 }
