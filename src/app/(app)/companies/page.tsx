@@ -21,6 +21,7 @@ import {
   getCurrentProfile,
   getMyEmailSettings,
   getPipelines,
+  getWorkspaceContext,
 } from "@/lib/data";
 import {
   KIND_LABEL,
@@ -79,6 +80,8 @@ export default async function CompaniesPage({
   const isOwner = profile?.role === "owner";
   const pipelines = await getPipelines();
   const emailSettings = await getMyEmailSettings();
+  const workspaceCtx = await getWorkspaceContext();
+  const canWrite = workspaceCtx?.canWrite ?? true;
   if (!pipelines.some((pipeline) => pipeline.id === list)) notFound();
 
   let result = await getCompanies({
@@ -134,7 +137,7 @@ export default async function CompaniesPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <PasteUrl list={list} pipelines={pipelines} />
+          {canWrite ? <PasteUrl list={list} pipelines={pipelines} /> : null}
         </div>
       </header>
 
@@ -228,10 +231,12 @@ export default async function CompaniesPage({
                   className="border-b border-zinc-100 transition-colors last:border-0 hover:bg-zinc-50/70"
                 >
                   <td className="td pl-2">
-                    <BookmarkToggle
-                      orgId={company.id}
-                      bookmarked={company.bookmarked}
-                    />
+                    {canWrite ? (
+                      <BookmarkToggle
+                        orgId={company.id}
+                        bookmarked={company.bookmarked}
+                      />
+                    ) : null}
                   </td>
                   <td className="td pl-2">
                     <div className="flex items-center gap-2.5">

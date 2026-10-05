@@ -30,6 +30,7 @@ import {
   getMyEmailSettings,
   getPipelines,
   getProfiles,
+  getWorkspaceContext,
 } from "@/lib/data";
 import { reconcileIfStale } from "@/lib/deep-research";
 import { createClient } from "@/lib/supabase/server";
@@ -159,6 +160,7 @@ export default async function CompanyPage({
     enrichmentRuns,
     profiles,
     emailSettings,
+    workspaceCtx,
   ] = await Promise.all([
     getCompany(companyId),
     getContacts(companyId),
@@ -169,6 +171,7 @@ export default async function CompanyPage({
     getEnrichmentRuns(companyId),
     getProfiles(),
     getMyEmailSettings(),
+    getWorkspaceContext(),
   ]);
 
   if (!company) notFound();
@@ -183,6 +186,7 @@ export default async function CompanyPage({
   const addedBy = labelFor(company.created_by);
 
   const isOwner = profile?.role === "owner";
+  const canWrite = workspaceCtx?.canWrite ?? true;
   const pipelineLabel = pipelineName(pipelines, company.list);
   const stages = pipelineStages(pipelines, company.list);
   const defaultFlavor =
@@ -338,11 +342,13 @@ export default async function CompanyPage({
           </Section>
 
           {/* Deep research */}
-          <DeepResearch
-            orgId={company.id}
-            initialActiveRun={deepResearchState.activeRunId !== null}
-            monthSpend={monthSpend}
-          />
+          {canWrite ? (
+            <DeepResearch
+              orgId={company.id}
+              initialActiveRun={deepResearchState.activeRunId !== null}
+              monthSpend={monthSpend}
+            />
+          ) : null}
 
           {/* Reach */}
           <Section
@@ -382,14 +388,16 @@ export default async function CompanyPage({
                     <span className="text-[11px] text-zinc-400">
                       via {sourceLabel(email.source)}
                     </span>
-                    <EmailComposer
-                      trigger="button"
-                      triggerLabel="Draft"
-                      orgId={company.id}
-                      defaultTo={email.email}
-                      defaultFlavor={defaultFlavor}
-                      smtpConfigured={emailSettings.configured}
-                    />
+                    {canWrite ? (
+                      <EmailComposer
+                        trigger="button"
+                        triggerLabel="Draft"
+                        orgId={company.id}
+                        defaultTo={email.email}
+                        defaultFlavor={defaultFlavor}
+                        smtpConfigured={emailSettings.configured}
+                      />
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -483,20 +491,22 @@ export default async function CompanyPage({
                             {contact.phone}
                           </span>
                         ) : null}
-                        <EmailComposer
-                          trigger="button"
-                          triggerLabel="Draft email"
-                          orgId={company.id}
-                          contactId={contact.id}
-                          contactLabel={`${contact.name}${
-                            contact.title ? ` · ${contact.title}` : ""
-                          }`}
-                          defaultTo={contact.email ?? null}
-                          defaultFlavor={defaultFlavor}
-                          smtpConfigured={emailSettings.configured}
-                        />
+                        {canWrite ? (
+                          <EmailComposer
+                            trigger="button"
+                            triggerLabel="Draft email"
+                            orgId={company.id}
+                            contactId={contact.id}
+                            contactLabel={`${contact.name}${
+                              contact.title ? ` · ${contact.title}` : ""
+                            }`}
+                            defaultTo={contact.email ?? null}
+                            defaultFlavor={defaultFlavor}
+                            smtpConfigured={emailSettings.configured}
+                          />
+                        ) : null}
                       </div>
-                      {!contact.linkedin_url ? (
+                      {canWrite && !contact.linkedin_url ? (
                         <div className="mt-1">
                           <FindLinkedInButton
                             contactId={contact.id}
@@ -532,11 +542,12 @@ export default async function CompanyPage({
               ) : null}
             </div>
 
-            <details className="group mt-3">
-              <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[13px] font-medium text-zinc-500 transition-colors hover:text-zinc-900 [&::-webkit-details-marker]:hidden">
-                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                Add person
-              </summary>
+            {canWrite ? (
+              <details className="group mt-3">
+                <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[13px] font-medium text-zinc-500 transition-colors hover:text-zinc-900 [&::-webkit-details-marker]:hidden">
+                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                  Add person
+                </summary>
               <form action={addContact} className="mt-3 space-y-3">
                 <input type="hidden" name="org_id" value={company.id} />
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -578,7 +589,8 @@ export default async function CompanyPage({
                 </div>
                 <SubmitButton pendingText="Adding…">Add person</SubmitButton>
               </form>
-            </details>
+              </details>
+            ) : null}
           </Section>
 
           {/* Outreach */}
@@ -592,11 +604,13 @@ export default async function CompanyPage({
                   Follow-up
                 </dt>
                 <dd className="mt-1.5">
-                  <FollowUpControl
-                    orgId={company.id}
-                    date={company.follow_up_on}
-                    note={company.follow_up_note}
-                  />
+                  {canWrite ? (
+                    <FollowUpControl
+                      orgId={company.id}
+                      date={company.follow_up_on}
+                      note={company.follow_up_note}
+                    />
+                  ) : null}
                 </dd>
               </div>
               <div>
@@ -693,11 +707,12 @@ export default async function CompanyPage({
             count={interactions.length}
             className="animate-rise animate-rise-3"
           >
-            <details className="group mt-3">
-              <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-md border border-dashed border-zinc-200 px-3 py-2 text-[13px] text-zinc-500 transition-colors hover:border-zinc-300 hover:text-zinc-800 [&::-webkit-details-marker]:hidden">
-                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                Log interaction
-              </summary>
+            {canWrite ? (
+              <details className="group mt-3">
+                <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-md border border-dashed border-zinc-200 px-3 py-2 text-[13px] text-zinc-500 transition-colors hover:border-zinc-300 hover:text-zinc-800 [&::-webkit-details-marker]:hidden">
+                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                  Log interaction
+                </summary>
               <form
                 action={addInteraction}
                 className="mt-3 space-y-3 rounded-md bg-zinc-50/70 p-3"
@@ -776,7 +791,8 @@ export default async function CompanyPage({
                   </SubmitButton>
                 </div>
               </form>
-            </details>
+              </details>
+            ) : null}
 
             {interactions.length === 0 ? (
               <p className="mt-4 text-[13px] text-zinc-500">
@@ -795,7 +811,7 @@ export default async function CompanyPage({
                         {item.occurred_on}
                         {item.channel ? ` · ${item.channel}` : ""}
                       </p>
-                      {isOwner ? (
+                      {isOwner && canWrite ? (
                         <form action={deleteInteraction}>
                           <input type="hidden" name="id" value={item.id} />
                           <input

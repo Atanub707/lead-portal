@@ -61,7 +61,7 @@ export default async function SettingsPage({
         <h1 className="text-lg font-semibold tracking-tight text-zinc-900">
           Settings
         </h1>
-        {isOwner ? <InviteButton /> : null}
+        {isOwner && workspaceCtx?.canWrite ? <InviteButton /> : null}
       </header>
 
       {removed ? (

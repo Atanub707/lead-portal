@@ -81,8 +81,10 @@ export function EmailSettingsForm({ initial }: { initial: EmailSettings }) {
         ok?: boolean;
         note?: string;
         error?: string;
+        secure?: boolean;
       };
       if (data.ok) {
+        if (typeof data.secure === "boolean") setSecure(data.secure);
         setTestState({
           status: "ok",
           message:

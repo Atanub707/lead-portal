@@ -12,7 +12,12 @@ const TLS_RETRY_NOTE =
   "Connected with SSL/STARTTLS — the toggle was adjusted automatically.";
 
 const AUTH_RE = /invalid login|535|authentication/i;
+const CERT_RE =
+  /certificate|self[- ]signed|unable to verify|cert_|altnames|hostname\/ip does not match|expired/i;
 const TLS_RE = /ssl|tls|wrong version|handshake|econnreset|socket hang up/i;
+
+const CERT_ERROR =
+  "The mail server's certificate couldn't be verified — double-check the host and port.";
 
 interface TestBody {
   host?: string;
@@ -32,6 +37,7 @@ function messageOf(err: unknown): string {
 
 function friendly(message: string): string {
   if (AUTH_RE.test(message)) return AUTH_ERROR;
+  if (CERT_RE.test(message)) return CERT_ERROR;
   if (TLS_RE.test(message)) return `${message}${TLS_HINT}`;
   return message;
 }
@@ -100,6 +106,7 @@ export async function POST(request: Request) {
 
   let transport: ReturnType<typeof nodemailer.createTransport>;
   let autoCorrected = false;
+  let usedSecure = secure;
   try {
     transport = await attempt(secure);
   } catch (firstErr) {
@@ -108,9 +115,10 @@ export async function POST(request: Request) {
       try {
         transport = await attempt(!secure);
         autoCorrected = true;
-      } catch {
+        usedSecure = !secure;
+      } catch (retryErr) {
         return NextResponse.json(
-          { ok: false, error: friendly(firstMessage) },
+          { ok: false, error: friendly(messageOf(retryErr)) },
           { status: 400 }
         );
       }
@@ -141,6 +149,8 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json(
-    autoCorrected ? { ok: true, note: TLS_RETRY_NOTE } : { ok: true }
+    autoCorrected
+      ? { ok: true, note: TLS_RETRY_NOTE, secure: usedSecure }
+      : { ok: true, secure: usedSecure }
   );
 }

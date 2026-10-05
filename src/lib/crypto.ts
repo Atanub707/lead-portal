@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 function key(): Buffer {
   const hex = process.env.SMTP_ENCRYPTION_KEY;
-  if (!hex || hex.length !== 64) {
+  if (!hex || !/^[0-9a-f]{64}$/i.test(hex)) {
     throw new Error("Missing SMTP_ENCRYPTION_KEY (64 hex chars)");
   }
   return Buffer.from(hex, "hex");
@@ -17,7 +17,11 @@ export function encryptSecret(plain: string): string {
 }
 
 export function decryptSecret(envelope: string): string {
-  const [version, nonceB64, tagB64, ctB64] = envelope.split(":");
+  const parts = envelope.split(":");
+  if (parts.length !== 4) {
+    throw new Error("Invalid or tampered secret");
+  }
+  const [version, nonceB64, tagB64, ctB64] = parts;
   if (version !== "v1" || !nonceB64 || !tagB64 || !ctB64) {
     throw new Error("Invalid or tampered secret");
   }

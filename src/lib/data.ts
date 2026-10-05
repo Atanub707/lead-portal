@@ -669,7 +669,7 @@ export async function getMyEmailSettings(): Promise<EmailSettings> {
   if (!userId) return empty;
 
   const supabase = await createClient();
-  const [{ data }, { count }] = await Promise.all([
+  const [{ data, error }, { count, error: countError }] = await Promise.all([
     supabase
       .from("user_email_settings")
       .select(
@@ -683,6 +683,12 @@ export async function getMyEmailSettings(): Promise<EmailSettings> {
       .eq("user_id", userId)
       .not("smtp_password_enc", "is", null),
   ]);
+  if (error || countError) {
+    console.error(
+      "[email-settings] read failed:",
+      error?.message ?? countError?.message
+    );
+  }
   if (!data) return empty;
 
   return {
