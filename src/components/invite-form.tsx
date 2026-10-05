@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Check, Copy, Loader2, MailPlus, X } from "lucide-react";
+import { Check, Copy, Loader2, UserPlus, X } from "lucide-react";
 import { inviteUser } from "@/lib/actions";
 import type { UserRole } from "@/lib/types";
 
@@ -71,8 +71,8 @@ export function InviteButton() {
   return (
     <>
       <button type="button" onClick={openDialog} className="btn-primary">
-        <MailPlus className="h-3.5 w-3.5" aria-hidden="true" />
-        Invite
+        <UserPlus className="h-3.5 w-3.5" aria-hidden="true" />
+        Invite team member
       </button>
 
       {open ? (
@@ -86,11 +86,13 @@ export function InviteButton() {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="Invite"
+            aria-label="Invite team member"
             className="animate-panel relative w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl"
           >
             <div className="flex items-center justify-between">
-              <p className="text-[13px] font-semibold text-zinc-900">Invite</p>
+              <p className="text-[13px] font-semibold text-zinc-900">
+                Invite team member
+              </p>
               <button
                 type="button"
                 onClick={() => setOpen(false)}

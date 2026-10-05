@@ -381,7 +381,7 @@ export async function renamePipeline(formData: FormData) {
   });
 
   revalidatePath("/", "layout");
-  redirect("/settings");
+  redirect("/settings/pipelines");
 }
 
 export async function updatePipeline(formData: FormData) {
@@ -421,7 +421,7 @@ export async function updatePipeline(formData: FormData) {
   });
 
   revalidatePath("/", "layout");
-  redirect("/settings");
+  redirect("/settings/pipelines");
 }
 
 // ─── Pipeline pitch (AI) ─────────────────────────────────────────────────────
@@ -715,7 +715,7 @@ export async function deletePipeline(formData: FormData) {
   const used = companies ?? 0;
   if (used > 0) {
     redirect(
-      `/settings?pipeline_error=${encodeURIComponent(
+      `/settings/pipelines?pipeline_error=${encodeURIComponent(
         `${used} compan${used === 1 ? "y is" : "ies are"} still in this pipeline — move or delete ${
           used === 1 ? "it" : "them"
         } first.`
@@ -724,7 +724,7 @@ export async function deletePipeline(formData: FormData) {
   }
   if ((total ?? 0) <= 1) {
     redirect(
-      `/settings?pipeline_error=${encodeURIComponent(
+      `/settings/pipelines?pipeline_error=${encodeURIComponent(
         "You need at least one pipeline."
       )}`
     );
@@ -742,7 +742,7 @@ export async function deletePipeline(formData: FormData) {
   });
 
   revalidatePath("/", "layout");
-  redirect("/settings?pipeline_removed=1");
+  redirect("/settings/pipelines?pipeline_removed=1");
 }
 
 // ─── Contacts ────────────────────────────────────────────────────────────────
@@ -1047,8 +1047,8 @@ export async function revokeInvitation(formData: FormData) {
   const client = await clerkClient();
   await client.invitations.revokeInvitation(id);
   clearClerkDirectoryCache();
-  revalidatePath("/settings");
-  redirect("/settings");
+  revalidatePath("/settings/members");
+  redirect("/settings/members");
 }
 
 export async function deleteInvitation(formData: FormData) {
@@ -1068,8 +1068,8 @@ export async function deleteInvitation(formData: FormData) {
     throw new Error(`Could not delete invitation (${res.status})`);
   }
   clearClerkDirectoryCache();
-  revalidatePath("/settings");
-  redirect("/settings");
+  revalidatePath("/settings/members");
+  redirect("/settings/members");
 }
 
 export async function removeUser(formData: FormData) {
@@ -1090,12 +1090,12 @@ export async function removeUser(formData: FormData) {
 async function removeUserInner(formData: FormData) {
   const supabase = await assertOwner();
   const targetId = field(formData, "user_id");
-  if (!targetId) redirect(`/settings?remove_error=${encodeURIComponent("Missing user")}`);
+  if (!targetId) redirect(`/settings/members?remove_error=${encodeURIComponent("Missing user")}`);
 
   const { userId } = await auth();
   if (userId === targetId) {
     redirect(
-      `/settings?remove_error=${encodeURIComponent("You cannot remove your own account")}`
+      `/settings/members?remove_error=${encodeURIComponent("You cannot remove your own account")}`
     );
   }
 
@@ -1119,7 +1119,7 @@ async function removeUserInner(formData: FormData) {
   revalidatePath("/settings");
 
   if (errorMessage) {
-    redirect(`/settings?remove_error=${encodeURIComponent(errorMessage)}`);
+    redirect(`/settings/members?remove_error=${encodeURIComponent(errorMessage)}`);
   }
 
   await logActivity({
@@ -1131,7 +1131,7 @@ async function removeUserInner(formData: FormData) {
       (target as { email?: string | null } | null)?.email ?? targetId
     }`,
   });
-  redirect("/settings?removed=1");
+  redirect("/settings/members?removed=1");
 }
 
 export async function updateUserRole(
