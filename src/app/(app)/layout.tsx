@@ -33,6 +33,11 @@ export default async function AppLayout({
     getWorkspaceContext(),
   ]);
 
+  // Paywall: an expired trial / lapsed subscription blocks the app.
+  if (context && !context.entitled) {
+    redirect("/billing");
+  }
+
   let viewedWorkspaceId = profile.workspace_id;
   let workspaces: { id: string; name: string }[] = [];
   if (isSuperAdmin) {

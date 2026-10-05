@@ -732,3 +732,49 @@ export async function getMyEmailSettings(): Promise<EmailSettings> {
     signature_link: data.signature_link ?? null,
   };
 }
+
+export interface BillingOverview {
+  workspace: Workspace;
+  isOwner: boolean;
+  memberCount: number;
+  payments: {
+    id: number;
+    amount_paise: number;
+    kind: string;
+    status: string;
+    created_at: string;
+    razorpay_payment_id: string;
+  }[];
+}
+
+export async function getBillingOverview(): Promise<BillingOverview | null> {
+  const profile = await getCurrentProfile();
+  if (!profile?.workspace_id) return null;
+  const supabase = await createClient();
+  const [{ data: workspace }, { count }, { data: payments }] = await Promise.all([
+    supabase
+      .from("workspaces")
+      .select(
+        "id, name, plan, trial_ends_at, created_at, seats, subscription_status, current_period_end"
+      )
+      .eq("id", profile.workspace_id)
+      .maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", profile.workspace_id),
+    supabase
+      .from("payments")
+      .select("id, amount_paise, kind, status, created_at, razorpay_payment_id")
+      .eq("workspace_id", profile.workspace_id)
+      .order("created_at", { ascending: false })
+      .limit(24),
+  ]);
+  if (!workspace) return null;
+  return {
+    workspace: workspace as Workspace,
+    isOwner: profile.role === "owner",
+    memberCount: count ?? 1,
+    payments: payments ?? [],
+  };
+}

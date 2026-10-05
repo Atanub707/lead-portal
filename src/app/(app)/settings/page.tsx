@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AvatarPicker } from "@/components/avatar-picker";
 import { SubmitButton } from "@/components/submit-button";
 import { renameWorkspace, updateMyName } from "@/lib/actions";
@@ -62,6 +63,23 @@ export default async function SettingsGeneralPage() {
                 ? "14-day trial — changes pause when it ends."
                 : "Trial ended — changes are paused. Contact us to continue."}
           </p>
+          {profile?.role === "owner" ? (
+            <div className="mt-3 flex items-center justify-between border-t border-zinc-100 pt-3">
+              <p className="text-[12px] text-zinc-500">
+                {workspaceCtx.workspace.plan === "active"
+                  ? "Comped — no billing."
+                  : `${workspaceCtx.workspace.seats} seat${
+                      workspaceCtx.workspace.seats === 1 ? "" : "s"
+                    } · ₹499/month`}
+              </p>
+              <Link
+                href="/billing"
+                className="text-[12px] font-medium text-zinc-600 underline-offset-2 hover:text-zinc-900 hover:underline"
+              >
+                Manage billing →
+              </Link>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
