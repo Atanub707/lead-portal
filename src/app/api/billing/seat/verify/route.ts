@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
   const { data: existingPayment, error: paymentReadError } = await admin
     .from("payments")
-    .select("id")
+    .select("id, seats")
     .eq("razorpay_payment_id", body.razorpay_payment_id)
     .maybeSingle();
   if (paymentReadError) {
@@ -65,7 +65,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Couldn't add the seat" }, { status: 500 });
   }
   if (existingPayment) {
-    return NextResponse.json({ ok: true, seats: currentSeats, already: true });
+    // Already applied when the workspace has reached the seats this payment
+    // bought. A webhook-first row (payment.captured arrived before this route)
+    // stores the expected post-increment count but no increment has happened
+    // yet — fall through and apply it once instead of stranding the seat.
+    const paidSeats = (existingPayment.seats as number | null) ?? currentSeats + 1;
+    if (currentSeats >= paidSeats) {
+      return NextResponse.json({ ok: true, seats: currentSeats, already: true });
+    }
   }
 
   const expectedSeats = currentSeats + 1;

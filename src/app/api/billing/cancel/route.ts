@@ -28,12 +28,17 @@ export async function POST() {
   const admin = createAdminClient();
   const { data: workspace, error: readError } = await admin
     .from("workspaces")
-    .select("id, razorpay_subscription_id")
+    .select("id, razorpay_subscription_id, cancel_at_period_end")
     .eq("id", me.workspace_id)
     .maybeSingle();
   if (readError) {
     console.error("[billing] cancel workspace read failed:", readError);
     return NextResponse.json({ error: "Couldn't cancel right now." }, { status: 500 });
+  }
+  if (workspace?.cancel_at_period_end) {
+    // Already scheduled: idempotent no-op, and calling Razorpay again would be
+    // rejected as an already-cancelled subscription.
+    return NextResponse.json({ ok: true });
   }
   if (!workspace?.razorpay_subscription_id) {
     return NextResponse.json({ error: "No active subscription" }, { status: 400 });

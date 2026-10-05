@@ -755,7 +755,7 @@ export async function getBillingOverview(): Promise<BillingOverview | null> {
     supabase
       .from("workspaces")
       .select(
-        "id, name, plan, trial_ends_at, created_at, seats, subscription_status, current_period_end"
+        "id, name, plan, trial_ends_at, created_at, seats, subscription_status, current_period_end, cancel_at_period_end"
       )
       .eq("id", profile.workspace_id)
       .maybeSingle(),

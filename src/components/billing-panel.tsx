@@ -66,14 +66,18 @@ export function BillingPanel({ overview }: { overview: BillingOverview | null })
             razorpay_subscription_id: string;
             razorpay_signature: string;
           }) => {
-            const verify = await fetch("/api/billing/verify", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(response),
-            });
-            const result = (await verify.json()) as { ok?: boolean; error?: string };
-            if (result.ok) router.refresh();
-            else setError(result.error ?? "Payment verification failed.");
+            try {
+              const verify = await fetch("/api/billing/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(response),
+              });
+              const result = (await verify.json()) as { ok?: boolean; error?: string };
+              if (result.ok) router.refresh();
+              else setError(result.error ?? "Payment verification failed.");
+            } catch {
+              setError("Payment succeeded but activation failed — try again or contact support.");
+            }
           },
         });
         rzp.open();
@@ -157,10 +161,16 @@ export function BillingPanel({ overview }: { overview: BillingOverview | null })
         ) : (
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {paidActive ? (
-              <button type="button" onClick={cancel} disabled={posting} className="btn-ghost">
-                {posting ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}
-                Cancel subscription
-              </button>
+              workspace.cancel_at_period_end ? (
+                <p className="text-[12px] text-zinc-500">
+                  Cancels on {workspace.current_period_end?.slice(0, 10) ?? "the end of the period"}.
+                </p>
+              ) : (
+                <button type="button" onClick={cancel} disabled={posting} className="btn-ghost">
+                  {posting ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}
+                  Cancel subscription
+                </button>
+              )
             ) : (
               <button type="button" onClick={subscribe} disabled={posting} className="btn-primary">
                 {posting ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}

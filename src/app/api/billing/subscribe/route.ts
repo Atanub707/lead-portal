@@ -26,7 +26,7 @@ export async function POST() {
 
   const { data: workspace } = await supabase
     .from("workspaces")
-    .select("id, seats, plan, subscription_status")
+    .select("id, seats, plan, subscription_status, razorpay_subscription_id")
     .eq("id", me.workspace_id)
     .maybeSingle();
   if (!workspace) {
@@ -34,6 +34,21 @@ export async function POST() {
   }
   if (workspace.plan === "paid" && workspace.subscription_status === "active") {
     return NextResponse.json({ error: "This workspace is already subscribed." }, { status: 409 });
+  }
+
+  // Reopening checkout while a subscription is still live must reuse it —
+  // creating another would orphan the first (and a paid checkout with it).
+  // Only a terminal (or absent) status starts a fresh subscription.
+  const NON_TERMINAL_STATUSES = ["created", "authenticated", "pending"];
+  if (
+    workspace.razorpay_subscription_id &&
+    workspace.subscription_status &&
+    NON_TERMINAL_STATUSES.includes(workspace.subscription_status)
+  ) {
+    return NextResponse.json({
+      keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? process.env.RAZORPAY_KEY_ID,
+      subscriptionId: workspace.razorpay_subscription_id,
+    });
   }
 
   try {

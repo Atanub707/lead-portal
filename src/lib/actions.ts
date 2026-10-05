@@ -993,7 +993,20 @@ export async function inviteUser(
     supabase.from("workspaces").select("seats").eq("id", workspaceId).maybeSingle(),
   ]);
   const seats = (seatRow as { seats: number } | null)?.seats ?? 1;
-  if ((memberCount ?? 0) >= seats) {
+
+  // Pending invitations already hold a seat: without counting them, repeated
+  // invites would bypass the seat gate until each invitee accepts.
+  const client = await clerkClient();
+  const pendingInvites = await client.invitations.getInvitationList({
+    status: "pending",
+    limit: 100,
+  });
+  const pendingForWorkspace = (pendingInvites.data ?? []).filter(
+    (invitation) =>
+      (invitation.publicMetadata as { workspace_id?: string } | null)
+        ?.workspace_id === workspaceId
+  ).length;
+  if ((memberCount ?? 0) + pendingForWorkspace >= seats) {
     return {
       ok: false,
       error: "Seats are full — add a seat to invite more people.",

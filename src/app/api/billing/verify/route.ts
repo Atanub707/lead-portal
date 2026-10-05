@@ -45,7 +45,9 @@ export async function POST(request: Request) {
     const admin = createAdminClient();
     const { data: workspace, error: workspaceError } = await admin
       .from("workspaces")
-      .select("id, razorpay_subscription_id, plan, subscription_status, current_period_end")
+      .select(
+        "id, razorpay_subscription_id, plan, subscription_status, current_period_end, last_verified_payment_id"
+      )
       .eq("id", me.workspace_id)
       .maybeSingle();
     if (workspaceError) {
@@ -77,6 +79,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    if (workspace.last_verified_payment_id === body.razorpay_payment_id) {
+      return NextResponse.json(
+        { error: "This payment was already used to activate the plan." },
+        { status: 409 }
+      );
+    }
+
     const nextPeriodEnd = new Date(Date.now() + 30 * 86_400_000).toISOString();
     const { error } = await admin
       .from("workspaces")
@@ -84,6 +93,7 @@ export async function POST(request: Request) {
         plan: "paid",
         subscription_status: "active",
         current_period_end: nextPeriodEnd,
+        last_verified_payment_id: body.razorpay_payment_id,
       })
       .eq("id", me.workspace_id);
     if (error) {

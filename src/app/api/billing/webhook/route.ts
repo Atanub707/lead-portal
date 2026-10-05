@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     ) {
       const { data: workspace } = await admin
         .from("workspaces")
-        .select("id")
+        .select("id, seats")
         .eq("razorpay_subscription_id", subscription.id)
         .maybeSingle();
       if (workspace) {
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
           patch.plan = "paid";
           patch.subscription_status = "active";
           patch.current_period_end = new Date(subscription.current_end * 1000).toISOString();
-          if (typeof subscription.quantity === "number") patch.seats = subscription.quantity;
+          patch.seats = Math.max(workspace.seats ?? 0, subscription.quantity ?? 0);
         }
         const { error } = await admin
           .from("workspaces")
@@ -90,7 +90,9 @@ export async function POST(request: Request) {
             amount_paise: payment.amount ?? 0,
             currency: payment.currency ?? "INR",
             status: payment.status ?? "captured",
-            seats: workspace?.seats ?? null,
+            seats: payment.notes?.seats_after
+              ? Number(payment.notes.seats_after)
+              : (workspace?.seats ?? null),
             raw: event as unknown as Record<string, unknown>,
           },
           { onConflict: "razorpay_payment_id", ignoreDuplicates: true }
