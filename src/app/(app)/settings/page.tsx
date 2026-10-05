@@ -1,3 +1,4 @@
+import { AvatarPicker } from "@/components/avatar-picker";
 import { SubmitButton } from "@/components/submit-button";
 import { renameWorkspace, updateMyName } from "@/lib/actions";
 import { getCurrentProfile, getWorkspaceContext } from "@/lib/data";
@@ -71,17 +72,32 @@ export default async function SettingsGeneralPage() {
         <p className="mt-1 text-[12px] text-zinc-500">
           Shown as “Added by …” on records you create.
         </p>
-        <form action={updateMyName} className="mt-3 flex items-center gap-2">
-          <input
-            name="full_name"
-            defaultValue={profile?.full_name ?? ""}
-            placeholder="Your name"
-            aria-label="Your display name"
-            required
-            maxLength={80}
-            className="input max-w-[280px]"
-          />
-          <SubmitButton pendingText="Saving…">Save</SubmitButton>
+        <form action={updateMyName} className="mt-3 space-y-4">
+          <div>
+            <span className="label">Display picture</span>
+            <AvatarPicker
+              initial={profile?.avatar ?? null}
+              userId={profile?.id ?? ""}
+              name={profile?.full_name ?? profile?.email ?? null}
+            />
+          </div>
+          <div>
+            <label htmlFor="full_name" className="label">
+              Your name
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                id="full_name"
+                name="full_name"
+                defaultValue={profile?.full_name ?? ""}
+                placeholder="Your name"
+                required
+                maxLength={80}
+                className="input max-w-[280px]"
+              />
+              <SubmitButton pendingText="Saving…">Save</SubmitButton>
+            </div>
+          </div>
         </form>
       </section>
     </div>

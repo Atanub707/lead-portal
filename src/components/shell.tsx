@@ -21,17 +21,19 @@ function UserBlock({
   userId,
   email,
   role,
+  avatar = null,
   collapsed = false,
 }: {
   userId: string;
   email: string;
   role: string;
+  avatar?: string | null;
   collapsed?: boolean;
 }) {
   if (collapsed) {
     return (
       <div className="flex flex-col items-center gap-2 py-3">
-        <UserAvatar seed={userId} name={email} size={24} />
+        <UserAvatar seed={userId} name={email} avatar={avatar} size={24} />
         <form action={signOut}>
           <ConfirmSubmit
             title="Sign out?"
@@ -50,7 +52,7 @@ function UserBlock({
 
   return (
     <div className="flex items-center gap-2 px-3 py-3">
-      <UserAvatar seed={userId} name={email} size={24} />
+      <UserAvatar seed={userId} name={email} avatar={avatar} size={24} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs text-zinc-600">{email}</p>
         <p className="text-[11px] capitalize text-zinc-400">{role}</p>
@@ -76,6 +78,7 @@ export function Shell({
   isOwner,
   email,
   role,
+  avatar = null,
   pipelines,
   switcher = null,
   banner = null,
@@ -85,6 +88,7 @@ export function Shell({
   isOwner: boolean;
   email: string;
   role: string;
+  avatar?: string | null;
   pipelines: Pipeline[];
   switcher?: {
     workspaces: { id: string; name: string }[];
@@ -204,6 +208,7 @@ export function Shell({
             userId={userId}
             email={email}
             role={role}
+            avatar={avatar}
             collapsed={collapsed}
           />
         </div>
@@ -253,7 +258,7 @@ export function Shell({
               onNavigate={() => setMobileOpen(false)}
             />
             <div className="shrink-0 border-t border-zinc-200/80">
-              <UserBlock userId={userId} email={email} role={role} />
+              <UserBlock userId={userId} email={email} role={role} avatar={avatar} />
             </div>
           </div>
         </div>

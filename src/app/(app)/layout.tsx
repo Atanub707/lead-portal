@@ -69,6 +69,7 @@ export default async function AppLayout({
       isOwner={profile.role === "owner"}
       email={profile.email ?? ""}
       role={profile.role}
+      avatar={profile.avatar ?? null}
       pipelines={pipelines}
       switcher={
         isSuperAdmin

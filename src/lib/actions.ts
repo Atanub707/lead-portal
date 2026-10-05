@@ -15,7 +15,13 @@ import { clearClerkDirectoryCache } from "./clerk-directory";
 import { createClient } from "./supabase/server";
 import { findLinkedInProfile, tinyfishEnabled } from "./research";
 import type { OrgKind, OrgList, PipelineStage, UserRole } from "./types";
-import { KIND_OPTIONS, PIPELINE_ICONS, PRIORITY_OPTIONS, STATUS_LABEL } from "./types";
+import {
+  AVATAR_PRESETS,
+  KIND_OPTIONS,
+  PIPELINE_ICONS,
+  PRIORITY_OPTIONS,
+  STATUS_LABEL,
+} from "./types";
 
 function field(formData: FormData, key: string): string | null {
   const value = formData.get(key);
@@ -1227,13 +1233,20 @@ export async function updateMyName(formData: FormData): Promise<void> {
 
   const cleanName = name.slice(0, 80);
 
+  // Avatar: a preset id from the picker, or null for auto-generated.
+  const avatarRaw = field(formData, "avatar");
+  const avatar =
+    avatarRaw && AVATAR_PRESETS.some((preset) => preset.id === avatarRaw)
+      ? avatarRaw
+      : null;
+
   // Admin client so a user can always set their OWN name even before the
   // row-level "update self" policy migration lands. Ownership is enforced here:
   // the update is hard-scoped to the signed-in user's id.
   const admin = createAdminClient();
   const { error } = await admin
     .from("profiles")
-    .update({ full_name: cleanName })
+    .update({ full_name: cleanName, avatar })
     .eq("id", userId);
   if (error) throw new Error(error.message);
 
@@ -1242,7 +1255,7 @@ export async function updateMyName(formData: FormData): Promise<void> {
     action: "profile.name",
     targetType: "profile",
     targetId: userId,
-    summary: `Set display name to “${cleanName}”`,
+    summary: `Updated profile — name “${cleanName}”`,
   });
 
   revalidatePath("/settings");

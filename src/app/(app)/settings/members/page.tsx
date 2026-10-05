@@ -80,7 +80,12 @@ export default async function SettingsMembersPage({
                 className="flex items-center justify-between gap-3 px-5 py-3.5"
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <UserAvatar seed={user.id} name={user.email} size={28} />
+                  <UserAvatar
+                    seed={user.id}
+                    name={user.email}
+                    avatar={user.avatar}
+                    size={28}
+                  />
                   <div className="min-w-0">
                     <p className="truncate text-[13px] font-medium text-zinc-900">
                       {user.email ?? user.id}

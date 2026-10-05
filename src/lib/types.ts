@@ -199,10 +199,29 @@ export interface Profile {
   workspace_id: string | null;
   is_super_admin: boolean;
   created_at: string;
+  avatar: string | null;
 }
 
 // Fixed id of the internal workspace that owns all pre-multi-tenant data.
 export const HI_LABS_WORKSPACE_ID = "00000000-0000-4000-8000-000000000001";
+
+// Selectable display pictures. A user picks one in Settings → General; the id
+// is stored on profiles.avatar and rendered everywhere they appear.
+export const AVATAR_PRESETS: { id: string; emoji: string; gradient: string }[] =
+  [
+    { id: "lion", emoji: "🦁", gradient: "from-amber-400 to-amber-600" },
+    { id: "fox", emoji: "🦊", gradient: "from-orange-400 to-orange-600" },
+    { id: "cat", emoji: "🐱", gradient: "from-pink-400 to-pink-600" },
+    { id: "panda", emoji: "🐼", gradient: "from-cyan-400 to-cyan-600" },
+    { id: "frog", emoji: "🐸", gradient: "from-emerald-400 to-emerald-600" },
+    { id: "owl", emoji: "🦉", gradient: "from-violet-400 to-violet-600" },
+    { id: "octopus", emoji: "🐙", gradient: "from-rose-400 to-rose-600" },
+    { id: "unicorn", emoji: "🦄", gradient: "from-sky-400 to-blue-600" },
+    { id: "robot", emoji: "🤖", gradient: "from-cyan-400 to-blue-600" },
+    { id: "tiger", emoji: "🐯", gradient: "from-amber-400 to-orange-600" },
+    { id: "koala", emoji: "🐨", gradient: "from-sky-400 to-cyan-600" },
+    { id: "dragon", emoji: "🐲", gradient: "from-emerald-400 to-cyan-600" },
+  ];
 
 export interface Workspace {
   id: string;

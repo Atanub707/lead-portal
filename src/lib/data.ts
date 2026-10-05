@@ -20,18 +20,25 @@ import {
 
 // id -> display label for attribution ("who added this").
 async function userLabels(): Promise<
-  Map<string, { label: string; email: string | null }>
+  Map<string, { label: string; email: string | null; avatar: string | null }>
 > {
   const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")
-    .select("id, email, full_name");
-  const map = new Map<string, { label: string; email: string | null }>();
+    .select("id, email, full_name, avatar");
+  const map = new Map<
+    string,
+    { label: string; email: string | null; avatar: string | null }
+  >();
   for (const profile of data ?? []) {
     const firstWord = (profile.full_name ?? "").trim().split(/\s+/)[0];
     const label =
       firstWord || (profile.email ? profile.email.split("@")[0] : "Someone");
-    map.set(profile.id, { label, email: profile.email ?? null });
+    map.set(profile.id, {
+      label,
+      email: profile.email ?? null,
+      avatar: profile.avatar ?? null,
+    });
   }
   return map;
 }
@@ -205,7 +212,10 @@ export interface CompanyRow extends Organization {
   first_email: string | null;
   created_by_name: string | null;
   created_by_email: string | null;
+  created_by_avatar: string | null;
+  last_sent_by: string | null;
   last_sent_by_name: string | null;
+  last_sent_by_avatar: string | null;
   last_sent_at: string | null;
   last_sent_subject: string | null;
 }
@@ -348,8 +358,15 @@ export async function getCompanies(opts: {
       created_by_email: row.created_by
         ? (labels.get(row.created_by)?.email ?? null)
         : null,
+      created_by_avatar: row.created_by
+        ? (labels.get(row.created_by)?.avatar ?? null)
+        : null,
+      last_sent_by: sentByOrg.get(row.id)?.sent_by ?? null,
       last_sent_by_name: sentByOrg.get(row.id)?.sent_by
         ? (labels.get(sentByOrg.get(row.id)?.sent_by ?? "")?.label ?? null)
+        : null,
+      last_sent_by_avatar: sentByOrg.get(row.id)?.sent_by
+        ? (labels.get(sentByOrg.get(row.id)?.sent_by ?? "")?.avatar ?? null)
         : null,
       last_sent_at: sentByOrg.get(row.id)?.created_at ?? null,
       last_sent_subject: sentByOrg.get(row.id)?.subject ?? null,

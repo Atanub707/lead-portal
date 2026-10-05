@@ -72,6 +72,7 @@ export default async function AuditPage({
   const toRow = Math.min(current * PER, count);
 
   const emails = new Map(profiles.map((p) => [p.id, p.email]));
+  const avatars = new Map(profiles.map((p) => [p.id, p.avatar]));
 
   function href(next: { page?: number }) {
     const params = new URLSearchParams();
@@ -143,7 +144,12 @@ export default async function AuditPage({
           return (
             <div key={row.id} className="flex items-start gap-3 px-4 py-3">
               <span className="pt-0.5">
-                <UserAvatar seed={row.actor_id} name={label} size={26} />
+                <UserAvatar
+                  seed={row.actor_id}
+                  name={label}
+                  avatar={row.actor_id ? (avatars.get(row.actor_id) ?? null) : null}
+                  size={26}
+                />
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">

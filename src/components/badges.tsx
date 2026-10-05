@@ -1,4 +1,5 @@
 import {
+  AVATAR_PRESETS,
   KIND_LABEL,
   STATUS_LABEL,
   type OrgKind,
@@ -119,19 +120,24 @@ const PERSON_EMOJIS = [
 export function UserAvatar({
   seed,
   name,
+  avatar,
   size = 22,
   title,
 }: {
   seed?: string | null;
   name?: string | null;
+  avatar?: string | null;
   size?: number;
   title?: string;
 }) {
+  const preset = avatar
+    ? AVATAR_PRESETS.find((entry) => entry.id === avatar)
+    : undefined;
   const key = seed || name || "?";
   const hash = hashString(key);
-  const emoji = PERSON_EMOJIS[hash % PERSON_EMOJIS.length];
+  const emoji = preset?.emoji ?? PERSON_EMOJIS[hash % PERSON_EMOJIS.length];
   const gradient =
-    AVATAR_GRADIENTS[(hash >>> 5) % AVATAR_GRADIENTS.length];
+    preset?.gradient ?? AVATAR_GRADIENTS[(hash >>> 5) % AVATAR_GRADIENTS.length];
 
   return (
     <span

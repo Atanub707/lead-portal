@@ -184,6 +184,9 @@ export default async function CompanyPage({
     return firstWord || (person.email ? person.email.split("@")[0] : null);
   };
   const addedBy = labelFor(company.created_by);
+  const addedByAvatar = company.created_by
+    ? (profiles.find((entry) => entry.id === company.created_by)?.avatar ?? null)
+    : null;
 
   const isOwner = profile?.role === "owner";
   const canWrite = workspaceCtx?.canWrite ?? true;
@@ -328,6 +331,7 @@ export default async function CompanyPage({
                         <UserAvatar
                           seed={company.created_by}
                           name={addedBy}
+                          avatar={addedByAvatar}
                           size={18}
                         />
                         {value}

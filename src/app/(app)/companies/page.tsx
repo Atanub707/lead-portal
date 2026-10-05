@@ -325,6 +325,7 @@ export default async function CompaniesPage({
                         <UserAvatar
                           seed={company.created_by}
                           name={company.created_by_name}
+                          avatar={company.created_by_avatar}
                           size={20}
                         />
                         <span className="text-[12px] text-zinc-600">
@@ -361,8 +362,9 @@ export default async function CompaniesPage({
                           title={`${company.last_sent_at?.slice(0, 10) ?? ""} · ${company.last_sent_subject ?? ""}`}
                         >
                           <UserAvatar
-                            seed={company.last_sent_by_name}
+                            seed={company.last_sent_by}
                             name={company.last_sent_by_name}
+                            avatar={company.last_sent_by_avatar}
                             size={18}
                           />
                           <span className="text-[12px] text-zinc-600">
