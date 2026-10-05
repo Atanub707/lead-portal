@@ -38,10 +38,15 @@ export async function GET(request: Request) {
     ).json();
     const kvStoreId = run?.data?.defaultKeyValueStoreId;
     let input: unknown = null;
+    let log: string | null = null;
     if (kvStoreId) {
       input = await (
         await fetch(`https://api.apify.com/v2/key-value-stores/${kvStoreId}/records/INPUT?token=${token}`, { cache: "no-store" })
       ).json().catch(() => null);
+      log = await (
+        await fetch(`https://api.apify.com/v2/key-value-stores/${kvStoreId}/records/LOG?token=${token}`, { cache: "no-store" })
+      ).text().catch(() => null);
+      if (log && log.length > 4000) log = log.slice(-4000);
     }
     out.push({
       runId,
@@ -50,7 +55,15 @@ export async function GET(request: Request) {
       startedAt: run?.data?.startedAt,
       finishedAt: run?.data?.finishedAt,
       input,
+      log,
     });
+  }
+
+  // Generic read-only Apify API passthrough for diagnostics.
+  for (const path of url.searchParams.getAll("apifyPath")) {
+    const res = await fetch(`https://api.apify.com/v2/${path}${path.includes("?") ? "&" : "?"}token=${token}`, { cache: "no-store" });
+    const text = await res.text();
+    out.push({ apifyPath: path, status: res.status, body: text.slice(0, 6000) });
   }
 
   return NextResponse.json(out);
