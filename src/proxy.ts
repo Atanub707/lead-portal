@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 
 // Clerk owns authentication now (sign-in, invitations, password resets).
 // Everything except the auth screens and assets requires a session.
-const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
+const isPublicRoute = createRouteMatcher([
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/api/billing/webhook",
+]);
 
 export default clerkMiddleware(async (auth, request) => {
   if (isPublicRoute(request)) return;
