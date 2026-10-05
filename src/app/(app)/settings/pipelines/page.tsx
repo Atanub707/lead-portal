@@ -24,7 +24,7 @@ export default async function SettingsPipelinesPage({
 
   if (!isOwner) {
     return (
-      <div className="max-w-[760px]">
+      <div>
         <section className="card p-5">
           <h2 className="text-[15px] font-semibold tracking-tight text-zinc-900">
             Pipelines
@@ -40,7 +40,7 @@ export default async function SettingsPipelinesPage({
   const pipelines = await getPipelineUsage();
 
   return (
-    <div className="max-w-[760px]">
+    <div>
       <header className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-[15px] font-semibold tracking-tight text-zinc-900">

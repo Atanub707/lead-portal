@@ -108,8 +108,11 @@ export function EmailSettingsForm({ initial }: { initial: EmailSettings }) {
   }
 
   return (
-    <form action={saveEmailSettings} className="space-y-5">
-      <section className="card p-5">
+    <form
+      action={saveEmailSettings}
+      className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]"
+    >
+      <section className="card p-5 lg:col-start-2 lg:row-start-1">
         <h2 className="text-[13px] font-semibold text-zinc-900">Sender</h2>
         <p className="mt-1 text-[12px] text-zinc-500">
           How your emails appear to recipients.
@@ -145,7 +148,7 @@ export function EmailSettingsForm({ initial }: { initial: EmailSettings }) {
         </div>
       </section>
 
-      <section className="card p-5">
+      <section className="card p-5 lg:col-start-1 lg:row-span-2 lg:row-start-1">
         <h2 className="text-[13px] font-semibold text-zinc-900">SMTP</h2>
         <p className="mt-1 text-[12px] text-zinc-500">
           The mail server your emails are sent through.
@@ -264,7 +267,7 @@ export function EmailSettingsForm({ initial }: { initial: EmailSettings }) {
         </div>
       </section>
 
-      <section className="card p-5">
+      <section className="card p-5 lg:col-start-2 lg:row-start-2">
         <h2 className="text-[13px] font-semibold text-zinc-900">Signature</h2>
         <p className="mt-1 text-[12px] text-zinc-500">
           Appended to the emails you generate.
@@ -299,7 +302,7 @@ export function EmailSettingsForm({ initial }: { initial: EmailSettings }) {
         </div>
       </section>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 lg:col-span-2">
         <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"

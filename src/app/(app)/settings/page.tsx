@@ -11,7 +11,7 @@ export default async function SettingsGeneralPage() {
   ]);
 
   return (
-    <div className="max-w-[760px] space-y-5">
+    <div className="grid items-start gap-5 lg:grid-cols-2">
       {workspaceCtx?.workspace ? (
         <section className="card p-5">
           <div className="flex items-center justify-between gap-2">

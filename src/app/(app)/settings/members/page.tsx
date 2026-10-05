@@ -32,7 +32,7 @@ export default async function SettingsMembersPage({
   ).length;
 
   return (
-    <div className="max-w-[760px]">
+    <div>
       <header className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-[15px] font-semibold tracking-tight text-zinc-900">

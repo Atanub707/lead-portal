@@ -7,7 +7,7 @@ export default async function EmailSettingsPage() {
   const settings = await getMyEmailSettings();
 
   return (
-    <div className="max-w-[880px]">
+    <div>
       <header>
         <h2 className="text-[15px] font-semibold tracking-tight text-zinc-900">
           Email & SMTP
