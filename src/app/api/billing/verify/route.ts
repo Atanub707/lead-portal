@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { razorpayConfigured, verifyCheckoutSignature } from "@/lib/billing";
 import { logActivity } from "@/lib/activity";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
   try {
@@ -41,11 +42,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Only the owner can subscribe" }, { status: 403 });
     }
 
-    const { data: workspace } = await supabase
+    const admin = createAdminClient();
+    const { data: workspace, error: workspaceError } = await admin
       .from("workspaces")
       .select("id, razorpay_subscription_id, plan, subscription_status, current_period_end")
       .eq("id", me.workspace_id)
       .maybeSingle();
+    if (workspaceError) {
+      console.error("[billing] failed to read workspace:", workspaceError);
+      return NextResponse.json(
+        { error: "Couldn't verify your subscription." },
+        { status: 500 }
+      );
+    }
     if (
       !workspace ||
       !body.razorpay_subscription_id ||
@@ -69,7 +78,7 @@ export async function POST(request: Request) {
     }
 
     const nextPeriodEnd = new Date(Date.now() + 30 * 86_400_000).toISOString();
-    const { error } = await supabase
+    const { error } = await admin
       .from("workspaces")
       .update({
         plan: "paid",

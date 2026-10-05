@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { createSubscription, razorpayConfigured } from "@/lib/billing";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST() {
   const { userId } = await auth();
@@ -40,7 +41,8 @@ export async function POST() {
       seats: workspace.seats ?? 1,
       workspaceId: workspace.id,
     });
-    const { error: persistError } = await supabase
+    const admin = createAdminClient();
+    const { error: persistError } = await admin
       .from("workspaces")
       .update({
         razorpay_subscription_id: subscription.id,

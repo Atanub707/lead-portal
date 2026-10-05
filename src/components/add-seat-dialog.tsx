@@ -50,14 +50,18 @@ export function AddSeatDialog({
             razorpay_order_id: string;
             razorpay_signature: string;
           }) => {
-            const verify = await fetch("/api/billing/seat/verify", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(response),
-            });
-            const result = (await verify.json()) as { ok?: boolean; error?: string };
-            if (result.ok) onPaid();
-            else setError(result.error ?? "Payment verification failed.");
+            try {
+              const verify = await fetch("/api/billing/seat/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(response),
+              });
+              const result = (await verify.json()) as { ok?: boolean; error?: string };
+              if (result.ok) onPaid();
+              else setError(result.error ?? "Payment verification failed.");
+            } catch {
+              setError("Payment succeeded but activation failed — try again or contact support.");
+            }
           },
         });
         rzp.open();
