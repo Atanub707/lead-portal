@@ -247,13 +247,12 @@ export function sanitizeLinkedinCompanyUrl(raw: string): string {
 export function linkedinEmployeesInput(companyLinkedinUrl: string) {
   return {
     companies: [sanitizeLinkedinCompanyUrl(companyLinkedinUrl)],
-    // Cap the scrape: worst case we pay for 10 profiles (~$0.12) and the
+    // Cap the scrape: worst case we pay for ~10 profiles (~$0.12) and the
     // merge keeps only decision-maker titles — never the whole team.
-    // (A bare jobTitles filter returned too few profiles; this exact
-    // searchQuery is proven on the actor — broader OR lists returned zero.)
+    // No actor-side title filter: the actor's searchQuery/jobTitles prefilters
+    // proved unreliable (returned zero profiles even for companies with
+    // matching people), so we scrape the capped set and filter on merge.
     maxItems: 10,
-    searchQuery:
-      'Founder OR "Co-Founder" OR CEO OR Owner OR President OR "Managing Director" OR CTO',
     // Email search tries to find each person's email (SMTP-validated) — not
     // guaranteed per profile, and the actor skips the charge when a profile
     // is too thin to search.
