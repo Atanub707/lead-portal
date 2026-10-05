@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Loader2, Mail, MailPlus, Sparkles, X } from "lucide-react";
@@ -152,7 +153,8 @@ export function EmailComposer({
         </button>
       )}
 
-      {open ? (
+      {open && typeof document !== "undefined"
+        ? createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
           <button
             type="button"
@@ -356,7 +358,8 @@ export function EmailComposer({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       ) : null}
     </>
   );

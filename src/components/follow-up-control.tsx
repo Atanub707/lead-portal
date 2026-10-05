@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { CalendarClock, Loader2, X } from "lucide-react";
 import { setFollowUp } from "@/lib/actions";
 
@@ -103,7 +104,8 @@ export function FollowUpControl({
         {label}
       </button>
 
-      {open ? (
+      {open && typeof document !== "undefined"
+        ? createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
           <button
             className="animate-overlay absolute inset-0 bg-zinc-900/20"
@@ -194,7 +196,8 @@ export function FollowUpControl({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       ) : null}
     </>
   );
