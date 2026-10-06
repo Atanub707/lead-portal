@@ -5,6 +5,7 @@ import { ensureProfile } from "./auth";
 import {
   FALLBACK_PIPELINES,
   type CompanyEmail,
+  type CompanySort,
   type Contact,
   type EmailSettings,
   type EnrichmentRun,
@@ -224,6 +225,7 @@ export async function getCompanies(opts: {
   list: OrgList;
   q?: string;
   kind?: string;
+  sort?: CompanySort;
   follow?: string;
   starred?: boolean;
   page?: number;
@@ -240,12 +242,21 @@ export async function getCompanies(opts: {
     .slice(0, 10);
 
   const workspaceId = await activeWorkspaceId();
+  const orderBy =
+    opts.sort === "oldest"
+      ? { column: "created_at", ascending: true }
+      : opts.sort === "name"
+        ? { column: "name", ascending: true }
+        : opts.sort === "name_desc"
+          ? { column: "name", ascending: false }
+          : { column: "created_at", ascending: false };
   let query = supabase
     .from("organizations")
     .select("*", { count: "exact" })
     .eq("workspace_id", workspaceId)
     .eq("list", opts.list)
-    .order("name")
+    .order(orderBy.column, { ascending: orderBy.ascending })
+    .order("id", { ascending: orderBy.ascending })
     .range(from, from + per - 1);
 
   if (opts.kind) query = query.eq("kind", opts.kind);

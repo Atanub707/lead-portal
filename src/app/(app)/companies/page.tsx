@@ -24,11 +24,13 @@ import {
   getWorkspaceContext,
 } from "@/lib/data";
 import {
+  COMPANY_SORT_OPTIONS,
   KIND_LABEL,
   KIND_OPTIONS,
   parseList,
   pipelineName,
   str,
+  type CompanySort,
 } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -69,6 +71,12 @@ export default async function CompaniesPage({
   const kind = str(sp.kind);
   const follow = str(sp.follow);
   const starred = str(sp.starred) === "1";
+  const sortRaw = str(sp.sort);
+  const sort: CompanySort = COMPANY_SORT_OPTIONS.some(
+    (option) => option.value === sortRaw
+  )
+    ? (sortRaw as CompanySort)
+    : "newest";
 
   const perRaw = Number(str(sp.per));
   const per = PAGE_SIZES.includes(perRaw) ? perRaw : DEFAULT_PER;
@@ -90,6 +98,7 @@ export default async function CompaniesPage({
     kind,
     follow,
     starred,
+    sort,
     page: requestedPage,
     per,
   });
@@ -102,6 +111,7 @@ export default async function CompaniesPage({
       kind,
       follow,
       starred,
+      sort,
       page: totalPages,
       per,
     });
@@ -120,6 +130,7 @@ export default async function CompaniesPage({
     if (kind) params.set("kind", kind);
     if (follow) params.set("follow", follow);
     if (starred) params.set("starred", "1");
+    params.set("sort", sort);
     params.set("per", String(next.per ?? per));
     params.set("page", String(next.page ?? current));
     return `/companies?${params.toString()}`;
@@ -195,10 +206,22 @@ export default async function CompaniesPage({
           <option value="">All companies</option>
           <option value="1">Starred only</option>
         </select>
+        <select
+          name="sort"
+          defaultValue={sort}
+          aria-label="Sort by"
+          className="input w-[150px]"
+        >
+          {COMPANY_SORT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
         <button type="submit" className="btn-ghost">
           Apply
         </button>
-        {q || kind || follow || starred ? (
+        {q || kind || follow || starred || sort !== "newest" ? (
           <Link href={`/companies?list=${list}&per=${per}`} className="btn-ghost">
             Reset
           </Link>

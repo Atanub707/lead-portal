@@ -274,6 +274,17 @@ export const STATUS_LABEL: Record<PipelineStage, string> = {
 
 export const KIND_OPTIONS: OrgKind[] = ["lead", "partner", "competitor", "other"];
 
+// Company list ordering. Newest first is the default so freshly added
+// companies appear at the top.
+export const COMPANY_SORT_OPTIONS = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "name", label: "Name (A–Z)" },
+  { value: "name_desc", label: "Name (Z–A)" },
+] as const;
+
+export type CompanySort = (typeof COMPANY_SORT_OPTIONS)[number]["value"];
+
 export const KIND_LABEL: Record<OrgKind, string> = {
   lead: "Lead",
   partner: "Partner",
