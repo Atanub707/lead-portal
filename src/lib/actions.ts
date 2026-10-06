@@ -1322,12 +1322,20 @@ export async function uploadAvatar(
   const path = `${userId}/avatar.${ext}`;
   let { error } = await admin.storage
     .from("avatars")
-    .upload(path, buffer, { contentType, upsert: true });
+    .upload(path, buffer, {
+      contentType,
+      upsert: true,
+      cacheControl: "31536000",
+    });
   if (error && /bucket/i.test(error.message)) {
     await admin.storage.createBucket("avatars", { public: true });
     ({ error } = await admin.storage
       .from("avatars")
-      .upload(path, buffer, { contentType, upsert: true }));
+      .upload(path, buffer, {
+        contentType,
+        upsert: true,
+        cacheControl: "31536000",
+      }));
   }
   if (error) {
     console.error("[avatar] upload failed:", error.message);

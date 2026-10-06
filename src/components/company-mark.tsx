@@ -30,7 +30,7 @@ export function CompanyMark({
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
+        src={`/api/logo?domain=${encodeURIComponent(domain)}`}
         alt=""
         width={size}
         height={size}
