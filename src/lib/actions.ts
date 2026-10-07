@@ -719,21 +719,22 @@ export async function deletePipeline(formData: FormData) {
   ]);
 
   const used = companies ?? 0;
-  if (used > 0) {
-    redirect(
-      `/settings/pipelines?pipeline_error=${encodeURIComponent(
-        `${used} compan${used === 1 ? "y is" : "ies are"} still in this pipeline — move or delete ${
-          used === 1 ? "it" : "them"
-        } first.`
-      )}`
-    );
-  }
   if ((total ?? 0) <= 1) {
     redirect(
       `/settings/pipelines?pipeline_error=${encodeURIComponent(
         "You need at least one pipeline."
       )}`
     );
+  }
+
+  // Force delete: the pipeline's companies (and their contacts, emails and
+  // history via ON DELETE CASCADE) are deleted with it. The UI warns first.
+  if (used > 0) {
+    const { error: orgError } = await supabase
+      .from("organizations")
+      .delete()
+      .eq("list", id);
+    if (orgError) throw new Error(orgError.message);
   }
 
   const { error } = await supabase.from("pipelines").delete().eq("id", id);
@@ -744,7 +745,11 @@ export async function deletePipeline(formData: FormData) {
     action: "pipeline.delete",
     targetType: "pipeline",
     targetId: id,
-    summary: `Deleted pipeline “${pipeline?.name ?? "Unknown"}”`,
+    summary: `Deleted pipeline “${pipeline?.name ?? "Unknown"}”${
+      used > 0
+        ? ` and ${used} compan${used === 1 ? "y" : "ies"}`
+        : ""
+    }`,
   });
 
   revalidatePath("/", "layout");

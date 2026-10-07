@@ -111,19 +111,22 @@ export default async function SettingsPipelinesPage({
                     default_flavor={pipeline.default_flavor}
                   />
                   {blocked ? (
-                    <button
-                      type="button"
-                      disabled
-                      title={`${pipeline.count} ${
-                        pipeline.count === 1 ? "company is" : "companies are"
-                      } still in this pipeline — move or delete ${
-                        pipeline.count === 1 ? "it" : "them"
-                      } first`}
-                      aria-label={`Cannot delete ${pipeline.name} while it has companies`}
-                      className="flex h-7 w-7 cursor-not-allowed items-center justify-center rounded-md text-zinc-300"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                    </button>
+                    <form action={deletePipeline}>
+                      <input type="hidden" name="id" value={pipeline.id} />
+                      <ConfirmSubmit
+                        title={`Delete ${pipeline.name}?`}
+                        message={`This permanently deletes the pipeline AND its ${pipeline.count} ${
+                          pipeline.count === 1 ? "company" : "companies"
+                        } — including their contacts, emails and history. This cannot be undone.`}
+                        confirmLabel="Delete everything"
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        <span className="sr-only">
+                          Delete {pipeline.name}
+                        </span>
+                      </ConfirmSubmit>
+                    </form>
                   ) : (
                     <form action={deletePipeline}>
                       <input type="hidden" name="id" value={pipeline.id} />
