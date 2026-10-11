@@ -311,11 +311,6 @@ export async function sendEmailViaSmtp(
       subject: message.subject,
       text: message.body,
       replyTo: fromAddress,
-      headers: {
-        // Signals a legitimate sender to spam filters (Gmail's bulk-sender
-        // guidance) without needing a tracking/unsubscribe service.
-        "List-Unsubscribe": `<mailto:${fromAddress}?subject=unsubscribe>`,
-      },
     });
   } catch (err) {
     const detail = err instanceof Error ? err.message : "Send failed";
