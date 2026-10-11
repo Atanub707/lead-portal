@@ -34,6 +34,7 @@ export interface EmailDraft {
   to: string;
   subject: string;
   body: string;
+  firstContact: boolean;
 }
 
 export type EmailDraftResult = EmailDraft | { ok: false; error: string };
@@ -162,6 +163,16 @@ export async function generateEmailDraft(opts: {
     return { ok: false, error: "No email address on this company — add one first." };
   }
 
+  // First email to this recipient? Cold first emails must stay link-free:
+  // links are a top spam signal, and Gmail flags messages "similar to past
+  // spam". Links only appear once a thread exists (second email onward).
+  const { count: priorSends } = await supabase
+    .from("sent_emails")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", opts.orgId)
+    .eq("to_email", to);
+  const firstContact = (priorSends ?? 0) === 0;
+
   const name = greetingName(to, contact?.name ?? null);
   const greeting = name ? `Hi ${name},` : "Hi there,";
   const prior =
@@ -252,14 +263,17 @@ ${
   const signature = [
     settings?.from_name,
     settings?.signature_phone,
-    settings?.signature_link,
+    firstContact ? null : settings?.signature_link,
   ]
     .map((line) => (typeof line === "string" ? line.trim() : ""))
     .filter((line) => line.length > 0)
     .join("\n");
 
-  const body = signature ? `${cleanBody}\n\n${signature}` : cleanBody;
-  return { ok: true, to, subject: cleanSubject, body };
+  const bodyText = firstContact
+    ? cleanBody.replace(/https?:\/\/\S+/gi, "").replace(/[ \t]+$/gm, "")
+    : cleanBody;
+  const body = signature ? `${bodyText}\n\n${signature}` : bodyText;
+  return { ok: true, to, subject: cleanSubject, body, firstContact };
 }
 
 // ─── SMTP send ────────────────────────────────────────────────────────────────

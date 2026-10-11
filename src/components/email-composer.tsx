@@ -33,6 +33,7 @@ export function EmailComposer({
   const [flavor, setFlavor] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [firstContact, setFirstContact] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +81,7 @@ export function EmailComposer({
         to?: string;
         subject?: string;
         body?: string;
+        firstContact?: boolean;
         error?: string;
       };
       if (!data.ok) {
@@ -88,6 +90,7 @@ export function EmailComposer({
       }
       setSubject(data.subject ?? "");
       setBody(data.body ?? "");
+      setFirstContact(data.firstContact === true);
       setTo((prev) => prev || data.to || "");
     } catch {
       setError("Couldn't draft this email. Please try again.");
@@ -299,6 +302,12 @@ export function EmailComposer({
                       rows={9}
                       className="input min-h-[160px] resize-y font-normal"
                     />
+                    {firstContact ? (
+                      <p className="mt-1 text-[11px] text-zinc-400">
+                        Link-free first email — signature links are added only
+                        after the first reply, for better inbox placement.
+                      </p>
+                    ) : null}
                   </div>
                 </>
               ) : null}
