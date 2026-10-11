@@ -27,6 +27,7 @@ Hard rules:
 - NEVER use: "I hope this email finds you well", "I'm writing to", "leverage", "passionate", "excited", "thrilled", exclamation marks, bullet points, or listicles.
 - PUNCTUATION: never use em-dashes or en-dashes. Commas, periods, and normal hyphens only.
 - Do NOT include any signature, name, phone, link, or sign-off. The system appends it.
+- Vary structure and wording from email to email. Never reuse sentence patterns or phrases across different recipients — near-identical mass mail is a spam signal.
 - Return valid JSON only, no markdown: { "subject": string (max 8 words, no fluff), "body": string }`;
 
 export interface EmailDraft {
@@ -119,8 +120,14 @@ export async function generateEmailDraft(opts: {
     .maybeSingle();
   if (!org) return { ok: false, error: "Company not found." };
 
-  const [pipelineResult, contactResult, emailsResult, priorResult, settingsResult] =
-    await Promise.all([
+  const [
+    pipelineResult,
+    contactResult,
+    emailsResult,
+    priorResult,
+    recentSendsResult,
+    settingsResult,
+  ] = await Promise.all([
       supabase
         .from("pipelines")
         .select("pitch, value_props, proof_points, cta")
@@ -144,6 +151,12 @@ export async function generateEmailDraft(opts: {
         .eq("org_id", opts.orgId)
         .order("created_at", { ascending: false })
         .limit(1),
+      supabase
+        .from("sent_emails")
+        .select("body")
+        .eq("sent_by", opts.userId)
+        .order("created_at", { ascending: false })
+        .limit(3),
       supabase
         .from("user_email_settings")
         .select("from_name, signature_phone, signature_link")
@@ -204,6 +217,12 @@ ${pitchLines || "Our offering: (no pitch defined for this pipeline yet — keep 
 ${
     prior
       ? `Prior email we sent on ${prior.created_at.slice(0, 10)}, subject: “${prior.subject}” — reference it naturally in one short clause.`
+      : ""
+  }${
+    (recentSendsResult.data ?? []).length > 0
+      ? `\n\nRecent emails we already sent to OTHER recipients. Write a clearly DIFFERENT email: do not reuse their phrasing, sentence patterns, opening structure, or ask wording. Only the greeting line is fixed. Near-identical mass mail is the #1 spam signal:\n${(recentSendsResult.data ?? [])
+          .map((row, index) => `--- recent ${index + 1} ---\n${(row.body ?? "").slice(0, 450)}`)
+          .join("\n")}`
       : ""
   }`;
 
