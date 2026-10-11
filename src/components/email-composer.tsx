@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Loader2, Mail, MailPlus, Sparkles, X } from "lucide-react";
 import { FLAVORS } from "@/lib/flavors";
+import { isGenericEmail } from "@/lib/people";
 
 export function EmailComposer({
   orgId,
@@ -206,6 +207,13 @@ export function EmailComposer({
                   placeholder="name@company.com"
                   className="input"
                 />
+                {to.includes("@") && isGenericEmail(to.split("@")[0]) ? (
+                  <p className="mt-1 text-[11px] text-amber-700">
+                    A role inbox like this often filters cold email. A decision
+                    maker&apos;s personal email lands better — find one with
+                    Deep Research on the company page.
+                  </p>
+                ) : null}
               </div>
 
               <div>

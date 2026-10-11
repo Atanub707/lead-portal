@@ -59,6 +59,26 @@ export async function POST(request: Request) {
     .eq("id", orgId)
     .maybeSingle();
 
+  // Daily cap per mailbox: high daily volume from one address is a top spam
+  // signal. Keep cold outreach slow and human-paced.
+  const SEND_DAILY_CAP = 30;
+  const dayStart = new Date();
+  dayStart.setUTCHours(0, 0, 0, 0);
+  const { count: sentToday } = await supabase
+    .from("sent_emails")
+    .select("id", { count: "exact", head: true })
+    .eq("sent_by", userId)
+    .gte("created_at", dayStart.toISOString());
+  if ((sentToday ?? 0) >= SEND_DAILY_CAP) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `Daily limit reached (${SEND_DAILY_CAP} sends/day per mailbox) — this protects your address from spam flags. Try again tomorrow.`,
+      },
+      { status: 429 }
+    );
+  }
+
   let password: string;
   try {
     password = decryptSecret(settings.smtp_password_enc);

@@ -22,6 +22,27 @@ const GENERIC_LOCALS = new Set([
   "jobs",
   "careers",
   "marketing",
+  // Common role inboxes in other languages (recipients' filters often treat
+  // cold mail to these as spam; they are never a person's own address).
+  "contacto",
+  "comunicacion",
+  "comunicaciones",
+  "admon",
+  "administracion",
+  "rgpd",
+  "ventas",
+  "comercial",
+  "direccion",
+  "correo",
+  "recepcion",
+  "contactus",
+  "accueil",
+  "kontakt",
+  "reception",
+  "enquiries",
+  "inquiries",
+  "reachus",
+  "hola",
 ]);
 
 export function isGenericEmail(local: string): boolean {
