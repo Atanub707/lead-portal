@@ -450,7 +450,7 @@ export default async function CompanyPage({
                     </span>
                     <div className="min-w-0 flex-1">
                       <Link
-                        href={`/replies/${thread.id}`}
+                        href={`/emails/${thread.id}`}
                         className="block truncate text-[13px] text-zinc-800 transition-colors hover:text-zinc-950"
                       >
                         {thread.subject_norm}

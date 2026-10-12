@@ -45,10 +45,10 @@ export default async function ReplyThreadPage({
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
       <Link
-        href="/replies"
+        href="/emails"
         className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900"
       >
-        ← Replies
+        ← Emails
       </Link>
 
       <header className="mt-3">

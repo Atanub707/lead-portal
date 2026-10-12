@@ -5,7 +5,7 @@ import { getReplyThreads } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
-export default async function RepliesPage() {
+export default async function EmailsPage() {
   const threads = await getReplyThreads();
 
   return (
@@ -14,7 +14,7 @@ export default async function RepliesPage() {
 
       <header>
         <h1 className="text-lg font-semibold tracking-tight text-zinc-900">
-          Replies
+          Emails
         </h1>
         <p className="mt-1 text-[13px] text-zinc-500 tabular-nums">
           {threads.length}{" "}
@@ -31,7 +31,7 @@ export default async function RepliesPage() {
           return (
             <Link
               key={thread.id}
-              href={`/replies/${thread.id}`}
+              href={`/emails/${thread.id}`}
               className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-zinc-50"
             >
               <span className="pt-0.5">
@@ -88,8 +88,8 @@ export default async function RepliesPage() {
         {threads.length === 0 ? (
           <div className="px-4 py-16 text-center">
             <p className="text-[13px] text-zinc-500">
-              No replies yet — emails you send from the portal and their replies
-              appear here.
+              No emails yet — everything you send from the portal and their
+              replies appear here.
             </p>
           </div>
         ) : null}

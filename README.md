@@ -111,7 +111,7 @@ Setup on [razorpay.com](https://razorpay.com):
    `payment.captured`. The webhook flips a workspace active after payment,
    applies cancellations at cycle end, and records receipts.
 
-## Replies (in-app conversations)
+## Emails (in-app conversations)
 
 A portal-native conversation view for your outreach: every email you send from
 the portal and the replies you receive — without ever seeing the rest of your
@@ -126,7 +126,7 @@ inbox.
 - **Setup:** none beyond email sending — it reuses your existing SMTP
   credentials (Gmail needs 2-Step Verification + an App Password; Gmail has
   IMAP enabled by default).
-- **Freshness:** replies sync when you open the Replies page (throttled to
+- **Freshness:** replies sync when you open the Emails page (throttled to
   once per 2 minutes) and via the Sync now button — not real-time push.
 - **Safety:** the mailbox is opened read-only; nothing is moved, deleted, or
   flagged. Replies still appear in your normal mail app exactly as before.

@@ -56,7 +56,7 @@ export function ReplySyncCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-[13px] font-semibold text-zinc-900">
-            Reply sync
+            Email sync
           </h3>
           <p className="mt-1 text-[12px] text-zinc-500">
             {lastSyncAt

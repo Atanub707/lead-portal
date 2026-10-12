@@ -109,10 +109,10 @@ export function SidebarNav({
         onNavigate={onNavigate}
       />
       <NavItem
-        href="/replies"
-        label="Replies"
+        href="/emails"
+        label="Emails"
         icon={Mail}
-        active={pathname.startsWith("/replies")}
+        active={pathname.startsWith("/emails")}
         collapsed={collapsed}
         onNavigate={onNavigate}
         badgeCount={unreadReplies}
