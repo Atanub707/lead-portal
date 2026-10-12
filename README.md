@@ -111,6 +111,28 @@ Setup on [razorpay.com](https://razorpay.com):
    `payment.captured`. The webhook flips a workspace active after payment,
    applies cancellations at cycle end, and records receipts.
 
+## Replies (in-app conversations)
+
+A portal-native conversation view for your outreach: every email you send from
+the portal and the replies you receive — without ever seeing the rest of your
+inbox.
+
+- **Reply-only capture.** The app reads your mailbox over IMAP (read-only) and
+  keeps **only** messages that match an email sent from the portal (via the
+  `Message-ID`/`In-Reply-To` headers, with a sender + subject fallback).
+  Everything else in your mailbox is never fetched or stored.
+- **Personal.** Each member syncs their own mailbox and sees only their own
+  conversations (enforced by row-level security).
+- **Setup:** none beyond email sending — it reuses your existing SMTP
+  credentials (Gmail needs 2-Step Verification + an App Password; Gmail has
+  IMAP enabled by default).
+- **Freshness:** replies sync when you open the Replies page (throttled to
+  once per 2 minutes) and via the Sync now button — not real-time push.
+- **Safety:** the mailbox is opened read-only; nothing is moved, deleted, or
+  flagged. Replies still appear in your normal mail app exactly as before.
+- **Threading:** replies sent from the portal carry proper `In-Reply-To` /
+  `References` headers, so they thread correctly in both the portal and Gmail.
+
 ## AI assistant ("Paste URL with AI")
 
 Each pipeline page has a **Paste URL with AI** button next to "Add company". Paste a
