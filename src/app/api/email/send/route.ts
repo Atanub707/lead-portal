@@ -5,6 +5,7 @@ import { decryptSecret } from "@/lib/crypto";
 import { sendEmailViaSmtp } from "@/lib/email";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { recordOutbound } from "@/lib/threads-db";
 
 export async function POST(request: Request) {
   const { userId } = await auth();
@@ -89,8 +90,9 @@ export async function POST(request: Request) {
     );
   }
 
+  let messageId: string;
   try {
-    await sendEmailViaSmtp(
+    ({ messageId } = await sendEmailViaSmtp(
       {
         host: settings.smtp_host,
         port: Number(settings.smtp_port ?? 587),
@@ -101,7 +103,7 @@ export async function POST(request: Request) {
         fromEmail: settings.from_email,
       },
       { to, subject, body: text }
-    );
+    ));
   } catch (err) {
     const message = err instanceof Error ? err.message : "Send failed";
     return NextResponse.json({ ok: false, error: message }, { status: 502 });
@@ -117,9 +119,26 @@ export async function POST(request: Request) {
     to_email: to,
     subject,
     body: text,
+    message_id: messageId,
   });
   if (recordError) {
     console.error("[email.send] sent_emails insert failed:", recordError.message);
+  }
+
+  try {
+    await recordOutbound(admin, {
+      workspaceId: workspaceId ?? "",
+      userId,
+      orgId,
+      contactId: body.contactId ?? null,
+      fromEmail: settings.from_email ?? settings.smtp_user,
+      toEmail: to,
+      subject,
+      body: text,
+      messageId,
+    });
+  } catch (err) {
+    console.error("[email.send] thread record failed:", err);
   }
 
   await logActivity({

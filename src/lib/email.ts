@@ -309,8 +309,9 @@ export interface SmtpSendSettings {
 
 export async function sendEmailViaSmtp(
   settings: SmtpSendSettings,
-  message: { to: string; subject: string; body: string }
-): Promise<void> {
+  message: { to: string; subject: string; body: string },
+  opts?: { inReplyTo?: string; references?: string; subjectOverride?: string }
+): Promise<{ messageId: string }> {
   const transport = nodemailer.createTransport({
     host: settings.host,
     port: settings.port,
@@ -324,13 +325,16 @@ export async function sendEmailViaSmtp(
     : fromAddress;
 
   try {
-    await transport.sendMail({
+    const info = await transport.sendMail({
       from,
       to: message.to,
-      subject: message.subject,
+      subject: opts?.subjectOverride ?? message.subject,
       text: message.body,
       replyTo: fromAddress,
+      ...(opts?.inReplyTo ? { inReplyTo: opts.inReplyTo } : {}),
+      ...(opts?.references ? { references: opts.references } : {}),
     });
+    return { messageId: info.messageId ?? `${Date.now()}@leadportal` };
   } catch (err) {
     const detail = err instanceof Error ? err.message : "Send failed";
     if (/invalid login|535|authentication/i.test(detail)) {
