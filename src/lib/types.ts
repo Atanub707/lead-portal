@@ -262,6 +262,32 @@ export interface EmailSettings {
   signature_link: string | null;
 }
 
+export interface EmailThread {
+  id: number;
+  workspace_id: string;
+  user_id: string;
+  org_id: number | null;
+  contact_id: number | null;
+  subject_norm: string;
+  counterparty_email: string;
+  last_message_at: string;
+  unread: number;
+  created_at: string;
+}
+
+export interface EmailMessage {
+  id: number;
+  thread_id: number;
+  direction: "out" | "in";
+  from_email: string;
+  to_email: string;
+  subject: string | null;
+  body: string;
+  message_id: string;
+  sent_at: string;
+  has_attachments: boolean;
+}
+
 export const STATUS_LABEL: Record<PipelineStage, string> = {
   new: "New",
   contacted: "Contacted",
