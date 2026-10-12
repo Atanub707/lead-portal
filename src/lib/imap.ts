@@ -72,7 +72,8 @@ export async function scanInbox(opts: {
       }
       uidValidity = currentUidValidity;
 
-      const startUid = lastUid + 1;
+      // First sync starts at the most recent MAX_PER_SYNC messages (≈ the last 30 days of a normal inbox), not the mailbox's oldest mail.
+      const startUid = opts.lastUid === null ? Math.max(1, Number(mailbox.uidNext) - MAX_PER_SYNC) : lastUid + 1;
       const uids: number[] = [];
       for await (const msg of client.fetch(
         `${startUid}:*`,
