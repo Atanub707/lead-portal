@@ -108,6 +108,15 @@ export function SidebarNav({
         collapsed={collapsed}
         onNavigate={onNavigate}
       />
+      <NavItem
+        href="/replies"
+        label="Replies"
+        icon={Mail}
+        active={pathname.startsWith("/replies")}
+        collapsed={collapsed}
+        onNavigate={onNavigate}
+        badgeCount={unreadReplies}
+      />
 
       {collapsed ? (
         <div className="mx-1 my-2.5 border-t border-zinc-200/80" />
@@ -140,15 +149,6 @@ export function SidebarNav({
               Admin
             </p>
           )}
-          <NavItem
-            href="/replies"
-            label="Replies"
-            icon={Mail}
-            active={pathname.startsWith("/replies")}
-            collapsed={collapsed}
-            onNavigate={onNavigate}
-            badgeCount={unreadReplies}
-          />
           <NavItem
             href="/settings"
             label="Settings"

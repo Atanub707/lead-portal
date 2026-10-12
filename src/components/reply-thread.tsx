@@ -22,26 +22,40 @@ export function ReplyThread({ threadId }: { threadId: number }) {
     if (!text.trim() || posting) return;
     setError("");
     startPosting(async () => {
-      const res = await fetch("/api/email/reply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ threadId, text }),
-      });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
-      if (data.ok) {
-        setText("");
-        router.refresh();
-      } else {
-        setError(data.error ?? "Send failed");
+      try {
+        const res = await fetch("/api/email/reply", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ threadId, text }),
+        });
+        const data = (await res.json()) as { ok?: boolean; error?: string };
+        if (data.ok) {
+          setText("");
+          router.refresh();
+        } else {
+          setError(data.error ?? "Send failed");
+        }
+      } catch {
+        setError("Couldn't send the reply — try again.");
       }
     });
   }
 
   async function syncNow() {
     setSyncing(true);
-    await fetch("/api/email/sync", { method: "POST" }).catch(() => {});
-    setSyncing(false);
-    router.refresh();
+    setError("");
+    try {
+      const res = await fetch("/api/email/sync", { method: "POST" });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!data.ok) {
+        setError(data.error ?? "Couldn't check for new replies — try again.");
+      }
+    } catch {
+      setError("Couldn't check for new replies — try again.");
+    } finally {
+      setSyncing(false);
+      router.refresh();
+    }
   }
 
   return (
