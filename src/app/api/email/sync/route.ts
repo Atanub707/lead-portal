@@ -91,7 +91,7 @@ export async function POST() {
     console.error("[email.sync] failed:", message);
     await admin
       .from("user_email_settings")
-      .update({ imap_last_error: message.slice(0, 300), imap_last_sync_at: new Date().toISOString() })
+      .update({ imap_last_error: message.slice(0, 300) })
       .eq("user_id", userId);
     return NextResponse.json({ ok: false, error: friendlyImapError(message) }, { status: 502 });
   }

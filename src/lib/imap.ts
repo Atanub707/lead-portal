@@ -92,8 +92,9 @@ export async function scanInbox(opts: {
         if (!headerMsg) continue;
         const headers = headerMsg.headers;
         const rawHeaders = headers ? headers.toString("utf8") : "";
+        const unfoldedHeaders = rawHeaders.replace(/\r?\n[ \t]+/g, " ");
         const get = (name: string): string | null => {
-          const m = rawHeaders.match(new RegExp(`^${name}:\\s*(.+)$`, "im"));
+          const m = unfoldedHeaders.match(new RegExp(`^${name}:\\s*(.+)$`, "im"));
           return m ? m[1].trim() : null;
         };
         const messageId = (get("message-id") ?? "").replace(/[<>]/g, "");
@@ -121,7 +122,10 @@ export async function scanInbox(opts: {
           (parsed.text && parsed.text.trim()) ||
           (parsed.html ? parsed.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : "") ||
           "(no text content)";
-        const sentAt = parsed.date ? new Date(parsed.date).toISOString() : new Date().toISOString();
+        const parsedDate = new Date(parsed.date ?? "");
+        const sentAt = Number.isNaN(parsedDate.getTime())
+          ? new Date().toISOString()
+          : parsedDate.toISOString();
         await opts.onMatch({
           anchorMessageId: match.anchorMessageId,
           messageId,
