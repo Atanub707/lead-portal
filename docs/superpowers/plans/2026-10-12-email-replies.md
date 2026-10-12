@@ -51,7 +51,7 @@
 - Modify: `src/lib/types.ts`
 
 **Interfaces:**
-- Produces: SQL tables; `normalizeSubject(s: string): string`; `threadKey(counterpartyEmail: string, subject: string): string`; `matchInbound(msg: InboundHeaders, index: MatchIndex): { messageId: string; threadMessageId: string } | null` where `MatchIndex = { messageIds: Set<string>; recipientEmails: Set<string>; subjects: Map<string, string /* thread's root message id */> }` and `InboundHeaders = { messageId: string; inReplyTo: string | null; references: string[]; fromEmail: string; subject: string }`.
+- Produces: SQL tables; `normalizeSubject(s: string): string`; `threadKey(counterpartyEmail: string, subject: string): string`; `matchInbound(msg: InboundHeaders, index: MatchIndex): InboundMatch | null` where `InboundMatch = { anchorMessageId: string }` (the stored message id the inbound message replies to) and `MatchIndex = { messageIds: Set<string>; recipientEmails: Set<string>; subjects: Map<string, string /* fromEmail|subjectNorm -> message id */> }` and `InboundHeaders = { messageId: string; inReplyTo: string | null; references: string[]; fromEmail: string; subject: string }`.
 
 - [ ] **Step 1: Write the migration**
 
@@ -655,7 +655,7 @@ git commit -m "feat(replies): outbound threading — message-id capture, thread 
 - Modify: `package.json` (deps: `imapflow`, `postal-mime`)
 
 **Interfaces:**
-- Consumes: `matchInbound` (Task 1), `getMatchIndex`/`recordInbound` (Task 2).
+- Consumes: `matchInbound` (Task 1), `getMatchIndex`/`recordInbound` (Task 2). Alignment (amended after Task 1–2 review): the fallback-subject part of the match index is keyed `fromEmail|subjectNorm` — the index passed to `scanInbox` uses the composite key; do not assume subject-only keys.
 - Produces: `POST /api/email/sync → { ok, skipped?, scanned, matched, lastSyncAt, error? }`.
 
 - [ ] **Step 1: Install deps**
@@ -1146,3 +1146,16 @@ git push
 - Spec coverage: reply-only capture ✓ (Task 1 matcher + Task 3 sync), personal RLS ✓ (Task 1), read-only INBOX ✓ (Task 3 `readOnly: true`), outbound message-id ✓ (Task 2), reply-from-portal threading ✓ (Task 2), badge/list/thread/company/settings ✓ (Task 4), caps + throttle ✓ (Task 3), attachments note ✓ (Task 3 `hasAttachments` + Task 4 note), deps limited to imapflow+postal-mime ✓.
 - Type consistency: `MatchIndex`/`InboundHeaders` defined in Task 1 and consumed in Tasks 2–3; `EmailThread`/`EmailMessage` in Task 1 used by Task 4; `sendEmailViaSmtp` return change is consumed in Task 2 only (send + reply).
 - Known gotcha recorded: `getMatchIndex` returns `messageToThread` (extra) — typed accordingly; admin client required for writes on the new tables (RLS grants SELECT only).
+
+## Amendments after Task 1–2 review
+
+Applied in the review-fix commit `fix(replies): composite fallback key, duplicate-safe inbound, loud outbound errors, sent_at, minor guards`:
+
+- **Fallback subject index key is now `fromEmail|subjectNorm`** (`MatchIndex.subjects` doc comment updated; `threads.ts` `matchInbound` and `threads-db.ts` `getMatchIndex` build/read the composite key). The same subject sent to two different leads can no longer cross-anchor a header-less reply. Task 1 Step 4's unit command is superseded — the reviewed version also asserts a subject match from a different sender does NOT match.
+- **`recordInbound` is duplicate-safe**: the upsert now chains `.select("id")`; an empty result (re-delivered message) returns early without bumping `unread` or rewinding `last_message_at`. Upsert errors still throw.
+- **`recordOutbound` throws on write failure** for both the message upsert and the thread update (callers already wrap in try/catch) and **sets `sent_at` explicitly** on the outbound row so `sent_at DESC` ordering cannot mis-thread.
+- **Reply subject prefix guard**: `/api/email/reply` only prefixes `Re: ` when the base subject doesn't already start with `re:` (case-insensitive).
+- **`/api/email/send` skips the thread record when `workspaceId` is missing**, logging `[email.send] missing workspaceId — skipped thread record` instead of writing with `""`.
+- Task 1 Interfaces line corrected: the operative contract is `InboundMatch = { anchorMessageId: string }` — the earlier `{ messageId; threadMessageId }` was never shipped.
+- Empty `if (row.direction === "out") { }` block removed from `getMatchIndex` (and `direction` is no longer selected there).
+- Still deferred (final-triage list): check-then-insert duplicate threads, unread read-then-write race, unbounded `getMatchIndex` fetch, reply-route 500-after-send alignment, `sent_emails.message_id` uniqueness scope.

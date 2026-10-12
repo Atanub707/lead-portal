@@ -26,7 +26,7 @@ export interface MatchIndex {
   messageIds: Set<string>;
   // Emails this user has emailed from the portal.
   recipientEmails: Set<string>;
-  // normalizeSubject(subject) -> thread root message id (latest wins).
+  // `${fromEmail}|${normalizeSubject(subject)}` -> message id (latest wins).
   subjects: Map<string, string>;
 }
 
@@ -49,7 +49,7 @@ export function matchInbound(
   // Fallback: from someone we emailed AND subject matches a subject we sent.
   const from = msg.fromEmail.trim().toLowerCase();
   if (index.recipientEmails.has(from)) {
-    const anchor = index.subjects.get(normalizeSubject(msg.subject));
+    const anchor = index.subjects.get(`${from}|${normalizeSubject(msg.subject)}`);
     if (anchor) return { anchorMessageId: anchor };
   }
   return null;

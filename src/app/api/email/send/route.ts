@@ -125,20 +125,24 @@ export async function POST(request: Request) {
     console.error("[email.send] sent_emails insert failed:", recordError.message);
   }
 
-  try {
-    await recordOutbound(admin, {
-      workspaceId: workspaceId ?? "",
-      userId,
-      orgId,
-      contactId: body.contactId ?? null,
-      fromEmail: settings.from_email ?? settings.smtp_user,
-      toEmail: to,
-      subject,
-      body: text,
-      messageId,
-    });
-  } catch (err) {
-    console.error("[email.send] thread record failed:", err);
+  if (workspaceId) {
+    try {
+      await recordOutbound(admin, {
+        workspaceId,
+        userId,
+        orgId,
+        contactId: body.contactId ?? null,
+        fromEmail: settings.from_email ?? settings.smtp_user,
+        toEmail: to,
+        subject,
+        body: text,
+        messageId,
+      });
+    } catch (err) {
+      console.error("[email.send] thread record failed:", err);
+    }
+  } else {
+    console.error("[email.send] missing workspaceId — skipped thread record");
   }
 
   await logActivity({

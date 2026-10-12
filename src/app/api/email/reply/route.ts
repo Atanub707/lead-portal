@@ -49,7 +49,8 @@ export async function POST(request: Request) {
     .limit(1)
     .maybeSingle();
   const references = [last?.references_ids, last?.message_id].filter(Boolean).join(" ");
-  const subject = `Re: ${last?.subject ?? thread.subject_norm}`;
+  const baseSubject = last?.subject ?? thread.subject_norm;
+  const subject = /^re\s*:/i.test(baseSubject) ? baseSubject : `Re: ${baseSubject}`;
 
   let password: string;
   try {

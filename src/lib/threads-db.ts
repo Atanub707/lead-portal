@@ -64,7 +64,7 @@ export async function recordOutbound(
     counterpartyEmail: opts.toEmail,
     subject: opts.subject,
   });
-  await supabase.from("email_messages").upsert(
+  const { error: messageError } = await supabase.from("email_messages").upsert(
     {
       thread_id: threadId,
       workspace_id: opts.workspaceId,
@@ -77,13 +77,16 @@ export async function recordOutbound(
       message_id: opts.messageId,
       in_reply_to: opts.inReplyTo ?? null,
       references_ids: opts.referencesIds ?? null,
+      sent_at: new Date().toISOString(),
     },
     { onConflict: "message_id", ignoreDuplicates: true }
   );
-  await supabase
+  if (messageError) throw new Error(messageError.message);
+  const { error: threadError } = await supabase
     .from("email_threads")
     .update({ last_message_at: new Date().toISOString(), unread: 0 })
     .eq("id", threadId);
+  if (threadError) throw new Error(threadError.message);
   return { threadId };
 }
 
@@ -104,25 +107,29 @@ export async function recordInbound(
     sentAt: string;
   }
 ): Promise<void> {
-  const { error } = await supabase.from("email_messages").upsert(
-    {
-      thread_id: opts.threadId,
-      workspace_id: opts.workspaceId,
-      user_id: opts.userId,
-      direction: "in",
-      from_email: opts.fromEmail,
-      to_email: opts.toEmail,
-      subject: opts.subject,
-      body: opts.body,
-      message_id: opts.messageId,
-      in_reply_to: opts.inReplyTo,
-      references_ids: opts.referencesIds,
-      has_attachments: opts.hasAttachments,
-      sent_at: opts.sentAt,
-    },
-    { onConflict: "message_id", ignoreDuplicates: true }
-  );
+  const { data: inserted, error } = await supabase
+    .from("email_messages")
+    .upsert(
+      {
+        thread_id: opts.threadId,
+        workspace_id: opts.workspaceId,
+        user_id: opts.userId,
+        direction: "in",
+        from_email: opts.fromEmail,
+        to_email: opts.toEmail,
+        subject: opts.subject,
+        body: opts.body,
+        message_id: opts.messageId,
+        in_reply_to: opts.inReplyTo,
+        references_ids: opts.referencesIds,
+        has_attachments: opts.hasAttachments,
+        sent_at: opts.sentAt,
+      },
+      { onConflict: "message_id", ignoreDuplicates: true }
+    )
+    .select("id");
   if (error) throw new Error(error.message);
+  if (!inserted || inserted.length === 0) return;
   const { data: thread } = await supabase
     .from("email_threads")
     .select("unread")
@@ -148,14 +155,11 @@ export async function getMatchIndex(
 
   const { data: messages } = await supabase
     .from("email_messages")
-    .select("message_id, thread_id, direction")
+    .select("message_id, thread_id")
     .eq("user_id", userId);
   for (const row of messages ?? []) {
     messageIds.add(row.message_id as string);
     messageToThread.set(row.message_id as string, row.thread_id as number);
-    if (row.direction === "out") {
-      // Track the newest outbound message id per thread as the subject anchor.
-    }
   }
 
   const { data: sent } = await supabase
@@ -166,7 +170,7 @@ export async function getMatchIndex(
     .limit(500);
   for (const row of sent ?? []) {
     recipientEmails.add((row.to_email as string).toLowerCase());
-    const key = normalizeSubject(row.subject as string);
+    const key = `${(row.to_email as string).toLowerCase()}|${normalizeSubject(row.subject as string)}`;
     if (!subjects.has(key) && row.message_id) {
       subjects.set(key, row.message_id as string);
     }
