@@ -48,7 +48,7 @@ export default async function RepliesPage() {
                       thread.unread > 0 ? "font-medium" : ""
                     }`}
                   >
-                    {thread.subject_norm}
+                    {thread.display_subject}
                   </p>
                   {thread.org_name ? (
                     <span className="shrink-0 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] text-zinc-500">

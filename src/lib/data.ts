@@ -756,6 +756,7 @@ export type ReplyThreadRow = EmailThread & {
   org_name: string | null;
   last_body: string | null;
   last_direction: string | null;
+  display_subject: string;
 };
 
 // The signed-in user's conversations, newest first, with a display name for
@@ -789,15 +790,19 @@ export async function getReplyThreads(): Promise<ReplyThreadRow[]> {
   const threadIds = list.map((thread) => thread.id);
   const { data: lastMessages } = await supabase
     .from("email_messages")
-    .select("thread_id, body, direction, sent_at")
+    .select("thread_id, body, direction, sent_at, subject")
     .in("thread_id", threadIds)
     .order("sent_at", { ascending: false });
-  const lastByThread = new Map<number, { body: string; direction: string }>();
+  const lastByThread = new Map<
+    number,
+    { body: string; direction: string; subject: string | null }
+  >();
   for (const message of lastMessages ?? []) {
     if (!lastByThread.has(message.thread_id as number)) {
       lastByThread.set(message.thread_id as number, {
         body: message.body as string,
         direction: message.direction as string,
+        subject: (message.subject as string | null) ?? null,
       });
     }
   }
@@ -807,11 +812,13 @@ export async function getReplyThreads(): Promise<ReplyThreadRow[]> {
     org_name: thread.org_id ? (orgNames.get(thread.org_id) ?? null) : null,
     last_body: lastByThread.get(thread.id)?.body ?? null,
     last_direction: lastByThread.get(thread.id)?.direction ?? null,
+    display_subject:
+      lastByThread.get(thread.id)?.subject || thread.subject_norm,
   }));
 }
 
 export async function getReplyThread(id: number): Promise<{
-  thread: EmailThread;
+  thread: EmailThread & { display_subject: string };
   messages: EmailMessage[];
 } | null> {
   const profile = await getCurrentProfile();
@@ -829,9 +836,12 @@ export async function getReplyThread(id: number): Promise<{
     .select("*")
     .eq("thread_id", id)
     .order("sent_at", { ascending: true });
+  const messageList = (messages ?? []) as EmailMessage[];
+  const displaySubject =
+    messageList[messageList.length - 1]?.subject || thread.subject_norm;
   return {
-    thread: thread as EmailThread,
-    messages: (messages ?? []) as EmailMessage[],
+    thread: { ...(thread as EmailThread), display_subject: displaySubject },
+    messages: messageList,
   };
 }
 

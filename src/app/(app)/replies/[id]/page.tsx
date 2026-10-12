@@ -53,7 +53,7 @@ export default async function ReplyThreadPage({
 
       <header className="mt-3">
         <h1 className="text-lg font-semibold tracking-tight text-zinc-900">
-          {thread.subject_norm}
+          {thread.display_subject}
         </h1>
         <p className="mt-1 text-[13px] text-zinc-500">
           {thread.counterparty_email}

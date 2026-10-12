@@ -80,6 +80,29 @@ export async function POST(request: Request) {
     );
 
     const admin = createAdminClient();
+    if (thread.org_id == null) {
+      console.error(
+        "[email.reply] sent_emails insert skipped: thread has no org_id"
+      );
+    } else {
+      const { error: recordError } = await admin.from("sent_emails").insert({
+        org_id: thread.org_id as number,
+        workspace_id: thread.workspace_id as string,
+        contact_id: (thread.contact_id as number | null) ?? null,
+        sent_by: userId,
+        to_email: thread.counterparty_email as string,
+        subject,
+        body: text,
+        message_id: messageId,
+      });
+      if (recordError) {
+        console.error(
+          "[email.reply] sent_emails insert failed:",
+          recordError.message
+        );
+      }
+    }
+
     await recordOutbound(admin, {
       workspaceId: thread.workspace_id as string,
       userId,
