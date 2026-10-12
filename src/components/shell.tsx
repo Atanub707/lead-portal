@@ -80,6 +80,7 @@ export function Shell({
   role,
   avatar = null,
   pipelines,
+  unreadReplies,
   switcher = null,
   banner = null,
   children,
@@ -90,6 +91,7 @@ export function Shell({
   role: string;
   avatar?: string | null;
   pipelines: Pipeline[];
+  unreadReplies: number;
   switcher?: {
     workspaces: { id: string; name: string }[];
     currentId: string;
@@ -201,7 +203,12 @@ export function Shell({
           />
         ) : null}
 
-        <SidebarNav isOwner={isOwner} pipelines={pipelines} collapsed={collapsed} />
+        <SidebarNav
+          isOwner={isOwner}
+          pipelines={pipelines}
+          unreadReplies={unreadReplies}
+          collapsed={collapsed}
+        />
 
         <div className="shrink-0 border-t border-zinc-200/80">
           <UserBlock
@@ -255,6 +262,7 @@ export function Shell({
             <SidebarNav
               isOwner={isOwner}
               pipelines={pipelines}
+              unreadReplies={unreadReplies}
               onNavigate={() => setMobileOpen(false)}
             />
             <div className="shrink-0 border-t border-zinc-200/80">

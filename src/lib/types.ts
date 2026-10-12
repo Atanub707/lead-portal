@@ -260,6 +260,9 @@ export interface EmailSettings {
   smtp_user: string | null;
   signature_phone: string | null;
   signature_link: string | null;
+  imap_host: string | null;
+  imap_last_sync_at: string | null;
+  imap_last_error: string | null;
 }
 
 export interface EmailThread {

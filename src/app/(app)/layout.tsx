@@ -9,6 +9,8 @@ import {
   getWorkspaceContext,
 } from "@/lib/data";
 import { ensureProfile } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import { getUnreadReplyCount } from "@/lib/threads-db";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +30,11 @@ export default async function AppLayout({
   }
 
   const isSuperAdmin = profile.is_super_admin;
-  const [pipelines, context] = await Promise.all([
+  const supabase = await createClient();
+  const [pipelines, context, unreadReplies] = await Promise.all([
     getPipelines(),
     getWorkspaceContext(),
+    getUnreadReplyCount(supabase, profile.id),
   ]);
 
   // Paywall: an expired trial / lapsed subscription blocks the app.
@@ -76,6 +80,7 @@ export default async function AppLayout({
       role={profile.role}
       avatar={profile.avatar ?? null}
       pipelines={pipelines}
+      unreadReplies={unreadReplies}
       switcher={
         isSuperAdmin
           ? {

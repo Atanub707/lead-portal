@@ -4,6 +4,7 @@ import Link, { useLinkStatus } from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   LayoutDashboard,
+  Mail,
   ScrollText,
   Settings,
   type LucideIcon,
@@ -34,6 +35,7 @@ function NavItem({
   collapsed = false,
   onNavigate,
   prefetch = true,
+  badgeCount = 0,
 }: {
   href: string;
   label: string;
@@ -42,6 +44,7 @@ function NavItem({
   collapsed?: boolean;
   onNavigate?: () => void;
   prefetch?: boolean | "auto";
+  badgeCount?: number;
 }) {
   return (
     <Link
@@ -61,6 +64,18 @@ function NavItem({
       {collapsed ? null : label}
       {collapsed ? <span className="sr-only">{label}</span> : null}
       <NavHint collapsed={collapsed} />
+      {badgeCount > 0 ? (
+        collapsed ? (
+          <span
+            aria-hidden="true"
+            className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-zinc-900"
+          />
+        ) : (
+          <span className="rounded-full bg-zinc-900 px-1.5 text-[10px] font-medium text-white tabular-nums">
+            {badgeCount}
+          </span>
+        )
+      ) : null}
     </Link>
   );
 }
@@ -68,11 +83,13 @@ function NavItem({
 export function SidebarNav({
   isOwner,
   pipelines,
+  unreadReplies,
   collapsed = false,
   onNavigate,
 }: {
   isOwner: boolean;
   pipelines: Pipeline[];
+  unreadReplies: number;
   collapsed?: boolean;
   onNavigate?: () => void;
 }) {
@@ -123,6 +140,15 @@ export function SidebarNav({
               Admin
             </p>
           )}
+          <NavItem
+            href="/replies"
+            label="Replies"
+            icon={Mail}
+            active={pathname.startsWith("/replies")}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+            badgeCount={unreadReplies}
+          />
           <NavItem
             href="/settings"
             label="Settings"

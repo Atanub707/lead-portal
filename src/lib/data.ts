@@ -7,7 +7,9 @@ import {
   type CompanyEmail,
   type CompanySort,
   type Contact,
+  type EmailMessage,
   type EmailSettings,
+  type EmailThread,
   type EnrichmentRun,
   type EnrichmentRunWithOrg,
   type Interaction,
@@ -703,6 +705,9 @@ export async function getMyEmailSettings(): Promise<EmailSettings> {
     smtp_user: null,
     signature_phone: null,
     signature_link: null,
+    imap_host: null,
+    imap_last_sync_at: null,
+    imap_last_error: null,
   };
 
   const { userId } = await auth();
@@ -713,7 +718,7 @@ export async function getMyEmailSettings(): Promise<EmailSettings> {
     supabase
       .from("user_email_settings")
       .select(
-        "from_name, from_email, smtp_host, smtp_port, smtp_secure, smtp_user, signature_phone, signature_link"
+        "from_name, from_email, smtp_host, smtp_port, smtp_secure, smtp_user, signature_phone, signature_link, imap_host, imap_last_sync_at, imap_last_error"
       )
       .eq("user_id", userId)
       .maybeSingle(),
@@ -741,6 +746,92 @@ export async function getMyEmailSettings(): Promise<EmailSettings> {
     smtp_user: data.smtp_user ?? null,
     signature_phone: data.signature_phone ?? null,
     signature_link: data.signature_link ?? null,
+    imap_host: data.imap_host ?? null,
+    imap_last_sync_at: data.imap_last_sync_at ?? null,
+    imap_last_error: data.imap_last_error ?? null,
+  };
+}
+
+export type ReplyThreadRow = EmailThread & {
+  org_name: string | null;
+  last_body: string | null;
+  last_direction: string | null;
+};
+
+// The signed-in user's conversations, newest first, with a display name for
+// the linked company and a snippet of the latest message.
+export async function getReplyThreads(): Promise<ReplyThreadRow[]> {
+  const profile = await getCurrentProfile();
+  if (!profile) return [];
+  const supabase = await createClient();
+  const { data: threads } = await supabase
+    .from("email_threads")
+    .select("*")
+    .eq("user_id", profile.id)
+    .order("last_message_at", { ascending: false })
+    .limit(100);
+  const list = (threads ?? []) as EmailThread[];
+  if (list.length === 0) return [];
+
+  const orgIds = [
+    ...new Set(list.map((thread) => thread.org_id).filter(Boolean)),
+  ] as number[];
+  let orgs: { id: number; name: string }[] = [];
+  if (orgIds.length > 0) {
+    const { data } = await supabase
+      .from("organizations")
+      .select("id, name")
+      .in("id", orgIds);
+    orgs = (data ?? []) as { id: number; name: string }[];
+  }
+  const orgNames = new Map(orgs.map((org) => [org.id, org.name]));
+
+  const threadIds = list.map((thread) => thread.id);
+  const { data: lastMessages } = await supabase
+    .from("email_messages")
+    .select("thread_id, body, direction, sent_at")
+    .in("thread_id", threadIds)
+    .order("sent_at", { ascending: false });
+  const lastByThread = new Map<number, { body: string; direction: string }>();
+  for (const message of lastMessages ?? []) {
+    if (!lastByThread.has(message.thread_id as number)) {
+      lastByThread.set(message.thread_id as number, {
+        body: message.body as string,
+        direction: message.direction as string,
+      });
+    }
+  }
+
+  return list.map((thread) => ({
+    ...thread,
+    org_name: thread.org_id ? (orgNames.get(thread.org_id) ?? null) : null,
+    last_body: lastByThread.get(thread.id)?.body ?? null,
+    last_direction: lastByThread.get(thread.id)?.direction ?? null,
+  }));
+}
+
+export async function getReplyThread(id: number): Promise<{
+  thread: EmailThread;
+  messages: EmailMessage[];
+} | null> {
+  const profile = await getCurrentProfile();
+  if (!profile) return null;
+  const supabase = await createClient();
+  const { data: thread } = await supabase
+    .from("email_threads")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", profile.id)
+    .maybeSingle();
+  if (!thread) return null;
+  const { data: messages } = await supabase
+    .from("email_messages")
+    .select("*")
+    .eq("thread_id", id)
+    .order("sent_at", { ascending: true });
+  return {
+    thread: thread as EmailThread,
+    messages: (messages ?? []) as EmailMessage[],
   };
 }
 

@@ -43,9 +43,15 @@ import {
   pipelineName,
   pipelineStages,
   sourceLabel,
+  type EmailThread,
 } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+type OrgThread = Pick<
+  EmailThread,
+  "id" | "subject_norm" | "counterparty_email" | "last_message_at" | "unread"
+>;
 
 const RUN_KIND_LABEL: Record<string, string> = {
   website_research: "Website research",
@@ -175,6 +181,21 @@ export default async function CompanyPage({
   ]);
 
   if (!company) notFound();
+
+  const orgThreads = profile
+    ? ((
+        (
+          await supabase
+            .from("email_threads")
+            .select(
+              "id, subject_norm, counterparty_email, last_message_at, unread"
+            )
+            .eq("user_id", profile.id)
+            .eq("org_id", company.id)
+            .order("last_message_at", { ascending: false })
+        ).data ?? []
+      ) as OrgThread[])
+    : [];
 
   const labelFor = (id: string | null) => {
     if (!id) return null;
@@ -407,6 +428,48 @@ export default async function CompanyPage({
               </ul>
             )}
           </Section>
+
+          {/* Emails */}
+          {orgThreads.length > 0 ? (
+            <Section
+              title="Emails"
+              count={orgThreads.length}
+              className="animate-rise animate-rise-2"
+            >
+              <ul className="mt-1 divide-y divide-zinc-100">
+                {orgThreads.map((thread) => (
+                  <li key={thread.id} className="flex items-center gap-3 py-2.5">
+                    <span className="flex w-1.5 shrink-0 justify-center">
+                      {thread.unread > 0 ? (
+                        <span
+                          role="img"
+                          aria-label="Unread"
+                          className="h-1.5 w-1.5 rounded-full bg-zinc-900"
+                        />
+                      ) : null}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/replies/${thread.id}`}
+                        className="block truncate text-[13px] text-zinc-800 transition-colors hover:text-zinc-950"
+                      >
+                        {thread.subject_norm}
+                      </Link>
+                      <p className="truncate text-[12px] text-zinc-500">
+                        {thread.counterparty_email}
+                      </p>
+                    </div>
+                    <time
+                      dateTime={thread.last_message_at}
+                      className="shrink-0 text-[12px] text-zinc-400 tabular-nums"
+                    >
+                      {dateOnly(thread.last_message_at)}
+                    </time>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          ) : null}
 
           {/* People */}
           <Section

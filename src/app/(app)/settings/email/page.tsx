@@ -1,4 +1,5 @@
 import { EmailSettingsForm } from "@/components/email-settings-form";
+import { ReplySyncCard } from "@/components/reply-sync-card";
 import { getMyEmailSettings } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
@@ -81,6 +82,11 @@ export default async function EmailSettingsPage() {
           </li>
         </ul>
       </section>
+
+      <ReplySyncCard
+        lastSyncAt={settings.imap_last_sync_at}
+        lastError={settings.imap_last_error}
+      />
     </div>
   );
 }
