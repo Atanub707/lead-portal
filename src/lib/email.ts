@@ -334,7 +334,14 @@ export async function sendEmailViaSmtp(
       ...(opts?.inReplyTo ? { inReplyTo: opts.inReplyTo } : {}),
       ...(opts?.references ? { references: opts.references } : {}),
     });
-    return { messageId: info.messageId ?? `${Date.now()}@leadportal` };
+    // Canonical stored form is BARE (no angle brackets) — nodemailer returns
+    // `<uuid@domain>`; inbound headers are compared unbraced.
+    return {
+      messageId: (info.messageId ?? `${Date.now()}@leadportal`).replace(
+        /[<>]/g,
+        ""
+      ),
+    };
   } catch (err) {
     const detail = err instanceof Error ? err.message : "Send failed";
     if (/invalid login|535|authentication/i.test(detail)) {

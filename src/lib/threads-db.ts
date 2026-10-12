@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { normalizeSubject, type MatchIndex } from "./threads";
+import { normalizeMessageId, normalizeSubject, type MatchIndex } from "./threads";
 
 export async function findOrCreateThread(
   supabase: SupabaseClient,
@@ -158,8 +158,10 @@ export async function getMatchIndex(
     .select("message_id, thread_id")
     .eq("user_id", userId);
   for (const row of messages ?? []) {
-    messageIds.add(row.message_id as string);
-    messageToThread.set(row.message_id as string, row.thread_id as number);
+    // Normalize at index build so legacy rows stored with <brackets> still match.
+    const id = normalizeMessageId(row.message_id as string);
+    messageIds.add(id);
+    messageToThread.set(id, row.thread_id as number);
   }
 
   const { data: sent } = await supabase
@@ -169,10 +171,11 @@ export async function getMatchIndex(
     .order("created_at", { ascending: false })
     .limit(500);
   for (const row of sent ?? []) {
-    recipientEmails.add((row.to_email as string).toLowerCase());
-    const key = `${(row.to_email as string).toLowerCase()}|${normalizeSubject(row.subject as string)}`;
+    const toEmail = (row.to_email as string).trim().toLowerCase();
+    recipientEmails.add(toEmail);
+    const key = `${toEmail}|${normalizeSubject(row.subject as string)}`;
     if (!subjects.has(key) && row.message_id) {
-      subjects.set(key, row.message_id as string);
+      subjects.set(key, normalizeMessageId(row.message_id as string));
     }
   }
   return { messageIds, recipientEmails, subjects, messageToThread };

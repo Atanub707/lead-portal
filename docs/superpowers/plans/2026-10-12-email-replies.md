@@ -1159,3 +1159,14 @@ Applied in the review-fix commit `fix(replies): composite fallback key, duplicat
 - Task 1 Interfaces line corrected: the operative contract is `InboundMatch = { anchorMessageId: string }` — the earlier `{ messageId; threadMessageId }` was never shipped.
 - Empty `if (row.direction === "out") { }` block removed from `getMatchIndex` (and `direction` is no longer selected there).
 - Still deferred (final-triage list): check-then-insert duplicate threads, unread read-then-write race, unbounded `getMatchIndex` fetch, reply-route 500-after-send alignment, `sent_emails.message_id` uniqueness scope.
+
+## Amendments after final review
+
+Applied in the review-fix commit `fix(replies): canonical bare Message-IDs (primary match), best-effort post-send writes, primary-match regression harness`:
+
+- **Canonical Message-ID form is BARE (no angle brackets)** for every stored id; angle-brackets are wire-only:
+  - Write: `sendEmailViaSmtp` (`src/lib/email.ts`) strips `<>` from `info.messageId` before returning, so `sent_emails.message_id` / `email_messages.message_id` are stored bare.
+  - Wire: `/api/email/reply` re-brackets ids when composing `In-Reply-To`/`References` (one `<id>` per RFC 5322); `references_ids` / `in_reply_to` written to the DB stay bare (whitespace-split, brackets stripped defensively).
+  - Match/index: `matchInbound` normalizes incoming `In-Reply-To`/`References` candidates before `Set.has`; `getMatchIndex` normalizes `email_messages.message_id` and `sent_emails.message_id` at build time (legacy bracketed rows now match) and trims + lowercases `to_email` for both the recipient set and the composite `fromEmail|subjectNorm` key.
+- **Reply route post-send writes are best-effort**: `recordOutbound` failures are caught and logged (`[email.reply] thread record failed:`); the route still logs activity and returns `{ ok: true, messageId }`. The mail already left the mailbox, so a 500 here caused retry-driven duplicate sends.
+- **Primary-match regression harness added**: `replies-primary-e2e.mjs` sends a real email via `/api/email/send`, asserts the stored `message_id` is bare, appends a synthetic inbox reply with `In-Reply-To: <bareId>` and a completely different subject (subject fallback cannot fire), syncs, and asserts the inbound row is captured — proving the primary header match end-to-end.

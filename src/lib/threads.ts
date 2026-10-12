@@ -13,6 +13,11 @@ export function threadKey(counterpartyEmail: string, subject: string): string {
   return `${counterpartyEmail.trim().toLowerCase()}|${normalizeSubject(subject)}`;
 }
 
+// Canonical Message-ID form: bare (no angle brackets, no whitespace).
+export function normalizeMessageId(id: string): string {
+  return id.replace(/[<>]/g, "").replace(/\s+/g, "");
+}
+
 export interface InboundHeaders {
   messageId: string;
   inReplyTo: string | null;
@@ -39,10 +44,10 @@ export function matchInbound(
   msg: InboundHeaders,
   index: MatchIndex
 ): InboundMatch | null {
-  // Primary: exact threading headers.
-  const candidates = [msg.inReplyTo, ...msg.references].filter(
-    (id): id is string => Boolean(id)
-  );
+  // Primary: exact threading headers (normalized to the bare canonical form).
+  const candidates = [msg.inReplyTo, ...msg.references]
+    .filter((id): id is string => Boolean(id))
+    .map(normalizeMessageId);
   for (const id of candidates) {
     if (index.messageIds.has(id)) return { anchorMessageId: id };
   }

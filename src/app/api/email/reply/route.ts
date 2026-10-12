@@ -48,7 +48,18 @@ export async function POST(request: Request) {
     .order("sent_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  const references = [last?.references_ids, last?.message_id].filter(Boolean).join(" ");
+  // Stored ids are canonical bare; compose bare storage + re-bracketed wire forms.
+  const lastMessageId = last?.message_id
+    ? last.message_id.replace(/[<>]/g, "").trim()
+    : null;
+  const referenceIds = [last?.references_ids, last?.message_id]
+    .filter((value): value is string => Boolean(value))
+    .flatMap((value) => value.split(/\s+/))
+    .map((id) => id.replace(/[<>]/g, "").trim())
+    .filter(Boolean);
+  const referencesBare = referenceIds.join(" ");
+  const referencesWire = referenceIds.map((id) => `<${id}>`).join(" ");
+  const inReplyToWire = lastMessageId ? `<${lastMessageId}>` : undefined;
   const baseSubject = last?.subject ?? thread.subject_norm;
   const subject = /^re\s*:/i.test(baseSubject) ? baseSubject : `Re: ${baseSubject}`;
 
@@ -73,8 +84,8 @@ export async function POST(request: Request) {
       },
       { to: thread.counterparty_email as string, subject, body: text },
       {
-        inReplyTo: last?.message_id ?? undefined,
-        references: references || undefined,
+        inReplyTo: inReplyToWire,
+        references: referencesWire || undefined,
         subjectOverride: subject,
       }
     );
@@ -103,19 +114,25 @@ export async function POST(request: Request) {
       }
     }
 
-    await recordOutbound(admin, {
-      workspaceId: thread.workspace_id as string,
-      userId,
-      orgId: (thread.org_id as number | null) ?? null,
-      contactId: (thread.contact_id as number | null) ?? null,
-      fromEmail,
-      toEmail: thread.counterparty_email as string,
-      subject,
-      body: text,
-      messageId,
-      inReplyTo: last?.message_id ?? null,
-      referencesIds: references || null,
-    });
+    // The mail already left — a post-send write failure must not 500 (the user
+    // would retry and send a duplicate). Log-only, same as /api/email/send.
+    try {
+      await recordOutbound(admin, {
+        workspaceId: thread.workspace_id as string,
+        userId,
+        orgId: (thread.org_id as number | null) ?? null,
+        contactId: (thread.contact_id as number | null) ?? null,
+        fromEmail,
+        toEmail: thread.counterparty_email as string,
+        subject,
+        body: text,
+        messageId,
+        inReplyTo: lastMessageId,
+        referencesIds: referencesBare || null,
+      });
+    } catch (err) {
+      console.error("[email.reply] thread record failed:", err);
+    }
 
     await logActivity({
       actorId: userId,
