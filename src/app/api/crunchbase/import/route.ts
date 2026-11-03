@@ -3,11 +3,11 @@ import { NextResponse } from "next/server";
 import { getActorRun, getDatasetItems } from "@/lib/apify";
 import {
   bareDomain,
-  CRUNCHBASE_SORTS,
   crunchbaseFiltersSummary,
   EMPLOYEE_BANDS,
   FUNDING_STAGES,
   hasCrunchbaseFilters,
+  INDUSTRY_OPTIONS,
   normalizeCompanyName,
   normalizeCrunchbaseItems,
   normalizeLinkedinUrl,
@@ -105,7 +105,10 @@ function parseFilters(raw: unknown): CrunchbaseFilters | null {
   const filters: CrunchbaseFilters = {};
 
   if (typeof body.category === "string" && body.category.trim()) {
-    filters.category = body.category.trim().slice(0, 120);
+    const category = body.category.trim();
+    if ((INDUSTRY_OPTIONS as readonly string[]).includes(category)) {
+      filters.category = category;
+    }
   }
   if (typeof body.location === "string" && body.location.trim()) {
     filters.location = body.location.trim().slice(0, 120);
@@ -124,14 +127,6 @@ function parseFilters(raw: unknown): CrunchbaseFilters | null {
       filters.fundingStage = stage;
     }
   }
-  if (typeof body.sort === "string" && body.sort.trim()) {
-    const sort = body.sort.trim();
-    if (CRUNCHBASE_SORTS.some((entry) => entry.value === sort)) {
-      filters.sort = sort;
-    }
-  }
-  filters.detailed = body.detailed !== false;
-
   return hasCrunchbaseFilters(filters) ? filters : null;
 }
 

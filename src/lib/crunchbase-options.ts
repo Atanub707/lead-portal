@@ -1,6 +1,29 @@
 // Shared between the API route and the client form — no server-only imports.
-export const CRUNCHBASE_COST_PER_RESULT_USD = 2 / 1000;
-export const CRUNCHBASE_DETAILED_COST_PER_RESULT_USD = 7 / 1000;
+export const CRUNCHBASE_COST_PER_RESULT_USD = 12.99 / 1000;
+
+// Crunchbase industry names accepted by the actor (exact strings).
+export const INDUSTRY_OPTIONS = [
+  "Information Technology",
+  "Software",
+  "SaaS",
+  "Enterprise Software",
+  "FinTech",
+  "Financial Services",
+  "Health Care",
+  "Biotechnology",
+  "Cyber Security",
+  "Cloud Computing",
+  "Artificial Intelligence (AI)",
+  "Human Resources",
+  "Legal",
+  "Manufacturing",
+  "E-Commerce",
+  "Telecommunications",
+  "Insurance",
+  "Medical Device",
+  "Pharmaceutical",
+  "Real Estate",
+] as const;
 
 export const EMPLOYEE_BANDS = [
   "1-10",
@@ -11,21 +34,18 @@ export const EMPLOYEE_BANDS = [
   "501-1000",
   "1001-5000",
   "5001-10000",
-  "10001+",
+  "10000+",
 ] as const;
 
 export const FUNDING_STAGES = [
-  { value: "", label: "Any stage" },
-  { value: "seed", label: "Seed" },
-  { value: "early_stage_venture", label: "Early stage VC (A/B)" },
-  { value: "late_stage_venture", label: "Late stage VC (C+)" },
-  { value: "private_equity", label: "Private equity" },
-] as const;
-
-export const CRUNCHBASE_SORTS = [
-  { value: "rank", label: "Best match" },
-  { value: "last_funding", label: "Recently funded" },
-  { value: "growth_score", label: "Fastest growing" },
-  { value: "employees", label: "Largest headcount" },
-  { value: "founded", label: "Newest companies" },
+  { value: "", label: "Any stage", types: [] as string[] },
+  { value: "seed", label: "Seed", types: ["Seed", "Pre-Seed"] },
+  { value: "series_a", label: "Series A", types: ["Series A"] },
+  { value: "series_b", label: "Series B", types: ["Series B"] },
+  {
+    value: "series_c_plus",
+    label: "Series C or later",
+    types: ["Series C", "Series D", "Series E", "Series F"],
+  },
+  { value: "private_equity", label: "Private equity", types: ["Private Equity"] },
 ] as const;

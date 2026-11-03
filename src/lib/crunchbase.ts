@@ -1,32 +1,28 @@
 import { startActorRun } from "./apify";
 import {
   CRUNCHBASE_COST_PER_RESULT_USD,
-  CRUNCHBASE_DETAILED_COST_PER_RESULT_USD,
-  CRUNCHBASE_SORTS,
   EMPLOYEE_BANDS,
   FUNDING_STAGES,
+  INDUSTRY_OPTIONS,
 } from "./crunchbase-options";
 
 export {
   CRUNCHBASE_COST_PER_RESULT_USD,
-  CRUNCHBASE_DETAILED_COST_PER_RESULT_USD,
-  CRUNCHBASE_SORTS,
   EMPLOYEE_BANDS,
   FUNDING_STAGES,
+  INDUSTRY_OPTIONS,
 };
 
 // Filter-based Crunchbase actor: no search URL, no cookies, no Crunchbase
-// login. It searches Crunchbase by structured filters and returns company
-// profiles (optionally with email/phone/founders/tech stack).
-export const CRUNCHBASE_ACTOR = "omkar-cloud/crunchbase-scraper";
+// login. It searches Crunchbase by structured filters and returns full
+// company profiles (contact email/phone, funding, employees, socials).
+export const CRUNCHBASE_ACTOR = "davidsharadbhatt/crunchbase-company-scraper";
 
 export interface CrunchbaseFilters {
   category?: string;
   location?: string;
   employeeCount?: string[];
   fundingStage?: string;
-  sort?: string;
-  detailed?: boolean;
 }
 
 export function hasCrunchbaseFilters(filters: CrunchbaseFilters): boolean {
@@ -58,18 +54,30 @@ export function buildCrunchbaseInput(
   filters: CrunchbaseFilters,
   count: number
 ): Record<string, unknown> {
+  const locations = (filters.location ?? "")
+    .split(/[\n,]/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
   const input: Record<string, unknown> = {
-    operatingStatus: "active",
-    sort: filters.sort?.trim() || "rank",
-    maxResultsPerSearch: count,
-    scrapeCompanyDetails: filters.detailed !== false,
+    maxCompanies: count,
+    locationMode: locations.length > 0 ? "list" : "worldwide",
+    operatingStatus: "Active",
+    companyType: "For Profit",
   };
-  if (filters.category?.trim()) input.category = filters.category.trim();
-  if (filters.location?.trim()) input.location = filters.location.trim();
-  if (filters.employeeCount?.length) {
-    input.employeeCount = filters.employeeCount;
+  if (locations.length > 0) {
+    input.headquartersLocation = locations.join("\n");
   }
-  if (filters.fundingStage?.trim()) input.fundingStage = filters.fundingStage;
+  if (filters.category?.trim()) input.industry = [filters.category.trim()];
+  if (filters.employeeCount?.length) {
+    input.numberOfEmployees = filters.employeeCount;
+  }
+  const stage = FUNDING_STAGES.find(
+    (entry) => entry.value === filters.fundingStage
+  );
+  if (stage && stage.types.length > 0) {
+    input.funding_type = stage.types;
+  }
   return input;
 }
 
