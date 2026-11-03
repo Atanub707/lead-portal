@@ -106,7 +106,7 @@ function parseFilters(raw: unknown): CrunchbaseFilters | null {
 
   if (typeof body.category === "string" && body.category.trim()) {
     const category = body.category.trim();
-    if ((INDUSTRY_OPTIONS as readonly string[]).includes(category)) {
+    if (INDUSTRY_OPTIONS.some((entry) => entry.value === category)) {
       filters.category = category;
     }
   }
@@ -127,6 +127,8 @@ function parseFilters(raw: unknown): CrunchbaseFilters | null {
       filters.fundingStage = stage;
     }
   }
+  filters.detailed = body.detailed !== false;
+
   return hasCrunchbaseFilters(filters) ? filters : null;
 }
 
@@ -355,11 +357,50 @@ export async function GET(request: Request) {
     return NextResponse.json({ status: "failed", error: message });
   }
 
+  const previousDetails =
+    row && (row as unknown as { details?: Record<string, unknown> }).details;
+  const attempts = Number(previousDetails?.attempts ?? 1);
+
+  if (items.length === 0 && attempts < 3) {
+    const filters =
+      (previousDetails?.filters as Record<string, unknown> | undefined) ?? null;
+    if (filters) {
+      let retry: { runId: string; datasetId: string } | null = null;
+      try {
+        retry = await startCrunchbaseActor(filters, row.requested_count);
+      } catch (err) {
+        console.error(
+          "[crunchbase] retry start failed:",
+          redactSecrets(err instanceof Error ? err.message : String(err), [
+            process.env.APIFY_API_TOKEN,
+          ])
+        );
+      }
+      if (retry) {
+        const { error: retryError } = await admin
+          .from("lead_imports")
+          .update({
+            actor_run_id: retry.runId,
+            dataset_id: retry.datasetId,
+            details: { ...previousDetails, attempts: attempts + 1 },
+          })
+          .eq("id", row.id)
+          .eq("workspace_id", row.workspace_id);
+        if (!retryError) {
+          return NextResponse.json({ status: "running" });
+        }
+        console.error("[crunchbase] retry update failed:", retryError.message);
+      }
+    }
+  }
+
   const { companies, dropped } = normalizeCrunchbaseItems(items);
   const details = {
+    ...previousDetails,
     fetched: items.length,
     returned: companies.length,
     dropped,
+    attempts,
     sample: items.length > 0 ? sampleOf(items[0]) : null,
   };
 

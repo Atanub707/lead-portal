@@ -1,6 +1,7 @@
 import { startActorRun } from "./apify";
 import {
   CRUNCHBASE_COST_PER_RESULT_USD,
+  CRUNCHBASE_DETAILED_COST_PER_RESULT_USD,
   EMPLOYEE_BANDS,
   FUNDING_STAGES,
   INDUSTRY_OPTIONS,
@@ -8,21 +9,23 @@ import {
 
 export {
   CRUNCHBASE_COST_PER_RESULT_USD,
+  CRUNCHBASE_DETAILED_COST_PER_RESULT_USD,
   EMPLOYEE_BANDS,
   FUNDING_STAGES,
   INDUSTRY_OPTIONS,
 };
 
 // Filter-based Crunchbase actor: no search URL, no cookies, no Crunchbase
-// login. It searches Crunchbase by structured filters and returns full
-// company profiles (contact email/phone, funding, employees, socials).
-export const CRUNCHBASE_ACTOR = "davidsharadbhatt/crunchbase-company-scraper";
+// login. It searches Crunchbase by structured filters and returns company
+// profiles; detailed mode adds email/phone/founders/tech stack.
+export const CRUNCHBASE_ACTOR = "omkar-cloud/crunchbase-scraper";
 
 export interface CrunchbaseFilters {
   category?: string;
   location?: string;
   employeeCount?: string[];
   fundingStage?: string;
+  detailed?: boolean;
 }
 
 export function hasCrunchbaseFilters(filters: CrunchbaseFilters): boolean {
@@ -54,30 +57,20 @@ export function buildCrunchbaseInput(
   filters: CrunchbaseFilters,
   count: number
 ): Record<string, unknown> {
-  const locations = (filters.location ?? "")
-    .split(/[\n,]/)
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-
+  // The actor's non-rank sorts return empty or only the first page, so always
+  // use rank for predictable paging.
   const input: Record<string, unknown> = {
-    maxCompanies: count,
-    locationMode: locations.length > 0 ? "list" : "worldwide",
-    operatingStatus: "Active",
-    companyType: "For Profit",
+    operatingStatus: "active",
+    sort: "rank",
+    maxResultsPerSearch: count,
+    scrapeCompanyDetails: filters.detailed !== false,
   };
-  if (locations.length > 0) {
-    input.headquartersLocation = locations.join("\n");
-  }
-  if (filters.category?.trim()) input.industry = [filters.category.trim()];
+  if (filters.category?.trim()) input.category = filters.category.trim();
+  if (filters.location?.trim()) input.location = filters.location.trim();
   if (filters.employeeCount?.length) {
-    input.numberOfEmployees = filters.employeeCount;
+    input.employeeCount = filters.employeeCount;
   }
-  const stage = FUNDING_STAGES.find(
-    (entry) => entry.value === filters.fundingStage
-  );
-  if (stage && stage.types.length > 0) {
-    input.funding_type = stage.types;
-  }
+  if (filters.fundingStage?.trim()) input.fundingStage = filters.fundingStage;
   return input;
 }
 

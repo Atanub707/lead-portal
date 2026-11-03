@@ -1,28 +1,29 @@
 // Shared between the API route and the client form — no server-only imports.
-export const CRUNCHBASE_COST_PER_RESULT_USD = 12.99 / 1000;
+export const CRUNCHBASE_COST_PER_RESULT_USD = 2 / 1000;
+export const CRUNCHBASE_DETAILED_COST_PER_RESULT_USD = 7 / 1000;
 
-// Crunchbase industry names accepted by the actor (exact strings).
+// Crunchbase category permalinks (the actor accepts permalinks reliably).
 export const INDUSTRY_OPTIONS = [
-  "Information Technology",
-  "Software",
-  "SaaS",
-  "Enterprise Software",
-  "FinTech",
-  "Financial Services",
-  "Health Care",
-  "Biotechnology",
-  "Cyber Security",
-  "Cloud Computing",
-  "Artificial Intelligence (AI)",
-  "Human Resources",
-  "Legal",
-  "Manufacturing",
-  "E-Commerce",
-  "Telecommunications",
-  "Insurance",
-  "Medical Device",
-  "Pharmaceutical",
-  "Real Estate",
+  { value: "information-technology", label: "Information Technology" },
+  { value: "software", label: "Software" },
+  { value: "saas", label: "SaaS" },
+  { value: "enterprise-software", label: "Enterprise Software" },
+  { value: "fintech", label: "FinTech" },
+  { value: "financial-services", label: "Financial Services" },
+  { value: "health-care", label: "Health Care" },
+  { value: "biotechnology", label: "Biotechnology" },
+  { value: "cyber-security", label: "Cyber Security" },
+  { value: "cloud-computing", label: "Cloud Computing" },
+  { value: "artificial-intelligence", label: "Artificial Intelligence" },
+  { value: "human-resources", label: "Human Resources" },
+  { value: "legal", label: "Legal" },
+  { value: "manufacturing", label: "Manufacturing" },
+  { value: "e-commerce", label: "E-Commerce" },
+  { value: "telecommunications", label: "Telecommunications" },
+  { value: "insurance", label: "Insurance" },
+  { value: "medical-device", label: "Medical Device" },
+  { value: "pharmaceutical", label: "Pharmaceutical" },
+  { value: "real-estate", label: "Real Estate" },
 ] as const;
 
 export const EMPLOYEE_BANDS = [
@@ -34,18 +35,13 @@ export const EMPLOYEE_BANDS = [
   "501-1000",
   "1001-5000",
   "5001-10000",
-  "10000+",
+  "10001+",
 ] as const;
 
 export const FUNDING_STAGES = [
-  { value: "", label: "Any stage", types: [] as string[] },
-  { value: "seed", label: "Seed", types: ["Seed", "Pre-Seed"] },
-  { value: "series_a", label: "Series A", types: ["Series A"] },
-  { value: "series_b", label: "Series B", types: ["Series B"] },
-  {
-    value: "series_c_plus",
-    label: "Series C or later",
-    types: ["Series C", "Series D", "Series E", "Series F"],
-  },
-  { value: "private_equity", label: "Private equity", types: ["Private Equity"] },
+  { value: "", label: "Any stage" },
+  { value: "seed", label: "Seed" },
+  { value: "early_stage_venture", label: "Early stage VC (A/B)" },
+  { value: "late_stage_venture", label: "Late stage VC (C+)" },
+  { value: "private_equity", label: "Private equity" },
 ] as const;

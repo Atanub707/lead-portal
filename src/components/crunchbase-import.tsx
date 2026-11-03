@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Loader2, Rocket, X } from "lucide-react";
 import {
   CRUNCHBASE_COST_PER_RESULT_USD,
+  CRUNCHBASE_DETAILED_COST_PER_RESULT_USD,
   EMPLOYEE_BANDS,
   FUNDING_STAGES,
   INDUSTRY_OPTIONS,
@@ -36,6 +37,7 @@ export function CrunchbaseImport({
   const [location, setLocation] = useState("");
   const [employees, setEmployees] = useState<string[]>([]);
   const [fundingStage, setFundingStage] = useState("");
+  const [detailed, setDetailed] = useState(true);
   const [count, setCount] = useState("25");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
@@ -53,6 +55,7 @@ export function CrunchbaseImport({
     setLocation("");
     setEmployees([]);
     setFundingStage("");
+    setDetailed(true);
     setCount("25");
     setStatus("idle");
     setError("");
@@ -139,7 +142,10 @@ export function CrunchbaseImport({
   const safeCount = Number.isFinite(requested)
     ? Math.min(100, Math.max(1, Math.round(requested)))
     : 25;
-  const estimate = (safeCount * CRUNCHBASE_COST_PER_RESULT_USD).toFixed(2);
+  const perResult = detailed
+    ? CRUNCHBASE_DETAILED_COST_PER_RESULT_USD
+    : CRUNCHBASE_COST_PER_RESULT_USD;
+  const estimate = (safeCount * perResult).toFixed(2);
 
   function toggleBand(band: string) {
     setEmployees((current) =>
@@ -164,6 +170,7 @@ export function CrunchbaseImport({
             location: location.trim() || undefined,
             employeeCount: employees.length > 0 ? employees : undefined,
             fundingStage: fundingStage || undefined,
+            detailed,
           },
           count: safeCount,
           pipelineId: pipeline,
@@ -313,8 +320,8 @@ export function CrunchbaseImport({
             >
               <option value="">Any industry</option>
               {INDUSTRY_OPTIONS.map((entry) => (
-                <option key={entry} value={entry}>
-                  {entry}
+                <option key={entry.value} value={entry.value}>
+                  {entry.label}
                 </option>
               ))}
             </select>
@@ -385,6 +392,23 @@ export function CrunchbaseImport({
             </select>
           </div>
 
+          <label className="flex items-start gap-2 rounded-lg border border-zinc-200 px-3 py-2.5">
+            <input
+              type="checkbox"
+              checked={detailed}
+              onChange={(event) => setDetailed(event.target.checked)}
+              className="mt-0.5 h-3.5 w-3.5 rounded border-zinc-300"
+            />
+            <span className="min-w-0">
+              <span className="block text-[12px] font-medium text-zinc-800">
+                Full profiles
+              </span>
+              <span className="block text-[11px] leading-relaxed text-zinc-500">
+                Adds email, phone, founders and tech stack.
+              </span>
+            </span>
+          </label>
+
           <div>
             <label
               htmlFor="cb-count"
@@ -405,8 +429,8 @@ export function CrunchbaseImport({
           </div>
 
           <p className="text-[11px] leading-relaxed text-zinc-500 tabular-nums">
-            $12.99 per 1,000 companies — about ${estimate} for {safeCount}.
-            Profiles include email, phone, funding, investors and socials.
+            ${detailed ? "7" : "2"} per 1,000 companies — about ${estimate} for{" "}
+            {safeCount}.
           </p>
 
           {error ? (
