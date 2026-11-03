@@ -5,6 +5,13 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Loader2, Rocket, X } from "lucide-react";
+import {
+  CRUNCHBASE_COST_PER_RESULT_USD,
+  CRUNCHBASE_DETAILED_COST_PER_RESULT_USD,
+  CRUNCHBASE_SORTS,
+  EMPLOYEE_BANDS,
+  FUNDING_STAGES,
+} from "@/lib/crunchbase-options";
 
 type Status = "idle" | "posting" | "running" | "done";
 
@@ -24,37 +31,49 @@ export function CrunchbaseImport({
 }) {
   const isPage = variant === "page";
   const router = useRouter();
-  const [pipeline, setPipeline] = useState(pipelines?.[0]?.id ?? list);
   const [open, setOpen] = useState(false);
-  const [searchUrl, setSearchUrl] = useState("");
+  const [pipeline, setPipeline] = useState(pipelines?.[0]?.id ?? list);
+  const [category, setCategory] = useState("");
+  const [location, setLocation] = useState("");
+  const [employees, setEmployees] = useState<string[]>([]);
+  const [fundingStage, setFundingStage] = useState("");
+  const [sort, setSort] = useState("");
+  const [detailed, setDetailed] = useState(true);
   const [count, setCount] = useState("25");
-  const [cookies, setCookies] = useState("");
-  const [configured, setConfigured] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
   const [result, setResult] = useState<ImportSummary | null>(null);
   const [importId, setImportId] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
   const startedAt = useRef<number | null>(null);
 
-  function openModal() {
-    setSearchUrl("");
+  const hasFilter = Boolean(
+    category.trim() || location.trim() || employees.length > 0 || fundingStage
+  );
+
+  function resetForm() {
+    setCategory("");
+    setLocation("");
+    setEmployees([]);
+    setFundingStage("");
+    setSort("");
+    setDetailed(true);
     setCount("25");
-    setCookies("");
     setStatus("idle");
     setError("");
     setResult(null);
     setImportId(null);
     setElapsed(0);
     startedAt.current = null;
+  }
+
+  function openModal() {
+    resetForm();
     setOpen(true);
   }
 
   useEffect(() => {
     if (!open || isPage) return;
-    inputRef.current?.focus();
-
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") setOpen(false);
     }
@@ -64,20 +83,6 @@ export function CrunchbaseImport({
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = previousOverflow;
-    };
-  }, [open, isPage]);
-
-  useEffect(() => {
-    if (!open && !isPage) return;
-    let cancelled = false;
-    fetch("/api/crunchbase/import")
-      .then((res) => res.json())
-      .then((json: { configured?: boolean } | null) => {
-        if (!cancelled) setConfigured(Boolean(json?.configured));
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
     };
   }, [open, isPage]);
 
@@ -114,7 +119,7 @@ export function CrunchbaseImport({
           setImportId(null);
         }
       } catch {
-        // A transient poll failure keeps the dialog polling.
+        // A transient poll failure keeps polling.
       }
     }
 
@@ -139,11 +144,21 @@ export function CrunchbaseImport({
   const safeCount = Number.isFinite(requested)
     ? Math.min(100, Math.max(1, Math.round(requested)))
     : 25;
-  const estimate = (safeCount * 0.0025).toFixed(2);
+  const perResult = detailed
+    ? CRUNCHBASE_DETAILED_COST_PER_RESULT_USD
+    : CRUNCHBASE_COST_PER_RESULT_USD;
+  const estimate = (safeCount * perResult).toFixed(2);
+
+  function toggleBand(band: string) {
+    setEmployees((current) =>
+      current.includes(band)
+        ? current.filter((entry) => entry !== band)
+        : [...current, band]
+    );
+  }
 
   async function start() {
-    const url = searchUrl.trim();
-    if (!url || status === "posting" || status === "running") return;
+    if (!hasFilter || status === "posting" || status === "running") return;
     setStatus("posting");
     setError("");
     setResult(null);
@@ -152,9 +167,15 @@ export function CrunchbaseImport({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          searchUrl: url,
+          filters: {
+            category: category.trim() || undefined,
+            location: location.trim() || undefined,
+            employeeCount: employees.length > 0 ? employees : undefined,
+            fundingStage: fundingStage || undefined,
+            sort: sort || undefined,
+            detailed,
+          },
           count: safeCount,
-          cookies: cookies.trim() || undefined,
           pipelineId: pipeline,
         }),
       });
@@ -166,8 +187,6 @@ export function CrunchbaseImport({
         setStatus("idle");
         return;
       }
-      if (cookies.trim()) setConfigured(true);
-      setCookies("");
       setImportId(Number(json.id));
       startedAt.current = Date.now();
       setElapsed(0);
@@ -179,222 +198,294 @@ export function CrunchbaseImport({
   }
 
   const panel = (
-      <div
-        role={isPage ? undefined : "dialog"}
-        aria-modal={isPage ? undefined : true}
-        aria-label="Import from Crunchbase"
-        className={
-          isPage
-            ? "card overflow-hidden"
-            : "animate-panel relative w-full max-w-md overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl"
-        }
-      >
-        <div className="flex items-center gap-3 border-b border-zinc-100 px-4 py-3">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white">
-            <Rocket className="h-3.5 w-3.5" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-semibold text-zinc-900">
-              Import from Crunchbase
-            </p>
-            <p className="truncate text-[11px] text-zinc-500">
-              Search results in, companies out
-            </p>
-          </div>
-          {isPage ? null : (
-            <button
-              onClick={() => setOpen(false)}
-              aria-label="Close"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
-            >
-              <X className="h-4 w-4" aria-hidden="true" />
-            </button>
-          )}
+    <div
+      role={isPage ? undefined : "dialog"}
+      aria-modal={isPage ? undefined : true}
+      aria-label="Find leads from Crunchbase"
+      className={
+        isPage
+          ? "card overflow-hidden"
+          : "animate-panel relative w-full max-w-md overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl"
+      }
+    >
+      <div className="flex items-center gap-3 border-b border-zinc-100 px-4 py-3">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white">
+          <Rocket className="h-3.5 w-3.5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-semibold text-zinc-900">
+            Find companies
+          </p>
+          <p className="truncate text-[11px] text-zinc-500">
+            Filter Crunchbase — no login or cookies needed
+          </p>
         </div>
-
-        {status === "running" ? (
-          <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
-            <Loader2
-              className="h-6 w-6 animate-spin text-zinc-400 motion-reduce:animate-none"
-              aria-hidden="true"
-            />
-            <div aria-live="polite">
-              <p className="text-[13px] font-medium text-zinc-800">
-                Reading Crunchbase results…
-              </p>
-              <p className="mt-1 text-[12px] text-zinc-500 tabular-nums">
-                {elapsed}s elapsed · {safeCount} results requested
-              </p>
-              <p className="mt-1 text-[12px] text-zinc-500">
-                Scraping, deduping and adding them to your pipeline.
-              </p>
-            </div>
-          </div>
-        ) : status === "done" && result ? (
-          <div className="space-y-4 px-5 py-5" aria-live="polite">
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-                <Check className="h-4 w-4" aria-hidden="true" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[13px] font-semibold text-zinc-900 tabular-nums">
-                  Imported {result.imported}{" "}
-                  {result.imported === 1 ? "company" : "companies"} ·{" "}
-                  {result.skipped}{" "}
-                  {result.skipped === 1 ? "duplicate" : "duplicates"} skipped
-                </p>
-                <p className="mt-0.5 text-[12px] text-zinc-500">
-                  They&apos;re ready for Deep Research and the Email Composer.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 pt-1">
-              <Link
-                href={`/companies?list=${encodeURIComponent(pipeline)}`}
-                className="btn-primary"
-                onClick={() => {
-                  if (!isPage) setOpen(false);
-                }}
-              >
-                View pipeline
-                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-              </Link>
-              <button onClick={openModal} className="btn-ghost">
-                Import more
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4 px-5 py-5">
-            <div>
-              <label
-                htmlFor="cb-search-url"
-                className="mb-1.5 block text-[12px] font-medium text-zinc-700"
-              >
-                Crunchbase search URL
-              </label>
-              <input
-                ref={inputRef}
-                id="cb-search-url"
-                type="url"
-                inputMode="url"
-                autoComplete="off"
-                spellCheck={false}
-                value={searchUrl}
-                onChange={(event) => setSearchUrl(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    start();
-                  }
-                }}
-                placeholder="https://www.crunchbase.com/discover/organization.companies/…"
-                className="input"
-              />
-            </div>
-
-            {pipelines && pipelines.length > 0 ? (
-              <div>
-                <label
-                  htmlFor="cb-pipeline"
-                  className="mb-1.5 block text-[12px] font-medium text-zinc-700"
-                >
-                  Import into pipeline
-                </label>
-                <select
-                  id="cb-pipeline"
-                  value={pipeline}
-                  onChange={(event) => setPipeline(event.target.value)}
-                  className="input"
-                >
-                  {pipelines.map((entry) => (
-                    <option key={entry.id} value={entry.id}>
-                      {entry.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
-
-            <div>
-              <label
-                htmlFor="cb-count"
-                className="mb-1.5 block text-[12px] font-medium text-zinc-700"
-              >
-                Max results
-              </label>
-              <input
-                id="cb-count"
-                type="number"
-                min={1}
-                max={100}
-                step={1}
-                value={count}
-                onChange={(event) => setCount(event.target.value)}
-                className="input w-24 tabular-nums"
-              />
-            </div>
-
-            <div>
-              <div className="mb-1.5 flex items-center justify-between gap-2">
-                <label
-                  htmlFor="cb-cookies"
-                  className="block text-[12px] font-medium text-zinc-700"
-                >
-                  Cookies
-                </label>
-                {configured ? (
-                  <span className="text-[11px] font-medium text-emerald-600">
-                    Cookies saved ✓
-                  </span>
-                ) : null}
-              </div>
-              <textarea
-                id="cb-cookies"
-                rows={4}
-                autoComplete="off"
-                spellCheck={false}
-                value={cookies}
-                onChange={(event) => setCookies(event.target.value)}
-                placeholder="Paste the Cookie-Editor JSON export"
-                className="input min-h-[96px] resize-y font-mono text-[11px]"
-              />
-              <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
-                Saved encrypted — you can leave this empty next time.
-              </p>
-            </div>
-
-            <p className="text-[11px] leading-relaxed text-zinc-500 tabular-nums">
-              $2.50 per 1,000 results — about ${estimate} for {safeCount}.
-            </p>
-
-            {error ? (
-              <div
-                role="alert"
-                className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2"
-              >
-                <p className="text-[12px] text-rose-700">{error}</p>
-              </div>
-            ) : null}
-
-            <button
-              onClick={start}
-              disabled={!searchUrl.trim() || status === "posting"}
-              className="btn-primary w-full justify-center"
-            >
-              {status === "posting" ? (
-                <Loader2
-                  className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
-                  aria-hidden="true"
-                />
-              ) : (
-                <Rocket className="h-3.5 w-3.5" aria-hidden="true" />
-              )}
-              Start import
-            </button>
-          </div>
+        {isPage ? null : (
+          <button
+            onClick={() => setOpen(false)}
+            aria-label="Close"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
         )}
       </div>
+
+      {status === "running" ? (
+        <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
+          <Loader2
+            className="h-6 w-6 animate-spin text-zinc-400 motion-reduce:animate-none"
+            aria-hidden="true"
+          />
+          <div aria-live="polite">
+            <p className="text-[13px] font-medium text-zinc-800">
+              Searching Crunchbase…
+            </p>
+            <p className="mt-1 text-[12px] text-zinc-500 tabular-nums">
+              {elapsed}s elapsed · {safeCount} companies requested
+            </p>
+            <p className="mt-1 text-[12px] text-zinc-500">
+              Fetching profiles, deduping and adding them to your pipeline.
+            </p>
+          </div>
+        </div>
+      ) : status === "done" && result ? (
+        <div className="space-y-4 px-5 py-5" aria-live="polite">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+              <Check className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[13px] font-semibold text-zinc-900 tabular-nums">
+                Imported {result.imported}{" "}
+                {result.imported === 1 ? "company" : "companies"} ·{" "}
+                {result.skipped}{" "}
+                {result.skipped === 1 ? "duplicate" : "duplicates"} skipped
+              </p>
+              <p className="mt-0.5 text-[12px] text-zinc-500">
+                They&apos;re ready for Deep Research and the Email Composer.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <Link
+              href={`/companies?list=${encodeURIComponent(pipeline)}`}
+              className="btn-primary"
+              onClick={() => {
+                if (!isPage) setOpen(false);
+              }}
+            >
+              View pipeline
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
+            <button onClick={resetForm} className="btn-ghost">
+              Import more
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4 px-5 py-5">
+          {pipelines && pipelines.length > 0 ? (
+            <div>
+              <label
+                htmlFor="cb-pipeline"
+                className="mb-1.5 block text-[12px] font-medium text-zinc-700"
+              >
+                Import into pipeline
+              </label>
+              <select
+                id="cb-pipeline"
+                value={pipeline}
+                onChange={(event) => setPipeline(event.target.value)}
+                className="input"
+              >
+                {pipelines.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+
+          <div>
+            <label
+              htmlFor="cb-category"
+              className="mb-1.5 block text-[12px] font-medium text-zinc-700"
+            >
+              Industry
+            </label>
+            <input
+              id="cb-category"
+              type="text"
+              autoComplete="off"
+              value={category}
+              onChange={(event) => setCategory(event.target.value)}
+              placeholder="e.g. Information Technology, Financial Services"
+              className="input"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="cb-location"
+              className="mb-1.5 block text-[12px] font-medium text-zinc-700"
+            >
+              Location
+            </label>
+            <input
+              id="cb-location"
+              type="text"
+              autoComplete="off"
+              value={location}
+              onChange={(event) => setLocation(event.target.value)}
+              placeholder="e.g. India, Bengaluru, United States"
+              className="input"
+            />
+          </div>
+
+          <div>
+            <p className="mb-1.5 text-[12px] font-medium text-zinc-700">
+              Headcount
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {EMPLOYEE_BANDS.map((band) => {
+                const active = employees.includes(band);
+                return (
+                  <button
+                    key={band}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => toggleBand(band)}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-medium tabular-nums transition-colors ${
+                      active
+                        ? "border-zinc-900 bg-zinc-900 text-white"
+                        : "border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:text-zinc-900"
+                    }`}
+                  >
+                    {band}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label
+                htmlFor="cb-stage"
+                className="mb-1.5 block text-[12px] font-medium text-zinc-700"
+              >
+                Funding stage
+              </label>
+              <select
+                id="cb-stage"
+                value={fundingStage}
+                onChange={(event) => setFundingStage(event.target.value)}
+                className="input"
+              >
+                {FUNDING_STAGES.map((entry) => (
+                  <option key={entry.value} value={entry.value}>
+                    {entry.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label
+                htmlFor="cb-sort"
+                className="mb-1.5 block text-[12px] font-medium text-zinc-700"
+              >
+                Sort by
+              </label>
+              <select
+                id="cb-sort"
+                value={sort}
+                onChange={(event) => setSort(event.target.value)}
+                className="input"
+              >
+                {CRUNCHBASE_SORTS.map((entry) => (
+                  <option key={entry.value} value={entry.value}>
+                    {entry.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <label className="flex items-start gap-2 rounded-lg border border-zinc-200 px-3 py-2.5">
+            <input
+              type="checkbox"
+              checked={detailed}
+              onChange={(event) => setDetailed(event.target.checked)}
+              className="mt-0.5 h-3.5 w-3.5 rounded border-zinc-300"
+            />
+            <span className="min-w-0">
+              <span className="block text-[12px] font-medium text-zinc-800">
+                Full profiles
+              </span>
+              <span className="block text-[11px] leading-relaxed text-zinc-500">
+                Adds email, phone, founders, tech stack and growth scores.
+              </span>
+            </span>
+          </label>
+
+          <div>
+            <label
+              htmlFor="cb-count"
+              className="mb-1.5 block text-[12px] font-medium text-zinc-700"
+            >
+              Max results
+            </label>
+            <input
+              id="cb-count"
+              type="number"
+              min={1}
+              max={100}
+              step={1}
+              value={count}
+              onChange={(event) => setCount(event.target.value)}
+              className="input w-24 tabular-nums"
+            />
+          </div>
+
+          <p className="text-[11px] leading-relaxed text-zinc-500 tabular-nums">
+            ${detailed ? "7" : "2"} per 1,000 companies — about ${estimate} for{" "}
+            {safeCount}.
+          </p>
+
+          {error ? (
+            <div
+              role="alert"
+              className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2"
+            >
+              <p className="text-[12px] text-rose-700">{error}</p>
+            </div>
+          ) : null}
+
+          <button
+            onClick={start}
+            disabled={!hasFilter || status === "posting"}
+            className="btn-primary w-full justify-center"
+          >
+            {status === "posting" ? (
+              <Loader2
+                className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
+            ) : (
+              <Rocket className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+            Start import
+          </button>
+          {!hasFilter ? (
+            <p className="text-center text-[11px] text-zinc-500">
+              Add at least one filter to start.
+            </p>
+          ) : null}
+        </div>
+      )}
+    </div>
   );
 
   const dialog = isPage ? (

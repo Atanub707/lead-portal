@@ -1,8 +1,84 @@
 import { startActorRun } from "./apify";
+import {
+  CRUNCHBASE_COST_PER_RESULT_USD,
+  CRUNCHBASE_DETAILED_COST_PER_RESULT_USD,
+  CRUNCHBASE_SORTS,
+  EMPLOYEE_BANDS,
+  FUNDING_STAGES,
+} from "./crunchbase-options";
 
-export const CRUNCHBASE_ACTOR = "curious_coder/crunchbase-scraper";
-export const CRUNCHBASE_SEARCH_PREFIX = "https://www.crunchbase.com/";
-export const CRUNCHBASE_COST_PER_RESULT_USD = 2.5 / 1000;
+export {
+  CRUNCHBASE_COST_PER_RESULT_USD,
+  CRUNCHBASE_DETAILED_COST_PER_RESULT_USD,
+  CRUNCHBASE_SORTS,
+  EMPLOYEE_BANDS,
+  FUNDING_STAGES,
+};
+
+// Filter-based Crunchbase actor: no search URL, no cookies, no Crunchbase
+// login. It searches Crunchbase by structured filters and returns company
+// profiles (optionally with email/phone/founders/tech stack).
+export const CRUNCHBASE_ACTOR = "omkar-cloud/crunchbase-scraper";
+
+export interface CrunchbaseFilters {
+  category?: string;
+  location?: string;
+  employeeCount?: string[];
+  fundingStage?: string;
+  sort?: string;
+  detailed?: boolean;
+}
+
+export function hasCrunchbaseFilters(filters: CrunchbaseFilters): boolean {
+  return Boolean(
+    filters.category?.trim() ||
+      filters.location?.trim() ||
+      (filters.employeeCount?.length ?? 0) > 0 ||
+      filters.fundingStage?.trim()
+  );
+}
+
+export function crunchbaseFiltersSummary(filters: CrunchbaseFilters): string {
+  const parts: string[] = [];
+  if (filters.category?.trim()) parts.push(filters.category.trim());
+  if (filters.location?.trim()) parts.push(`in ${filters.location.trim()}`);
+  if (filters.employeeCount?.length) {
+    parts.push(`${filters.employeeCount.join(", ")} employees`);
+  }
+  if (filters.fundingStage?.trim()) {
+    parts.push(
+      FUNDING_STAGES.find((entry) => entry.value === filters.fundingStage)
+        ?.label ?? filters.fundingStage
+    );
+  }
+  return parts.length > 0 ? parts.join(" · ") : "All companies";
+}
+
+export function buildCrunchbaseInput(
+  filters: CrunchbaseFilters,
+  count: number
+): Record<string, unknown> {
+  const input: Record<string, unknown> = {
+    operatingStatus: "active",
+    sort: filters.sort?.trim() || "rank",
+    maxResultsPerSearch: count,
+    scrapeCompanyDetails: filters.detailed !== false,
+  };
+  if (filters.category?.trim()) input.category = filters.category.trim();
+  if (filters.location?.trim()) input.location = filters.location.trim();
+  if (filters.employeeCount?.length) {
+    input.employeeCount = filters.employeeCount;
+  }
+  if (filters.fundingStage?.trim()) input.fundingStage = filters.fundingStage;
+  return input;
+}
+
+export async function startCrunchbaseActor(
+  filters: CrunchbaseFilters,
+  count: number
+): Promise<{ runId: string; datasetId: string }> {
+  return startActorRun(CRUNCHBASE_ACTOR, buildCrunchbaseInput(filters, count));
+}
 
 export interface NormalizedCrunchbaseCompany {
   name: string;
@@ -20,32 +96,6 @@ export interface NormalizedCrunchbaseCompany {
   nameKey: string;
   domainKey: string | null;
 }
-
-const NAME_KEYS = ["name", "organizationName", "companyName", "title"];
-const WEBSITE_KEYS = ["website", "websiteUrl", "homepage", "url"];
-const LINKEDIN_KEYS = ["linkedin", "linkedinUrl", "linkedin_url"];
-const DESCRIPTION_KEYS = ["shortDescription", "description", "about"];
-const EMAIL_KEYS = ["contactEmail", "email"];
-const PHONE_KEYS = ["phoneNumber", "phone"];
-const EMPLOYEE_KEYS = ["numEmployeesEnum", "numEmployees", "employeeCount"];
-const FOUNDED_KEYS = ["foundedOn", "founded", "foundedYear"];
-const LOCATION_KEYS = ["locationIdentifiers", "location", "headquarters"];
-const FUNDING_KEYS = ["fundingStage", "lastFundingType", "fundingTotal"];
-const CRUNCHBASE_URL_KEYS = [
-  "crunchbaseUrl",
-  "crunchbase_url",
-  "crunchbaseProfileUrl",
-  "organizationUrl",
-  "profileUrl",
-];
-const CRUNCHBASE_ID_KEYS = [
-  "identifier",
-  "uuid",
-  "slug",
-  "permalink",
-  "id",
-];
-const NESTED_KEYS = ["organization", "company", "properties", "data"];
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -69,102 +119,100 @@ function asText(value: unknown): string | null {
   }
   const record = asRecord(value);
   if (!record) return null;
-  for (const key of [
-    "name",
-    "label",
-    "display_name",
-    "value",
-    "text",
-    "url",
-    "city",
-    "region",
-    "state",
-    "country",
-    "location",
-    "location_identifier",
-    "identifier",
-  ]) {
-    const part = asText(record[key]);
-    if (part) return part;
-  }
-  try {
-    const json = JSON.stringify(value);
-    return json && json !== "{}" && json !== "[]" ? json : null;
-  } catch {
-    return null;
-  }
-}
-
-function pick(item: unknown, keys: string[]): string | null {
-  const record = asRecord(item);
-  if (!record) return null;
-  for (const key of keys) {
-    const value = asText(record[key]);
-    if (value) return value;
-  }
-  for (const nestedKey of NESTED_KEYS) {
-    const nested = asRecord(record[nestedKey]);
-    if (!nested) continue;
-    for (const key of keys) {
-      const value = asText(nested[key]);
-      if (value) return value;
-    }
+  for (const key of ["name", "label", "display_name", "value", "text", "url"]) {
+    const text = asText(record[key]);
+    if (text) return text;
   }
   return null;
 }
 
-function isHttpUrl(value: string) {
+function firstText(
+  item: Record<string, unknown>,
+  keys: string[]
+): string | null {
+  for (const key of keys) {
+    const text = asText(item[key]);
+    if (text) return text;
+  }
+  return null;
+}
+
+function isHttpUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
 }
 
 export function bareDomain(value: string | null | undefined): string | null {
   if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
   try {
-    const url = new URL(isHttpUrl(value) ? value : `https://${value}`);
-    const host = url.hostname.toLowerCase().replace(/^www\./, "");
-    return host || null;
+    const withProtocol = /^https?:\/\//i.test(trimmed)
+      ? trimmed
+      : `https://${trimmed}`;
+    const host = new URL(withProtocol).hostname.toLowerCase();
+    return host.replace(/^www\./, "") || null;
   } catch {
     return null;
   }
 }
 
 export function normalizeCompanyName(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 export function normalizeLinkedinUrl(
   value: string | null | undefined
 ): string | null {
   if (!value) return null;
-  const bare = value
-    .trim()
-    .toLowerCase()
-    .replace(/[?#].*$/, "")
-    .replace(/\/+$/, "")
-    .replace(/^https?:\/\//, "")
-    .replace(/^www\./, "");
-  return bare || null;
+  const match = value.match(
+    /linkedin\.com\/(?:company|school|in)\/([^/?#]+)/i
+  );
+  if (!match) return null;
+  return `linkedin.com/${match[0].split("/")[1].toLowerCase()}/${match[1].toLowerCase()}`;
 }
 
-export async function startCrunchbaseActor(opts: {
-  searchUrl: string;
-  count: number;
-  cookies?: string | null;
-}): Promise<{ runId: string; datasetId: string }> {
-  const input: Record<string, unknown> = {
-    "search.url": opts.searchUrl,
-    count: opts.count,
-    minDelay: 1,
-    maxDelay: 5,
-  };
-  if (opts.cookies) input.cookie = opts.cookies;
-  return startActorRun(CRUNCHBASE_ACTOR, input);
+function locationText(value: unknown): string | null {
+  const record = asRecord(value);
+  if (!record) return asText(value);
+  const parts = [record.city, record.region, record.country]
+    .map(asText)
+    .filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
+function fundingText(item: Record<string, unknown>): string | null {
+  const record = asRecord(item.funding);
+  const parts: string[] = [];
+  if (record) {
+    const rounds = asText(record.rounds_count);
+    if (rounds) parts.push(`${rounds} round${rounds === "1" ? "" : "s"}`);
+    const investors = asText(record.investors_count);
+    if (investors) parts.push(`${investors} investors`);
+  }
+  const last = firstText(item, ["last_funding_type", "lastFundingType"]);
+  if (last) parts.push(`latest: ${last.replace(/_/g, " ")}`);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+function foundersText(item: Record<string, unknown>): string | null {
+  const founders = item.founders;
+  if (!Array.isArray(founders)) return null;
+  const names = founders
+    .map((entry) => asText(entry))
+    .filter((name): name is string => Boolean(name));
+  return names.length > 0 ? `Founders: ${names.join(", ")}` : null;
 }
 
 export function normalizeCrunchbaseCompany(
   item: unknown
 ): NormalizedCrunchbaseCompany | null {
-  const name = pick(item, NAME_KEYS);
+  const record = asRecord(item);
+  if (!record) return null;
+
+  const name = firstText(record, ["name", "organizationName", "companyName"]);
   if (!name) {
     console.warn(
       "[crunchbase] skipping item without a recognizable name:",
@@ -173,8 +221,17 @@ export function normalizeCrunchbaseCompany(
     return null;
   }
 
-  const websiteCandidate = pick(item, WEBSITE_KEYS);
-  let crunchbaseUrl = pick(item, CRUNCHBASE_URL_KEYS);
+  const websiteCandidate = firstText(record, [
+    "website",
+    "websiteUrl",
+    "homepage",
+  ]);
+  let crunchbaseUrl = firstText(record, [
+    "link",
+    "crunchbaseUrl",
+    "crunchbase_url",
+    "profileUrl",
+  ]);
   let website: string | null = null;
   if (websiteCandidate && isHttpUrl(websiteCandidate)) {
     if (/crunchbase\.com/i.test(websiteCandidate)) {
@@ -184,42 +241,43 @@ export function normalizeCrunchbaseCompany(
     }
   }
 
-  const linkedin = pick(item, LINKEDIN_KEYS);
-  const description = pick(item, DESCRIPTION_KEYS);
-  const email = pick(item, EMAIL_KEYS);
-  const phone = pick(item, PHONE_KEYS);
-  const employees = pick(item, EMPLOYEE_KEYS);
-  const founded = pick(item, FOUNDED_KEYS);
-  const location = pick(item, LOCATION_KEYS);
-  const funding = pick(item, FUNDING_KEYS);
-  const crunchbaseId = pick(item, CRUNCHBASE_ID_KEYS);
+  const social = asRecord(record.social);
+  const linkedin =
+    asText(social?.linkedin) ??
+    firstText(record, ["linkedin", "linkedinUrl", "linkedin_url"]);
+  const description = firstText(record, [
+    "short_description",
+    "description",
+    "about",
+    "shortDescription",
+  ]);
+  const email = firstText(record, ["email", "contactEmail"]);
+  const phone = firstText(record, ["phone", "phoneNumber"]);
+  const employees = firstText(record, [
+    "employee_count",
+    "employeeCount",
+    "numEmployeesEnum",
+  ]);
+  const founded = firstText(record, [
+    "founded",
+    "founded_on",
+    "foundedOn",
+    "foundedYear",
+  ]);
+  const location = locationText(record.location ?? record.headquarters);
+  const funding = fundingText(record);
+  const founders = foundersText(record);
 
   const lines: string[] = [];
   if (description) lines.push(description);
   if (funding) lines.push(`Funding: ${funding}`);
   if (employees) lines.push(`Employees: ${employees}`);
   if (location) lines.push(`Location: ${location}`);
-  const crunchbaseRef = crunchbaseUrl ?? crunchbaseId;
-  if (crunchbaseRef) lines.push(`Crunchbase: ${crunchbaseRef}`);
+  if (founders) lines.push(founders);
+  if (email) lines.push(`Email: ${email}`);
+  if (phone) lines.push(`Phone: ${phone}`);
+  if (crunchbaseUrl) lines.push(`Crunchbase: ${crunchbaseUrl}`);
   const notes = lines.length > 0 ? lines.join("\n").slice(0, 4000) : null;
-
-  if (
-    !website &&
-    !linkedin &&
-    !description &&
-    !email &&
-    !phone &&
-    !employees &&
-    !founded &&
-    !location &&
-    !funding &&
-    !crunchbaseRef
-  ) {
-    console.warn(
-      "[crunchbase] company mapped with a name only — unmapped item shape:",
-      JSON.stringify(item).slice(0, 600)
-    );
-  }
 
   return {
     name,

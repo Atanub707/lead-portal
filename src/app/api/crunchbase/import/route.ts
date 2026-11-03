@@ -3,21 +3,23 @@ import { NextResponse } from "next/server";
 import { getActorRun, getDatasetItems } from "@/lib/apify";
 import {
   bareDomain,
-  CRUNCHBASE_SEARCH_PREFIX,
+  CRUNCHBASE_SORTS,
+  crunchbaseFiltersSummary,
+  EMPLOYEE_BANDS,
+  FUNDING_STAGES,
+  hasCrunchbaseFilters,
   normalizeCompanyName,
   normalizeCrunchbaseItems,
   normalizeLinkedinUrl,
   startCrunchbaseActor,
+  type CrunchbaseFilters,
 } from "@/lib/crunchbase";
-import { decryptSecret, encryptSecret } from "@/lib/crypto";
 import { requireWorkspaceId } from "@/lib/data";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const maxDuration = 60;
 
 const RUN_TIMEOUT_MS = 30 * 60_000;
-const COOKIES_MESSAGE =
-  "Add your Crunchbase cookies once — they're needed to read Crunchbase search results.";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -34,14 +36,6 @@ interface LeadImportRow {
   cost_usd: number;
   error: string | null;
   created_at: string;
-}
-
-function isCookieJson(value: string) {
-  try {
-    return Array.isArray(JSON.parse(value));
-  } catch {
-    return false;
-  }
 }
 
 function redactSecrets(message: string, secrets: (string | null | undefined)[]) {
@@ -105,6 +99,42 @@ function summary(row: LeadImportRow) {
   };
 }
 
+function parseFilters(raw: unknown): CrunchbaseFilters | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const body = raw as Record<string, unknown>;
+  const filters: CrunchbaseFilters = {};
+
+  if (typeof body.category === "string" && body.category.trim()) {
+    filters.category = body.category.trim().slice(0, 120);
+  }
+  if (typeof body.location === "string" && body.location.trim()) {
+    filters.location = body.location.trim().slice(0, 120);
+  }
+  if (Array.isArray(body.employeeCount)) {
+    const bands = body.employeeCount.filter(
+      (band): band is string =>
+        typeof band === "string" &&
+        (EMPLOYEE_BANDS as readonly string[]).includes(band)
+    );
+    if (bands.length > 0) filters.employeeCount = [...new Set(bands)];
+  }
+  if (typeof body.fundingStage === "string" && body.fundingStage.trim()) {
+    const stage = body.fundingStage.trim();
+    if (FUNDING_STAGES.some((entry) => entry.value === stage)) {
+      filters.fundingStage = stage;
+    }
+  }
+  if (typeof body.sort === "string" && body.sort.trim()) {
+    const sort = body.sort.trim();
+    if (CRUNCHBASE_SORTS.some((entry) => entry.value === sort)) {
+      filters.sort = sort;
+    }
+  }
+  filters.detailed = body.detailed !== false;
+
+  return hasCrunchbaseFilters(filters) ? filters : null;
+}
+
 export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) {
@@ -115,20 +145,15 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
 
   const body = (await request.json().catch(() => null)) as {
-    searchUrl?: unknown;
+    filters?: unknown;
     count?: unknown;
-    cookies?: unknown;
     pipelineId?: unknown;
   } | null;
 
-  const searchUrl =
-    typeof body?.searchUrl === "string" ? body.searchUrl.trim() : "";
-  if (!searchUrl.startsWith(CRUNCHBASE_SEARCH_PREFIX)) {
+  const filters = parseFilters(body?.filters);
+  if (!filters) {
     return NextResponse.json(
-      {
-        error:
-          "Paste a Crunchbase search URL that starts with https://www.crunchbase.com/.",
-      },
+      { error: "Choose at least one filter: industry, location, headcount or funding stage." },
       { status: 400 }
     );
   }
@@ -166,74 +191,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unknown pipeline." }, { status: 400 });
   }
 
-  const providedCookies =
-    typeof body?.cookies === "string" ? body.cookies.trim() : "";
-  let cookies = providedCookies;
-  if (cookies) {
-    if (!isCookieJson(cookies)) {
-      return NextResponse.json(
-        {
-          error:
-            "That doesn't look like the Cookie-Editor JSON export. Copy the whole JSON array and paste it here.",
-        },
-        { status: 400 }
-      );
-    }
-  } else {
-    const { data: settings, error: settingsError } = await admin
-      .from("lead_source_settings")
-      .select("crunchbase_cookies_enc")
-      .eq("workspace_id", workspaceId)
-      .maybeSingle();
-    if (settingsError) {
-      console.error(
-        "[crunchbase] settings lookup failed:",
-        settingsError.message
-      );
-    }
-    const envelope = settings?.crunchbase_cookies_enc;
-    if (typeof envelope === "string" && envelope) {
-      try {
-        cookies = decryptSecret(envelope);
-      } catch {
-        console.error("[crunchbase] stored cookies could not be decrypted");
-      }
-    }
-  }
-
-  if (!cookies) {
-    return NextResponse.json({ error: COOKIES_MESSAGE }, { status: 400 });
-  }
-
-  if (providedCookies) {
-    const { error: saveError } = await admin.from("lead_source_settings").upsert(
-      {
-        workspace_id: workspaceId,
-        crunchbase_cookies_enc: encryptSecret(providedCookies),
-        updated_by: userId,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "workspace_id" }
-    );
-    if (saveError) {
-      console.error("[crunchbase] settings save failed:", saveError.message);
-      return NextResponse.json(
-        { error: "Couldn't save your Crunchbase cookies. Please try again." },
-        { status: 500 }
-      );
-    }
-  }
-
   let run: { runId: string; datasetId: string };
   try {
-    run = await startCrunchbaseActor({ searchUrl, count, cookies });
+    run = await startCrunchbaseActor(filters, count);
   } catch (err) {
     console.error(
       "[crunchbase] start failed:",
-      redactSecrets(
-        err instanceof Error ? err.message : String(err),
-        [cookies, process.env.APIFY_API_TOKEN]
-      )
+      redactSecrets(err instanceof Error ? err.message : String(err), [
+        process.env.APIFY_API_TOKEN,
+      ])
     );
     return NextResponse.json(
       { error: "Couldn't start the Crunchbase import. Please try again." },
@@ -248,11 +214,12 @@ export async function POST(request: Request) {
       created_by: userId,
       pipeline_id: pipelineId,
       source: "crunchbase",
-      search_url: searchUrl,
+      search_url: crunchbaseFiltersSummary(filters),
       requested_count: count,
       actor_run_id: run.runId,
       dataset_id: run.datasetId,
       status: "running",
+      details: { filters },
     })
     .select("id")
     .single();
@@ -285,19 +252,8 @@ export async function GET(request: Request) {
   const idParam = new URL(request.url).searchParams.get("id");
 
   if (!idParam) {
-    const { data, error } = await admin
-      .from("lead_source_settings")
-      .select("crunchbase_cookies_enc")
-      .eq("workspace_id", workspaceId)
-      .maybeSingle();
-    if (error) {
-      console.error("[crunchbase] settings lookup failed:", error.message);
-      return NextResponse.json({ ok: true, configured: false });
-    }
-    return NextResponse.json({
-      ok: true,
-      configured: Boolean(data?.crunchbase_cookies_enc),
-    });
+    // This actor needs no cookies or account, so the source is always ready.
+    return NextResponse.json({ ok: true, configured: true });
   }
 
   const id = Number(idParam);
@@ -347,10 +303,9 @@ export async function GET(request: Request) {
   } catch (err) {
     console.error(
       "[crunchbase] run lookup failed:",
-      redactSecrets(
-        err instanceof Error ? err.message : String(err),
-        [process.env.APIFY_API_TOKEN]
-      )
+      redactSecrets(err instanceof Error ? err.message : String(err), [
+        process.env.APIFY_API_TOKEN,
+      ])
     );
     return NextResponse.json({ status: "running" });
   }
@@ -362,7 +317,7 @@ export async function GET(request: Request) {
 
   if (runStatus !== "SUCCEEDED") {
     const message =
-      "The Crunchbase import failed before returning results. Check that your cookies are still valid and try again.";
+      "The Crunchbase import failed before returning results. Please try again.";
     await finishImport(admin, row, {
       status: "failed",
       cost: run.usageTotalUsd,
@@ -391,10 +346,9 @@ export async function GET(request: Request) {
   } catch (err) {
     console.error(
       "[crunchbase] dataset fetch failed:",
-      redactSecrets(
-        err instanceof Error ? err.message : String(err),
-        [process.env.APIFY_API_TOKEN]
-      )
+      redactSecrets(err instanceof Error ? err.message : String(err), [
+        process.env.APIFY_API_TOKEN,
+      ])
     );
     const message =
       "Couldn't download the Crunchbase results. Please try again.";

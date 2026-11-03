@@ -16,9 +16,9 @@ export default async function LeadsPage() {
           Find leads
         </h1>
         <p className="mt-1 text-[13px] leading-relaxed text-zinc-500">
-          Pull targeted startups from Crunchbase straight into a pipeline. Their
-          details land as companies, ready for Deep Research and the Email
-          Composer.
+          Filter Crunchbase by industry, location, headcount and funding stage —
+          no Crunchbase login needed. Companies land in your pipeline, ready for
+          Deep Research and the Email Composer.
         </p>
       </header>
 
