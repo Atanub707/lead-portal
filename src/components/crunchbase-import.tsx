@@ -13,8 +13,18 @@ interface ImportSummary {
   skipped: number;
 }
 
-export function CrunchbaseImport({ list }: { list: string }) {
+export function CrunchbaseImport({
+  list,
+  variant = "dialog",
+  pipelines,
+}: {
+  list: string;
+  variant?: "dialog" | "page";
+  pipelines?: { id: string; name: string }[];
+}) {
+  const isPage = variant === "page";
   const router = useRouter();
+  const [pipeline, setPipeline] = useState(pipelines?.[0]?.id ?? list);
   const [open, setOpen] = useState(false);
   const [searchUrl, setSearchUrl] = useState("");
   const [count, setCount] = useState("25");
@@ -42,7 +52,7 @@ export function CrunchbaseImport({ list }: { list: string }) {
   }
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || isPage) return;
     inputRef.current?.focus();
 
     function onKey(event: KeyboardEvent) {
@@ -55,10 +65,10 @@ export function CrunchbaseImport({ list }: { list: string }) {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = previousOverflow;
     };
-  }, [open]);
+  }, [open, isPage]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open && !isPage) return;
     let cancelled = false;
     fetch("/api/crunchbase/import")
       .then((res) => res.json())
@@ -69,10 +79,10 @@ export function CrunchbaseImport({ list }: { list: string }) {
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, isPage]);
 
   useEffect(() => {
-    if (!open || status !== "running" || importId === null) return;
+    if ((!open && !isPage) || status !== "running" || importId === null) return;
     let stopped = false;
 
     async function poll() {
@@ -113,7 +123,7 @@ export function CrunchbaseImport({ list }: { list: string }) {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [open, status, importId, router]);
+  }, [open, isPage, status, importId, router]);
 
   useEffect(() => {
     if (status !== "running") return;
@@ -145,7 +155,7 @@ export function CrunchbaseImport({ list }: { list: string }) {
           searchUrl: url,
           count: safeCount,
           cookies: cookies.trim() || undefined,
-          pipelineId: list,
+          pipelineId: pipeline,
         }),
       });
       const json = (await res.json().catch(() => null)) as
@@ -168,18 +178,16 @@ export function CrunchbaseImport({ list }: { list: string }) {
     }
   }
 
-  const dialog = (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
-      <button
-        className="animate-overlay absolute inset-0 bg-zinc-900/30"
-        aria-label="Close"
-        onClick={() => setOpen(false)}
-      />
+  const panel = (
       <div
-        role="dialog"
-        aria-modal="true"
+        role={isPage ? undefined : "dialog"}
+        aria-modal={isPage ? undefined : true}
         aria-label="Import from Crunchbase"
-        className="animate-panel relative w-full max-w-md overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl"
+        className={
+          isPage
+            ? "card overflow-hidden"
+            : "animate-panel relative w-full max-w-md overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl"
+        }
       >
         <div className="flex items-center gap-3 border-b border-zinc-100 px-4 py-3">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white">
@@ -193,13 +201,15 @@ export function CrunchbaseImport({ list }: { list: string }) {
               Search results in, companies out
             </p>
           </div>
-          <button
-            onClick={() => setOpen(false)}
-            aria-label="Close"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </button>
+          {isPage ? null : (
+            <button
+              onClick={() => setOpen(false)}
+              aria-label="Close"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
         </div>
 
         {status === "running" ? (
@@ -240,9 +250,11 @@ export function CrunchbaseImport({ list }: { list: string }) {
             </div>
             <div className="flex items-center gap-2 pt-1">
               <Link
-                href={`/companies?list=${encodeURIComponent(list)}`}
+                href={`/companies?list=${encodeURIComponent(pipeline)}`}
                 className="btn-primary"
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  if (!isPage) setOpen(false);
+                }}
               >
                 View pipeline
                 <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -280,6 +292,29 @@ export function CrunchbaseImport({ list }: { list: string }) {
                 className="input"
               />
             </div>
+
+            {pipelines && pipelines.length > 0 ? (
+              <div>
+                <label
+                  htmlFor="cb-pipeline"
+                  className="mb-1.5 block text-[12px] font-medium text-zinc-700"
+                >
+                  Import into pipeline
+                </label>
+                <select
+                  id="cb-pipeline"
+                  value={pipeline}
+                  onChange={(event) => setPipeline(event.target.value)}
+                  className="input"
+                >
+                  {pipelines.map((entry) => (
+                    <option key={entry.id} value={entry.id}>
+                      {entry.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
 
             <div>
               <label
@@ -360,8 +395,24 @@ export function CrunchbaseImport({ list }: { list: string }) {
           </div>
         )}
       </div>
+  );
+
+  const dialog = isPage ? (
+    panel
+  ) : (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
+      <button
+        className="animate-overlay absolute inset-0 bg-zinc-900/30"
+        aria-label="Close"
+        onClick={() => setOpen(false)}
+      />
+      {panel}
     </div>
   );
+
+  if (isPage) {
+    return dialog;
+  }
 
   return (
     <>

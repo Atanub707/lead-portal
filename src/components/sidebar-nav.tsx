@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import {
   LayoutDashboard,
   Mail,
+  Rocket,
   ScrollText,
   Settings,
   type LucideIcon,
@@ -116,6 +117,14 @@ export function SidebarNav({
         collapsed={collapsed}
         onNavigate={onNavigate}
         badgeCount={unreadReplies}
+      />
+      <NavItem
+        href="/leads"
+        label="Find leads"
+        icon={Rocket}
+        active={pathname.startsWith("/leads")}
+        collapsed={collapsed}
+        onNavigate={onNavigate}
       />
 
       {collapsed ? (
