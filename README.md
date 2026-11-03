@@ -190,6 +190,27 @@ Fallbacks (used only when `OPENCODE_API_KEY` is empty): `OPENAI_API_KEY`,
 `GOOGLE_GENERATIVE_AI_API_KEY`, or `GROQ_API_KEY` — `AI_MODEL` overrides those
 fallback models.
 
+## Crunchbase leads
+
+Every pipeline page has a **Crunchbase leads** button. Paste a Crunchbase **search
+URL** (it must start with `https://www.crunchbase.com/`), choose how many results to
+pull (1–100), and add your Crunchbase cookies once.
+
+- **Cookies:** export them for `crunchbase.com` with the
+  [Cookie-Editor](https://cookie-editor.com/) browser extension (JSON format) and
+  paste the array into the dialog. They're stored encrypted per workspace, so later
+  imports can leave the field empty.
+- **Cost:** the scraper bills **$2.50 per 1,000 results** (about $0.06 for 25). The
+  actual Apify cost is recorded on each import.
+- **Dedupe:** companies already in the workspace are skipped when the name, website
+  domain, or LinkedIn URL matches.
+- **Target:** new companies land in the pipeline you opened as leads (status `new`),
+  ready for Deep Research and the Email Composer.
+
+Imports run in the background; the dialog polls until they finish and links straight
+to the pipeline. The scraper is the `curious_coder/crunchbase-scraper` Apify actor and
+uses the same `APIFY_API_TOKEN` as Deep Research.
+
 ## Deploy to Vercel (free)
 
 1. Push this `admin-portal` folder to a GitHub repository (or use the Vercel CLI)

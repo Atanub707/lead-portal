@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { BookmarkToggle } from "@/components/bookmark-toggle";
 import { ConfirmSubmit } from "@/components/confirm-submit";
+import { CrunchbaseImport } from "@/components/crunchbase-import";
 import { FollowUpControl } from "@/components/follow-up-control";
 import { PasteUrl } from "@/components/paste-url";
 import { KindBadge, UserAvatar } from "@/components/badges";
@@ -148,7 +149,12 @@ export default async function CompaniesPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {canWrite ? <PasteUrl list={list} pipelines={pipelines} /> : null}
+          {canWrite ? (
+            <>
+              <PasteUrl list={list} pipelines={pipelines} />
+              <CrunchbaseImport list={list} />
+            </>
+          ) : null}
         </div>
       </header>
 
