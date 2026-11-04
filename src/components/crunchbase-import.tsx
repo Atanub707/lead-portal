@@ -9,6 +9,7 @@ import {
   CRUNCHBASE_COST_PER_RESULT_USD,
   CRUNCHBASE_DETAILED_COST_PER_RESULT_USD,
   EMPLOYEE_BANDS,
+  FOUNDED_AFTER_OPTIONS,
   FUNDING_STAGES,
   INDUSTRY_OPTIONS,
 } from "@/lib/crunchbase-options";
@@ -37,6 +38,7 @@ export function CrunchbaseImport({
   const [location, setLocation] = useState("");
   const [employees, setEmployees] = useState<string[]>([]);
   const [fundingStage, setFundingStage] = useState("");
+  const [foundedAfter, setFoundedAfter] = useState("");
   const [detailed, setDetailed] = useState(true);
   const [count, setCount] = useState("25");
   const [status, setStatus] = useState<Status>("idle");
@@ -47,7 +49,11 @@ export function CrunchbaseImport({
   const startedAt = useRef<number | null>(null);
 
   const hasFilter = Boolean(
-    category.trim() || location.trim() || employees.length > 0 || fundingStage
+    category.trim() ||
+      location.trim() ||
+      employees.length > 0 ||
+      fundingStage ||
+      foundedAfter
   );
 
   function resetForm() {
@@ -55,6 +61,7 @@ export function CrunchbaseImport({
     setLocation("");
     setEmployees([]);
     setFundingStage("");
+    setFoundedAfter("");
     setDetailed(true);
     setCount("25");
     setStatus("idle");
@@ -170,6 +177,7 @@ export function CrunchbaseImport({
             location: location.trim() || undefined,
             employeeCount: employees.length > 0 ? employees : undefined,
             fundingStage: fundingStage || undefined,
+            foundedAfter: foundedAfter || undefined,
             detailed,
           },
           count: safeCount,
@@ -349,6 +357,9 @@ export function CrunchbaseImport({
             <p className="mb-1.5 text-[12px] font-medium text-zinc-700">
               Headcount
             </p>
+            <p className="mb-1.5 text-[11px] leading-relaxed text-zinc-500">
+              Newly formed companies are usually 1–10.
+            </p>
             <div className="flex flex-wrap gap-1.5">
               {EMPLOYEE_BANDS.map((band) => {
                 const active = employees.includes(band);
@@ -371,25 +382,47 @@ export function CrunchbaseImport({
             </div>
           </div>
 
-          <div>
-            <label
-              htmlFor="cb-stage"
-              className="mb-1.5 block text-[12px] font-medium text-zinc-700"
-            >
-              Funding stage
-            </label>
-            <select
-              id="cb-stage"
-              value={fundingStage}
-              onChange={(event) => setFundingStage(event.target.value)}
-              className="input"
-            >
-              {FUNDING_STAGES.map((entry) => (
-                <option key={entry.value} value={entry.value}>
-                  {entry.label}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label
+                htmlFor="cb-stage"
+                className="mb-1.5 block text-[12px] font-medium text-zinc-700"
+              >
+                Funding stage
+              </label>
+              <select
+                id="cb-stage"
+                value={fundingStage}
+                onChange={(event) => setFundingStage(event.target.value)}
+                className="input"
+              >
+                {FUNDING_STAGES.map((entry) => (
+                  <option key={entry.value} value={entry.value}>
+                    {entry.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label
+                htmlFor="cb-founded"
+                className="mb-1.5 block text-[12px] font-medium text-zinc-700"
+              >
+                Founded
+              </label>
+              <select
+                id="cb-founded"
+                value={foundedAfter}
+                onChange={(event) => setFoundedAfter(event.target.value)}
+                className="input"
+              >
+                {FOUNDED_AFTER_OPTIONS.map((entry) => (
+                  <option key={entry.value} value={entry.value}>
+                    {entry.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <label className="flex items-start gap-2 rounded-lg border border-zinc-200 px-3 py-2.5">

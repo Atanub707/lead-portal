@@ -38,6 +38,14 @@ export const EMPLOYEE_BANDS = [
   "10001+",
 ] as const;
 
+export const FOUNDED_AFTER_OPTIONS = [
+  { value: "", label: "Any time" },
+  { value: "2026-01-01", label: "2026 (this year)" },
+  { value: "2025-01-01", label: "2025 or later" },
+  { value: "2024-01-01", label: "2024 or later" },
+  { value: "2023-01-01", label: "2023 or later" },
+] as const;
+
 export const FUNDING_STAGES = [
   { value: "", label: "Any stage" },
   { value: "seed", label: "Seed" },

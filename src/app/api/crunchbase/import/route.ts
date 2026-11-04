@@ -5,6 +5,7 @@ import {
   bareDomain,
   crunchbaseFiltersSummary,
   EMPLOYEE_BANDS,
+  FOUNDED_AFTER_OPTIONS,
   FUNDING_STAGES,
   hasCrunchbaseFilters,
   INDUSTRY_OPTIONS,
@@ -125,6 +126,12 @@ function parseFilters(raw: unknown): CrunchbaseFilters | null {
     const stage = body.fundingStage.trim();
     if (FUNDING_STAGES.some((entry) => entry.value === stage)) {
       filters.fundingStage = stage;
+    }
+  }
+  if (typeof body.foundedAfter === "string" && body.foundedAfter.trim()) {
+    const foundedAfter = body.foundedAfter.trim();
+    if (FOUNDED_AFTER_OPTIONS.some((entry) => entry.value === foundedAfter)) {
+      filters.foundedAfter = foundedAfter;
     }
   }
   filters.detailed = body.detailed !== false;

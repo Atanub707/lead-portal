@@ -3,6 +3,7 @@ import {
   CRUNCHBASE_COST_PER_RESULT_USD,
   CRUNCHBASE_DETAILED_COST_PER_RESULT_USD,
   EMPLOYEE_BANDS,
+  FOUNDED_AFTER_OPTIONS,
   FUNDING_STAGES,
   INDUSTRY_OPTIONS,
 } from "./crunchbase-options";
@@ -11,6 +12,7 @@ export {
   CRUNCHBASE_COST_PER_RESULT_USD,
   CRUNCHBASE_DETAILED_COST_PER_RESULT_USD,
   EMPLOYEE_BANDS,
+  FOUNDED_AFTER_OPTIONS,
   FUNDING_STAGES,
   INDUSTRY_OPTIONS,
 };
@@ -25,6 +27,7 @@ export interface CrunchbaseFilters {
   location?: string;
   employeeCount?: string[];
   fundingStage?: string;
+  foundedAfter?: string;
   detailed?: boolean;
 }
 
@@ -33,7 +36,8 @@ export function hasCrunchbaseFilters(filters: CrunchbaseFilters): boolean {
     filters.category?.trim() ||
       filters.location?.trim() ||
       (filters.employeeCount?.length ?? 0) > 0 ||
-      filters.fundingStage?.trim()
+      filters.fundingStage?.trim() ||
+      filters.foundedAfter?.trim()
   );
 }
 
@@ -48,6 +52,12 @@ export function crunchbaseFiltersSummary(filters: CrunchbaseFilters): string {
     parts.push(
       FUNDING_STAGES.find((entry) => entry.value === filters.fundingStage)
         ?.label ?? filters.fundingStage
+    );
+  }
+  if (filters.foundedAfter?.trim()) {
+    parts.push(
+      FOUNDED_AFTER_OPTIONS.find((entry) => entry.value === filters.foundedAfter)
+        ?.label ?? `founded ${filters.foundedAfter}`
     );
   }
   return parts.length > 0 ? parts.join(" · ") : "All companies";
@@ -71,6 +81,7 @@ export function buildCrunchbaseInput(
     input.employeeCount = filters.employeeCount;
   }
   if (filters.fundingStage?.trim()) input.fundingStage = filters.fundingStage;
+  if (filters.foundedAfter?.trim()) input.foundedAfter = filters.foundedAfter;
   return input;
 }
 
