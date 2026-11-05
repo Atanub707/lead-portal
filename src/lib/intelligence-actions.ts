@@ -172,7 +172,18 @@ export async function saveIcp(formData: FormData) {
     if (error) throw new Error(error.message);
   }
 
-  // Criteria (targeting)
+  // Criteria (targeting). Preserve existing signal rules when the form did
+  // not render weight fields (e.g. definitions unavailable at render time).
+  const hasSignalFields = [...formData.keys()].some((key) =>
+    key.startsWith("signal_")
+  );
+  const { data: existingSignalRows } = await supabase
+    .from("icp_criteria")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("icp_id", icpId)
+    .eq("kind", "signal");
+
   await supabase
     .from("icp_criteria")
     .delete()
@@ -218,6 +229,22 @@ export async function saveIcp(formData: FormData) {
     .select("key")
     .eq("workspace_id", workspaceId)
     .eq("is_active", true);
+  if (!hasSignalFields && existingSignalRows) {
+    for (const row of existingSignalRows) {
+      criteria.push({
+        workspace_id: workspaceId,
+        icp_id: icpId,
+        kind: "signal",
+        field: row.field,
+        operator: row.operator,
+        value: row.value,
+        is_required: row.is_required,
+        weight: row.weight,
+        label: row.label,
+        sort_order: criteria.length,
+      });
+    }
+  }
   for (const definition of definitions ?? []) {
     const key = (definition as { key: string }).key;
     const raw = field(formData, `signal_${key}`);

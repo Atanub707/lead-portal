@@ -1,5 +1,6 @@
 import { activeWorkspaceId, getPipelines } from "./data";
 import { createClient } from "./supabase/server";
+import { createAdminClient } from "./supabase/admin";
 import type {
   BusinessProfile,
   Firmographics,
@@ -32,6 +33,7 @@ export interface IntelligenceBundle {
 
 export async function getIntelligenceBundle(): Promise<IntelligenceBundle> {
   const supabase = await createClient();
+  const admin = createAdminClient();
   const workspaceId = await activeWorkspaceId();
 
   const [profilesRes, icpsRes, signalsRes, templatesRes, pipelines] =
@@ -47,7 +49,7 @@ export async function getIntelligenceBundle(): Promise<IntelligenceBundle> {
         .eq("workspace_id", workspaceId)
         .order("is_default", { ascending: false })
         .order("created_at", { ascending: true }),
-      supabase
+      admin
         .from("signal_definitions")
         .select("*")
         .eq("workspace_id", workspaceId)
@@ -61,6 +63,9 @@ export async function getIntelligenceBundle(): Promise<IntelligenceBundle> {
       getPipelines(),
     ]);
 
+  if (signalsRes.error) {
+    console.error("[intelligence] signal definitions read failed:", signalsRes.error.message);
+  }
   const profiles = (profilesRes.data ?? []) as BusinessProfile[];
   const icps = (icpsRes.data ?? []) as IcpProfile[];
   const icp = icps[0] ?? null;

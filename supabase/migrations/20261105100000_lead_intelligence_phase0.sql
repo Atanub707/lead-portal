@@ -745,7 +745,7 @@ values
         "industries": ["SaaS", "FinTech", "Health Care", "Information Technology"],
         "employee_bands": ["11-50", "51-100", "101-250", "251-500"],
         "geo": ["India", "United States", "United Kingdom", "EU"],
-        "funding_stages": ["seed", "series_a", "series_b"],
+        "funding_stages": ["seed", "early_stage_venture"],
         "personas": [
           {"name": "Founder", "titles": ["Founder", "Co-Founder", "CEO"], "seniorities": ["c_suite", "owner"], "is_primary": true},
           {"name": "Engineering leader", "titles": ["CTO", "VP Engineering", "Head of Engineering"], "seniorities": ["c_suite", "vp"]},
