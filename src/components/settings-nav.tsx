@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const TABS: { href: string; label: string; ownerOnly?: boolean }[] = [
   { href: "/settings", label: "General" },
+  { href: "/settings/business", label: "Business profile" },
   { href: "/settings/members", label: "Members" },
   { href: "/settings/pipelines", label: "Pipelines", ownerOnly: true },
   { href: "/settings/email", label: "Email & SMTP" },

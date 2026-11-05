@@ -16,6 +16,13 @@ import {
   type CrunchbaseFilters,
 } from "@/lib/crunchbase";
 import { requireWorkspaceId } from "@/lib/data";
+import {
+  employeeBandFromCount,
+  parseEmployeeBandText,
+  parseFundingStage,
+  parseLocationText,
+} from "@/lib/intelligence";
+import { upsertFirmographics } from "@/lib/intelligence-write";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const maxDuration = 60;
@@ -469,9 +476,10 @@ export async function GET(request: Request) {
 
   let imported = 0;
   if (rows.length > 0) {
-    const { error: writeError } = await admin
+    const { data: createdRows, error: writeError } = await admin
       .from("organizations")
-      .insert(rows);
+      .insert(rows)
+      .select("id, name");
     if (writeError) {
       console.error("[crunchbase] company insert failed:", writeError.message);
       const message = "Couldn't save the imported companies. Please try again.";
@@ -484,7 +492,35 @@ export async function GET(request: Request) {
       });
       return NextResponse.json({ status: "failed", error: message });
     }
-    imported = rows.length;
+    imported = createdRows?.length ?? rows.length;
+
+    const byName = new Map(companies.map((company) => [company.nameKey, company]));
+    const appliedFilters =
+      (previousDetails?.filters as Record<string, unknown> | undefined) ?? {};
+    const appliedCategory =
+      typeof appliedFilters.category === "string"
+        ? appliedFilters.category
+        : null;
+    const industryLabel =
+      INDUSTRY_OPTIONS.find((entry) => entry.value === appliedCategory)?.label ??
+      appliedCategory;
+    for (const created of createdRows ?? []) {
+      const company = byName.get(normalizeCompanyName(created.name as string));
+      if (!company) continue;
+      const location = parseLocationText(company.location);
+      await upsertFirmographics(created.id as number, workspaceId, {
+        industry: industryLabel,
+        employee_band:
+          parseEmployeeBandText(company.employees) ??
+          employeeBandFromCount(null),
+        funding_stage: parseFundingStage(company.funding),
+        hq_city: location.city,
+        hq_region: location.region,
+        hq_country: location.country,
+        data_sources: { crunchbase: true },
+        confidence: 0.8,
+      });
+    }
   }
 
   await finishImport(admin, row, {

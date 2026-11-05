@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { logActivity } from "./activity";
 import { getActorRun, getDatasetItems, startActorRun, type ActorRunInfo } from "./apify";
+import { employeeBandFromCount, parseLocationText } from "./intelligence";
+import { upsertFirmographics } from "./intelligence-write";
 import { matchEmailToContact } from "./match";
 import { isDecisionTitle, isGenericEmail } from "./people";
 import { createAdminClient } from "./supabase/admin";
@@ -800,6 +802,32 @@ export async function reconcileDeepResearch(
       ).length;
       const cost = allInfos.reduce((sum, info) => sum + info.usageTotalUsd, 0);
       const status = succeeded > 0 ? "ok" : "failed";
+      const { data: orgRow } = await admin
+        .from("organizations")
+        .select("workspace_id")
+        .eq("id", run.org_id)
+        .maybeSingle();
+      const workspaceId = (orgRow as { workspace_id?: string } | null)
+        ?.workspace_id;
+      if (workspaceId) {
+        const address = parseLocationText(state.companyFacts.address);
+        await upsertFirmographics(run.org_id as number, workspaceId, {
+          employee_count: state.companyFacts.employees ?? null,
+          employee_band: employeeBandFromCount(
+            state.companyFacts.employees ?? null
+          ),
+          founded_year: state.companyFacts.founded ?? null,
+          hq_city: address.city,
+          hq_region: address.region,
+          hq_country: address.country,
+          data_sources: {
+            deep_research: true,
+            linkedin: Boolean(state.companyFacts.linkedin_url),
+          },
+          confidence: 0.7,
+        });
+      }
+
       const { error } = await admin
         .from("enrichment_runs")
         .update({

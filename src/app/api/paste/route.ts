@@ -40,15 +40,21 @@ const ExtractSchema = z.object({
     .describe("Real people named on the site (team/about pages), max 12"),
 });
 
-const EXTRACT_SYSTEM = `You extract structured company data from website research for an internal CRM with two pipelines.
+function extractSystem(offering: string) {
+  return `You extract structured company data from website research for a B2B CRM.
+This workspace sells: ${offering}.
 
-- POS Pipeline: restaurant/hospitality point-of-sale technology. "competitor" = a POS vendor/product company, "partner" = an integration or channel partner, "lead" = a potential customer, "other" = unclear.
-- Compliance Pipeline: organizations that may buy SOC 2 / ISO 27000 readiness services. Most are "lead".
+Classify "kind":
+- "lead": likely buyer of these services.
+- "partner": could integrate, resell or complement these services.
+- "competitor": sells the same or overlapping services.
+- "other": unclear.
 
 Rules:
 - Use ONLY facts present in the research. Never invent people, emails, or URLs.
 - contacts: only real people named on the site (team/about/leadership pages), prefer founders and senior people. Set title/linkedin_url/email to "" when not present.
 - Use "" for unknown single values and [] for unknown lists.`;
+}
 
 const JSON_SHAPE = `Return a single JSON object with exactly these keys:
 {
@@ -145,6 +151,25 @@ export async function POST(req: Request) {
     return Response.json({ error: "Unknown pipeline." }, { status: 400 });
   }
 
+  // Classification follows the workspace's own business profile, so the same
+  // code serves any industry (compliance, POS, marketing, recruiting, …).
+  const { data: businessProfile } = await supabase
+    .from("business_profiles")
+    .select("name, service_categories")
+    .eq("workspace_id", workspaceId)
+    .eq("is_active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const offering =
+    (
+      (businessProfile?.service_categories as string[] | null) ?? []
+    )
+      .filter(Boolean)
+      .join(", ") ||
+    (businessProfile?.name as string | null) ||
+    pipeline.name;
+
   const model = pickModel(userId);
   if (!model) {
     return Response.json({ error: NO_AI_KEY_MESSAGE }, { status: 503 });
@@ -183,10 +208,7 @@ export async function POST(req: Request) {
   const userPrompt = `Here is the website research (JSON):\n\n${JSON.stringify(
     digest
   )}`;
-  const pipelineHint =
-    list === "pos" || list === "compliance"
-      ? ""
-      : `\nThe user selected the "${pipeline.name}" pipeline — classify kind as "lead" unless the research clearly shows a partner or competitor relationship.`;
+  const pipelineHint = `\nThe user is adding this company to the "${pipeline.name}" pipeline.`;
 
   // Plain-text generation first: no response_format, the request shape OpenCode Go
   // handles most reliably. generateObject (JSON mode) is the second chance.
@@ -196,7 +218,7 @@ export async function POST(req: Request) {
   try {
     const { text } = await generateText({
       model,
-      system: `${EXTRACT_SYSTEM}${pipelineHint}\n\n${JSON_SHAPE}`,
+      system: `${extractSystem(offering)}${pipelineHint}\n\n${JSON_SHAPE}`,
       prompt: userPrompt,
     });
     const parsed = parseJsonObject(text);
@@ -221,7 +243,7 @@ export async function POST(req: Request) {
       const { object } = await generateObject({
         model,
         schema: ExtractSchema,
-        system: `${EXTRACT_SYSTEM}${pipelineHint}`,
+        system: `${extractSystem(offering)}${pipelineHint}`,
         prompt: userPrompt,
       });
       extracted = object;

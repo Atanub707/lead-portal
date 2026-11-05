@@ -22,6 +22,7 @@ export interface Pipeline {
   proof_points: string[] | null;
   cta: string | null;
   default_flavor: string | null;
+  icp_id?: string | null;
 }
 
 export const DEFAULT_STAGES: PipelineStage[] = [

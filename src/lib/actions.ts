@@ -14,6 +14,7 @@ import { createAdminClient } from "./supabase/admin";
 import { clearClerkDirectoryCache } from "./clerk-directory";
 import { createClient } from "./supabase/server";
 import { findLinkedInProfile, tinyfishEnabled } from "./research";
+import { ensureDefaultIcp, seedWorkspaceSignals } from "./intelligence-write";
 import type { OrgKind, OrgList, PipelineStage, UserRole } from "./types";
 import {
   AVATAR_PRESETS,
@@ -683,6 +684,9 @@ export async function createWorkspace(formData: FormData) {
     .from("profiles")
     .update({ workspace_id: workspace.id, role: "owner" })
     .eq("id", userId);
+
+  await seedWorkspaceSignals(workspace.id);
+  await ensureDefaultIcp(workspace.id, userId);
 
   await logActivity({
     actorId: userId,
