@@ -55,7 +55,7 @@ export async function getIntelligenceBundle(): Promise<IntelligenceBundle> {
         .eq("workspace_id", workspaceId)
         .eq("is_active", true)
         .order("category", { ascending: true })
-        .order("sort_order", { ascending: true }),
+        .order("label", { ascending: true }),
       supabase
         .from("template_business_profiles")
         .select("key, name, description")
