@@ -64,6 +64,16 @@ async function fetchText(rawUrl: string): Promise<{ url: string; text: string } 
   }
 }
 
+// Reject script/style artifacts so evidence stays readable.
+function isLikelyContent(snippet: string): boolean {
+  if (!snippet) return false;
+  if (/[{}]/.test(snippet)) return false;
+  if (/@media|function\s*\(|=>|\.border-|\.bg-|\.text-|var\s+\w+\s*=/.test(snippet)) {
+    return false;
+  }
+  return true;
+}
+
 async function refreshOrgSignalStats(orgId: number, workspaceId: string) {
   const admin = createAdminClient();
   const { count } = await admin
@@ -110,19 +120,28 @@ export async function scanCompanySignals(
     return { ok: true, created: 0, scanned: 0, skipped: "No website signals configured" };
   }
 
-  let text = "";
   const sources: { url: string; text: string }[] = [];
+  const addSource = (url: string, text: string) => {
+    if (!text.trim()) return;
+    const existing = sources.find((source) => source.url === url);
+    if (existing) {
+      if (existing.text.length < 60_000) {
+        existing.text = `${existing.text}\n${text}`.slice(0, 60_000);
+      }
+      return;
+    }
+    sources.push({ url, text: text.slice(0, 60_000) });
+  };
+
   try {
     const research = await researchWebsite(website);
-    text += [
-      research.title ?? "",
-      research.description ?? "",
-      research.notes ?? "",
-      ...research.pages.map((page) => page.excerpt),
-    ].join("\n");
-    sources.push(
-      ...research.pages.map((page) => ({ url: page.url, text: page.excerpt }))
+    addSource(
+      research.final_url || website,
+      [research.title ?? "", research.description ?? ""].filter(Boolean).join("\n")
     );
+    for (const page of research.pages) {
+      addSource(page.url, page.excerpt);
+    }
     const base = isPublicHttpUrl(research.final_url || website);
     if (base) {
       const existing = new Set(research.pages.map((page) => page.url));
@@ -130,10 +149,7 @@ export async function scanCompanySignals(
         const target = new URL(path, base.origin).toString();
         if (existing.has(target)) continue;
         const fetched = await fetchText(target);
-        if (fetched) {
-          text += `\n${fetched.text}`;
-          sources.push(fetched);
-        }
+        if (fetched) addSource(fetched.url, fetched.text);
       }
     }
   } catch {
@@ -144,24 +160,34 @@ export async function scanCompanySignals(
   for (const definition of definitions) {
     const keywords = extractKeywords(definition.query_config);
     if (keywords.length === 0) continue;
-    const matches = findKeywordMatches(text, keywords);
-    for (const match of matches.slice(0, 3)) {
+    for (const keyword of keywords) {
+      const match = sources
+        .map((source) => {
+          const found = findKeywordMatches(source.text, [keyword]);
+          return found[0] ? { source, match: found[0] } : null;
+        })
+        .filter(
+          (entry): entry is { source: { url: string; text: string }; match: { keyword: string; snippet: string } } =>
+            entry !== null
+        )
+        .find((entry) => isLikelyContent(entry.match.snippet));
+      if (!match) continue;
       rows.push({
         workspace_id: workspaceId,
         org_id: orgId,
         signal_key: definition.key,
-        value: { keyword: match.keyword },
+        value: { keyword: match.match.keyword },
         evidence: {
           source: "website",
-          url: sources[0]?.url ?? website,
-          keyword: match.keyword,
-          snippet: match.snippet,
+          url: match.source.url,
+          keyword: match.match.keyword,
+          snippet: match.match.snippet,
         },
         source_key: "website",
         confidence: 0.8,
         observed_at: new Date().toISOString(),
         expires_at: expiryFor(definition.decay_days),
-        dedupe_hash: signalDedupeHash([orgId, definition.key, match.keyword.toLowerCase()]),
+        dedupe_hash: signalDedupeHash([orgId, definition.key, match.match.keyword.toLowerCase()]),
       });
     }
   }
