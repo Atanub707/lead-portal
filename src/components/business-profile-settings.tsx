@@ -134,7 +134,11 @@ export function BusinessProfileSettings({
         <h2 className="text-[13px] font-semibold text-zinc-900">
           What we sell
         </h2>
-        <form action={saveBusinessProfile} className="mt-3 space-y-4">
+        <form
+          key={`bp-${profile?.id ?? "new"}-${profile?.updated_at ?? ""}`}
+          action={saveBusinessProfile}
+          className="mt-3 space-y-4"
+        >
           <input type="hidden" name="id" value={profile?.id ?? ""} />
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -234,7 +238,11 @@ export function BusinessProfileSettings({
             ) : null}
           </div>
 
-          <form action={saveIcp} className="mt-4 space-y-5">
+          <form
+            key={`icp-${icp.id}-${icp.updated_at}`}
+            action={saveIcp}
+            className="mt-4 space-y-5"
+          >
             <input type="hidden" name="icp_id" value={icp.id} />
             <input
               type="hidden"

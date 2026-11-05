@@ -294,6 +294,19 @@ export async function saveIcp(formData: FormData) {
       .eq("id", pipelineId);
   }
 
+  // The ICP being edited becomes the workspace default (single visible ICP in
+  // the settings UI; the partial unique index enforces one default).
+  await supabase
+    .from("icp_profiles")
+    .update({ is_default: false })
+    .eq("workspace_id", workspaceId)
+    .neq("id", icpId);
+  await supabase
+    .from("icp_profiles")
+    .update({ is_default: true })
+    .eq("workspace_id", workspaceId)
+    .eq("id", icpId);
+
   await seedWorkspaceSignals(workspaceId);
   revalidatePath("/settings/business");
   revalidatePath("/companies");

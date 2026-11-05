@@ -215,7 +215,8 @@ export async function applyTemplateToWorkspace(
     businessProfileId = created.id as string;
   }
 
-  // One ICP per business profile.
+  // One ICP per business profile. If none exists, reuse an empty default ICP
+  // so a freshly-created workspace doesn't accumulate placeholder ICPs.
   const { data: existingIcp } = await admin
     .from("icp_profiles")
     .select("id")
@@ -225,12 +226,39 @@ export async function applyTemplateToWorkspace(
 
   let icpId = existingIcp?.id as string | undefined;
   const icpName = config.icp ? template.name : "Default ICP";
+
+  if (!icpId) {
+    const { data: emptyDefault } = await admin
+      .from("icp_profiles")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .eq("is_default", true)
+      .is("business_profile_id", null)
+      .maybeSingle();
+    if (emptyDefault?.id) {
+      const [{ count: personaCount }, { count: criteriaCount }] = await Promise.all([
+        admin
+          .from("icp_personas")
+          .select("id", { count: "exact", head: true })
+          .eq("icp_id", emptyDefault.id),
+        admin
+          .from("icp_criteria")
+          .select("id", { count: "exact", head: true })
+          .eq("icp_id", emptyDefault.id),
+      ]);
+      if ((personaCount ?? 0) === 0 && (criteriaCount ?? 0) === 0) {
+        icpId = emptyDefault.id as string;
+      }
+    }
+  }
+
   if (icpId) {
     await admin
       .from("icp_profiles")
       .update({
         name: icpName,
         description: template.description,
+        business_profile_id: businessProfileId,
         status: "active",
         updated_at: new Date().toISOString(),
       })
@@ -255,6 +283,19 @@ export async function applyTemplateToWorkspace(
     }
     icpId = created.id as string;
   }
+
+  // The configured ICP becomes the workspace default (partial unique index
+  // allows only one default per workspace).
+  await admin
+    .from("icp_profiles")
+    .update({ is_default: false })
+    .eq("workspace_id", workspaceId)
+    .neq("id", icpId);
+  await admin
+    .from("icp_profiles")
+    .update({ is_default: true })
+    .eq("workspace_id", workspaceId)
+    .eq("id", icpId);
 
   // Replace personas and criteria for this ICP.
   await admin
