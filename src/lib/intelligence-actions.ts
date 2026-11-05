@@ -9,7 +9,9 @@ import {
   seedWorkspaceSignals,
 } from "./intelligence-write";
 import { createClient } from "./supabase/server";
+import { createAdminClient } from "./supabase/admin";
 import { splitLines, splitList } from "./intelligence";
+import { signalDedupeHash } from "./signals";
 
 function field(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -104,6 +106,64 @@ export async function createDefaultIcp() {
   await seedWorkspaceSignals(workspaceId);
   await ensureDefaultIcp(workspaceId, userId);
   revalidatePath("/settings/business");
+}
+
+export async function addManualSignal(formData: FormData) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Not signed in");
+  const workspaceId = await requireWorkspaceId();
+  const supabase = await createClient();
+
+  const orgId = Number(field(formData, "org_id"));
+  const signalKey = field(formData, "signal_key");
+  const note = field(formData, "note");
+  const url = field(formData, "evidence_url");
+  if (!orgId || !signalKey || !note) {
+    throw new Error("Pick a signal and add a short note");
+  }
+
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("id", orgId)
+    .maybeSingle();
+  if (!org) throw new Error("Company not found");
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("company_signals").upsert(
+    [
+      {
+        workspace_id: workspaceId,
+        org_id: orgId,
+        signal_key: signalKey,
+        value: { note },
+        evidence: { source: "manual", url: url || null, snippet: note.slice(0, 240) },
+        source_key: "manual",
+        confidence: 1,
+        observed_at: new Date().toISOString(),
+        expires_at: null,
+        dedupe_hash: signalDedupeHash([orgId, signalKey, note, url]),
+      },
+    ],
+    { onConflict: "org_id,signal_key,dedupe_hash", ignoreDuplicates: true }
+  );
+  if (error) throw new Error(error.message);
+
+  const { count } = await admin
+    .from("company_signals")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("workspace_id", workspaceId);
+  await admin
+    .from("organizations")
+    .update({
+      signal_count: count ?? 0,
+      last_signal_at: new Date().toISOString(),
+    })
+    .eq("id", orgId)
+    .eq("workspace_id", workspaceId);
+
+  revalidatePath(`/companies/${orgId}`);
 }
 
 export async function saveIcp(formData: FormData) {

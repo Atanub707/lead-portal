@@ -126,6 +126,23 @@ export async function getFirmographics(
   return (data ?? null) as Firmographics | null;
 }
 
+export async function getSignalDefinitions(): Promise<SignalDefinition[]> {
+  const admin = createAdminClient();
+  const workspaceId = await activeWorkspaceId();
+  const { data, error } = await admin
+    .from("signal_definitions")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("is_active", true)
+    .order("category", { ascending: true })
+    .order("label", { ascending: true });
+  if (error) {
+    console.error("[intelligence] signal definitions read failed:", error.message);
+    return [];
+  }
+  return (data ?? []) as SignalDefinition[];
+}
+
 export async function getCompanySignals(orgId: number) {
   const supabase = await createClient();
   const { data } = await supabase

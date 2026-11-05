@@ -23,6 +23,7 @@ import {
   parseLocationText,
 } from "@/lib/intelligence";
 import { upsertFirmographics } from "@/lib/intelligence-write";
+import { recordFundingSignal } from "@/lib/signal-scan";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const maxDuration = 60;
@@ -520,6 +521,12 @@ export async function GET(request: Request) {
         data_sources: { crunchbase: true },
         confidence: 0.8,
       });
+      await recordFundingSignal(
+        created.id as number,
+        workspaceId,
+        company.funding,
+        company.crunchbaseUrl
+      );
     }
   }
 

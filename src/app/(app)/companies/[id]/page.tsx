@@ -33,6 +33,12 @@ import {
   getWorkspaceContext,
 } from "@/lib/data";
 import { reconcileIfStale } from "@/lib/deep-research";
+import { CompanyIntelligence } from "@/components/company-intelligence";
+import {
+  getCompanySignals,
+  getFirmographics,
+  getSignalDefinitions,
+} from "@/lib/intelligence-data";
 import { createClient } from "@/lib/supabase/server";
 import {
   CHANNELS,
@@ -167,6 +173,9 @@ export default async function CompanyPage({
     profiles,
     emailSettings,
     workspaceCtx,
+    firmographics,
+    companySignals,
+    signalDefinitions,
   ] = await Promise.all([
     getCompany(companyId),
     getContacts(companyId),
@@ -178,6 +187,9 @@ export default async function CompanyPage({
     getProfiles(),
     getMyEmailSettings(),
     getWorkspaceContext(),
+    getFirmographics(companyId),
+    getCompanySignals(companyId),
+    getSignalDefinitions(),
   ]);
 
   if (!company) notFound();
@@ -364,6 +376,21 @@ export default async function CompanyPage({
                 </div>
               ))}
             </dl>
+          </Section>
+
+          {/* Intelligence */}
+          <Section
+            title="Intelligence"
+            count={companySignals.length}
+            className="animate-rise animate-rise-1"
+          >
+            <CompanyIntelligence
+              orgId={company.id}
+              firmographics={firmographics}
+              signals={companySignals as never}
+              definitions={signalDefinitions}
+              canWrite={canWrite}
+            />
           </Section>
 
           {/* Deep research */}
