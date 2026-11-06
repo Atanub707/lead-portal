@@ -129,6 +129,11 @@ export interface Organization {
   follow_up_note: string | null;
   created_by: string | null;
   created_at: string;
+  icp_id?: string | null;
+  score?: number | null;
+  grade?: string | null;
+  signal_count?: number;
+  last_signal_at?: string | null;
 }
 
 export interface CompanyEmail {
@@ -311,6 +316,7 @@ export const COMPANY_SORT_OPTIONS = [
   { value: "oldest", label: "Oldest first" },
   { value: "name", label: "Name (A–Z)" },
   { value: "name_desc", label: "Name (Z–A)" },
+  { value: "score", label: "Score (high → low)" },
 ] as const;
 
 export type CompanySort = (typeof COMPANY_SORT_OPTIONS)[number]["value"];

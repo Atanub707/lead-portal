@@ -12,6 +12,7 @@ import { createClient } from "./supabase/server";
 import { createAdminClient } from "./supabase/admin";
 import { splitLines, splitList } from "./intelligence";
 import { signalDedupeHash } from "./signals";
+import { scoreOrg } from "./scoring";
 
 function field(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -162,6 +163,10 @@ export async function addManualSignal(formData: FormData) {
     })
     .eq("id", orgId)
     .eq("workspace_id", workspaceId);
+
+  await scoreOrg(orgId, workspaceId).catch((err) => {
+    console.error("[intelligence] score failed:", err instanceof Error ? err.message : err);
+  });
 
   revalidatePath(`/companies/${orgId}`);
 }

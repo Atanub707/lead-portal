@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { claimJobs, completeJob, failJob } from "@/lib/jobs";
 import { scanCompanySignals } from "@/lib/signal-scan";
+import { recomputeWorkspaceScores, scoreOrg } from "@/lib/scoring";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -32,8 +33,19 @@ async function run() {
         }
         await completeJob(job.id);
         results.push({ id: job.id, kind: job.kind, ok: true, detail: `${result.created} signals` });
+      } else if (job.kind === "score_recompute") {
+        const orgId = Number(job.payload?.orgId);
+        if (orgId) {
+          const score = await scoreOrg(orgId, job.workspace_id);
+          await completeJob(job.id);
+          results.push({ id: job.id, kind: job.kind, ok: true, detail: score ? `score ${score.total}` : "no ICP" });
+        } else {
+          const result = await recomputeWorkspaceScores(job.workspace_id);
+          await completeJob(job.id);
+          results.push({ id: job.id, kind: job.kind, ok: true, detail: `${result.scored} scored` });
+        }
       } else {
-        // Later phases add handlers here (score_recompute, campaign_tick, …).
+        // Later phases add handlers here (campaign_tick, …).
         await failJob(job, `No handler for ${job.kind} yet`);
         results.push({ id: job.id, kind: job.kind, ok: false, detail: "no handler" });
       }

@@ -7,6 +7,28 @@ import { SubmitButton } from "@/components/submit-button";
 import { addManualSignal } from "@/lib/intelligence-actions";
 import type { Firmographics, SignalDefinition } from "@/lib/intelligence";
 
+interface ScoreReason {
+  rule?: string;
+  label?: string;
+  category?: string;
+  points?: number;
+  max_points?: number;
+  matched?: boolean;
+  detail?: string;
+}
+
+interface ScoreView {
+  fit: number;
+  intent: number;
+  reach: number;
+  total: number;
+  grade: string;
+  excluded: boolean;
+  exclusion_reason: string | null;
+  reasons: unknown;
+  computed_at: string;
+}
+
 interface SignalRow {
   id: number;
   signal_key: string;
@@ -45,12 +67,14 @@ export function CompanyIntelligence({
   firmographics,
   signals,
   definitions,
+  score,
   canWrite,
 }: {
   orgId: number;
   firmographics: Firmographics | null;
   signals: SignalRow[];
   definitions: SignalDefinition[];
+  score: ScoreView | null;
   canWrite: boolean;
 }) {
   const router = useRouter();
@@ -127,6 +151,102 @@ export function CompanyIntelligence({
         ) : null}
         {error ? <span className="text-[11px] text-rose-600">{error}</span> : null}
       </div>
+
+      {score ? (
+        <div className="rounded-lg border border-zinc-200 px-3 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[12px] font-semibold text-zinc-900">
+              Lead score
+            </span>
+            <span className="text-[18px] font-semibold tabular-nums text-zinc-900">
+              {score.total}
+            </span>
+            <span className="text-[11px] text-zinc-400">/100</span>
+            <span
+              className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+                score.grade === "A"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : score.grade === "B"
+                    ? "border-sky-200 bg-sky-50 text-sky-700"
+                    : score.grade === "C"
+                      ? "border-amber-200 bg-amber-50 text-amber-700"
+                      : score.grade === "excluded"
+                        ? "border-rose-200 bg-rose-50 text-rose-700"
+                        : "border-zinc-200 bg-zinc-50 text-zinc-600"
+              }`}
+            >
+              {score.grade}
+            </span>
+            <span className="ml-auto text-[11px] text-zinc-400">
+              {shortDate(score.computed_at)}
+            </span>
+          </div>
+          {score.excluded ? (
+            <p className="mt-2 text-[12px] text-rose-600">
+              Excluded: {score.exclusion_reason ?? "matches an exclusion rule"}
+            </p>
+          ) : (
+            <>
+              <div className="mt-3 grid grid-cols-3 gap-3">
+                {(
+                  [
+                    ["Fit", score.fit],
+                    ["Intent", score.intent],
+                    ["Reach", score.reach],
+                  ] as const
+                ).map(([label, value]) => (
+                  <div key={label}>
+                    <div className="flex items-center justify-between text-[11px] text-zinc-500">
+                      <span>{label}</span>
+                      <span className="tabular-nums">{value}</span>
+                    </div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-100">
+                      <div
+                        className="h-full rounded-full bg-zinc-900"
+                        style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <details className="mt-3">
+                <summary className="cursor-pointer text-[11px] font-medium text-zinc-500 hover:text-zinc-800">
+                  Why this score
+                </summary>
+                <ul className="mt-2 space-y-1.5">
+                  {(Array.isArray(score.reasons) ? (score.reasons as ScoreReason[]) : [])
+                    .slice(0, 14)
+                    .map((reason, index) => (
+                      <li
+                        key={`${reason.rule ?? index}-${index}`}
+                        className="flex items-start gap-2 text-[11px] leading-relaxed"
+                      >
+                        <span
+                          className={`mt-0.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
+                            reason.matched ? "bg-emerald-500" : "bg-zinc-300"
+                          }`}
+                          aria-hidden="true"
+                        />
+                        <span className="min-w-0 flex-1 text-zinc-600">
+                          <span className="font-medium text-zinc-800">
+                            {reason.label ?? reason.rule}
+                          </span>
+                          {typeof reason.points === "number" ? (
+                            <span className="ml-1 tabular-nums text-zinc-400">
+                              +{reason.points}
+                              {reason.max_points ? `/${reason.max_points}` : ""}
+                            </span>
+                          ) : null}
+                          {reason.detail ? <> — {reason.detail}</> : null}
+                        </span>
+                      </li>
+                    ))}
+                </ul>
+              </details>
+            </>
+          )}
+        </div>
+      ) : null}
 
       {facts.length > 0 ? (
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-md border border-zinc-100 bg-zinc-50/60 px-3 py-2.5 sm:grid-cols-4">

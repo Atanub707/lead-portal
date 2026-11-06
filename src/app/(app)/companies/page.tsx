@@ -10,6 +10,7 @@ import {
 import { BookmarkToggle } from "@/components/bookmark-toggle";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { CrunchbaseImport } from "@/components/crunchbase-import";
+import { ScoreBadge } from "@/components/score-badge";
 import { FollowUpControl } from "@/components/follow-up-control";
 import { PasteUrl } from "@/components/paste-url";
 import { KindBadge, UserAvatar } from "@/components/badges";
@@ -244,6 +245,7 @@ export default async function CompaniesPage({
                 </th>
                 <th className="th pl-2">Company</th>
                 <th className="th">Type</th>
+                <th className="th">Score</th>
                 <th className="th">Reach</th>
                 <th className="th">Added by</th>
                 <th className="th">Follow-up</th>
@@ -312,6 +314,9 @@ export default async function CompaniesPage({
                   </td>
                   <td className="td">
                     <KindBadge kind={company.kind} />
+                  </td>
+                  <td className="td">
+                    <ScoreBadge score={company.score} grade={company.grade} />
                   </td>
                   <td className="td">
                     <span className="text-[12px] text-zinc-600 tabular-nums">

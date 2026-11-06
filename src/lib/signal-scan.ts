@@ -1,6 +1,7 @@
 // Website + funding signal detection. Writes company_signals with evidence,
 // confidence and observation timestamps; never guesses beyond the source text.
 import { createAdminClient } from "./supabase/admin";
+import { scoreOrg } from "./scoring";
 import { researchWebsite } from "./research";
 import {
   expiryFor,
@@ -209,6 +210,9 @@ export async function scanCompanySignals(
   }
 
   await refreshOrgSignalStats(orgId, workspaceId);
+  await scoreOrg(orgId, workspaceId).catch((err) => {
+    console.error("[signals] score failed:", err instanceof Error ? err.message : err);
+  });
   return { ok: true, created, scanned: definitions.length };
 }
 
@@ -253,5 +257,8 @@ export async function recordFundingSignal(
     return 0;
   }
   await refreshOrgSignalStats(orgId, workspaceId);
+  await scoreOrg(orgId, workspaceId).catch((err) => {
+    console.error("[signals] funding score failed:", err instanceof Error ? err.message : err);
+  });
   return data?.length ?? 0;
 }

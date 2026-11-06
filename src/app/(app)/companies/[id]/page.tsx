@@ -37,6 +37,7 @@ import { CompanyIntelligence } from "@/components/company-intelligence";
 import {
   getCompanySignals,
   getFirmographics,
+  getLatestScore,
   getSignalDefinitions,
 } from "@/lib/intelligence-data";
 import { createClient } from "@/lib/supabase/server";
@@ -176,6 +177,7 @@ export default async function CompanyPage({
     firmographics,
     companySignals,
     signalDefinitions,
+    scoreSnapshot,
   ] = await Promise.all([
     getCompany(companyId),
     getContacts(companyId),
@@ -190,6 +192,7 @@ export default async function CompanyPage({
     getFirmographics(companyId),
     getCompanySignals(companyId),
     getSignalDefinitions(),
+    getLatestScore(companyId),
   ]);
 
   if (!company) notFound();
@@ -389,6 +392,7 @@ export default async function CompanyPage({
               firmographics={firmographics}
               signals={companySignals as never}
               definitions={signalDefinitions}
+              score={scoreSnapshot}
               canWrite={canWrite}
             />
           </Section>

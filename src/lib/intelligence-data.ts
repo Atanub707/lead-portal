@@ -126,6 +126,32 @@ export async function getFirmographics(
   return (data ?? null) as Firmographics | null;
 }
 
+export interface ScoreSnapshot {
+  id: number;
+  fit: number;
+  intent: number;
+  reach: number;
+  total: number;
+  grade: string;
+  excluded: boolean;
+  exclusion_reason: string | null;
+  reasons: unknown;
+  computed_at: string;
+}
+
+export async function getLatestScore(orgId: number): Promise<ScoreSnapshot | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("lead_scores")
+    .select("*")
+    .eq("org_id", orgId)
+    .order("computed_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data ?? null) as ScoreSnapshot | null;
+}
+
 export async function getSignalDefinitions(): Promise<SignalDefinition[]> {
   const admin = createAdminClient();
   const workspaceId = await activeWorkspaceId();

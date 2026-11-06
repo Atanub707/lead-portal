@@ -24,6 +24,7 @@ import {
 } from "@/lib/intelligence";
 import { upsertFirmographics } from "@/lib/intelligence-write";
 import { recordFundingSignal } from "@/lib/signal-scan";
+import { scoreOrg } from "@/lib/scoring";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const maxDuration = 60;
@@ -527,6 +528,9 @@ export async function GET(request: Request) {
         company.funding,
         company.crunchbaseUrl
       );
+      await scoreOrg(created.id as number, workspaceId).catch((err) => {
+        console.error("[crunchbase] score failed:", err instanceof Error ? err.message : err);
+      });
     }
   }
 

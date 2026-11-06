@@ -3,6 +3,7 @@ import { logActivity } from "./activity";
 import { getActorRun, getDatasetItems, startActorRun, type ActorRunInfo } from "./apify";
 import { employeeBandFromCount, parseLocationText } from "./intelligence";
 import { upsertFirmographics } from "./intelligence-write";
+import { scoreOrg } from "./scoring";
 import { matchEmailToContact } from "./match";
 import { isDecisionTitle, isGenericEmail } from "./people";
 import { createAdminClient } from "./supabase/admin";
@@ -825,6 +826,9 @@ export async function reconcileDeepResearch(
             linkedin: Boolean(state.companyFacts.linkedin_url),
           },
           confidence: 0.7,
+        });
+        await scoreOrg(run.org_id as number, workspaceId).catch((err) => {
+          console.error("[deep-research] score failed:", err instanceof Error ? err.message : err);
         });
       }
 
