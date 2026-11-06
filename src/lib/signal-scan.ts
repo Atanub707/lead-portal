@@ -200,7 +200,6 @@ export async function scanCompanySignals(
     for (const pattern of signatures) {
       const match = htmlSource.html.match(pattern);
       if (!match) continue;
-      const index = match.index ?? 0;
       rows.push({
         workspace_id: workspaceId,
         org_id: orgId,
@@ -210,9 +209,7 @@ export async function scanCompanySignals(
           source: "website_html",
           url: htmlSource.url,
           keyword: match[0],
-          snippet: collapse(
-            htmlSource.html.slice(Math.max(0, index - 80), index + 160)
-          ).slice(0, 240),
+          snippet: `Detected ${match[0]} in the page source`,
         },
         source_key: "techstack",
         confidence: 0.55,
