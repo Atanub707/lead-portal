@@ -531,6 +531,20 @@ export async function GET(request: Request) {
         data_sources: { crunchbase: true },
         confidence: 0.8,
       });
+      if (company.email) {
+        await admin.from("company_emails").upsert(
+          [
+            {
+              org_id: created.id,
+              workspace_id: workspaceId,
+              email: company.email.toLowerCase(),
+              kind: "general",
+              source: "crunchbase",
+            },
+          ],
+          { onConflict: "org_id,email", ignoreDuplicates: true }
+        );
+      }
       await recordFundingSignal(
         created.id as number,
         workspaceId,

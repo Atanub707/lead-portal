@@ -11,6 +11,7 @@ import {
 import { employeeBandFromCount, parseLocationText } from "@/lib/intelligence";
 import { upsertFirmographics } from "@/lib/intelligence-write";
 import { scoreOrg } from "@/lib/scoring";
+import { researchWebsite } from "@/lib/research";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -33,6 +34,44 @@ export async function POST(request: Request) {
     .from("organizations")
     .select("id, name, website")
     .in("id", orgIds);
+  const admin = createAdminClient();
+
+  // Free first pass: published emails from each company's own website. This
+  // guarantees a usable address even when the contact database has no coverage.
+  const emailPattern = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+  await Promise.all(
+    (orgs ?? []).map(async (org) => {
+      if (!org.website) return;
+      try {
+        const research = await researchWebsite(org.website as string);
+        const collected = new Set<string>(research.links.emails);
+        for (const page of research.pages) {
+          for (const email of page.excerpt.match(emailPattern) ?? []) {
+            collected.add(email);
+          }
+        }
+        const emails = [...collected]
+          .map((email) => email.trim().toLowerCase())
+          .filter((email) => !/\.(png|jpe?g|webp|svg|gif|ico)$/i.test(email))
+          .slice(0, 5);
+        if (emails.length > 0) {
+          await admin.from("company_emails").upsert(
+            emails.map((email) => ({
+              org_id: org.id,
+              workspace_id: workspaceId,
+              email,
+              kind: "general",
+              source: "website",
+            })),
+            { onConflict: "org_id,email", ignoreDuplicates: true }
+          );
+        }
+      } catch {
+        // Website unavailable — Apollo is the fallback.
+      }
+    })
+  );
+
   const runs: { orgId: number; runId: string; datasetId: string }[] = [];
   for (const org of orgs ?? []) {
     try {
