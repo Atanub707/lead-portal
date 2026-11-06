@@ -178,11 +178,12 @@ export async function scanCompanySignals(
     const base = isPublicHttpUrl(research.final_url || website);
     if (base) {
       const existing = new Set(research.pages.map((page) => page.url));
-      for (const path of EXTRA_PATHS) {
-        const target = new URL(path, base.origin).toString();
-        if (existing.has(target)) continue;
-        const fetched = await fetchText(target);
-        if (fetched) addSource(fetched.url, fetched.text);
+      const targets = EXTRA_PATHS.map((path) =>
+        new URL(path, base.origin).toString()
+      ).filter((target) => !existing.has(target));
+      const fetched = await Promise.all(targets.map((target) => fetchText(target)));
+      for (const page of fetched) {
+        if (page) addSource(page.url, page.text);
       }
     }
   } catch {

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { claimJobs, completeJob, failJob } from "@/lib/jobs";
+import { claimJobs, completeJob, failJob, type JobRow } from "@/lib/jobs";
 import { scanCompanySignals } from "@/lib/signal-scan";
 import { recomputeWorkspaceScores, scoreOrg } from "@/lib/scoring";
 import { enqueueStaleSignalScans } from "@/lib/signal-schedule";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -13,29 +14,59 @@ function authorized(request: Request): boolean {
   return request.headers.get("authorization") === `Bearer ${secret}`;
 }
 
+async function reapStuckJobs() {
+  const admin = createAdminClient();
+  const cutoff = new Date(Date.now() - 10 * 60_000).toISOString();
+  const { data } = await admin
+    .from("jobs")
+    .select("id, attempts")
+    .eq("status", "running")
+    .lt("locked_at", cutoff)
+    .limit(20);
+  for (const job of data ?? []) {
+    const attempts = Number(job.attempts ?? 1);
+    await admin
+      .from("jobs")
+      .update({
+        status: attempts >= 3 ? "failed" : "queued",
+        locked_by: null,
+        locked_at: null,
+        last_error: "worker timed out",
+        run_after: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", job.id);
+  }
+}
+
 async function run() {
-  // Refresh up to five stale companies before claiming, so the daily cron also
-  // performs its scheduled scans in the same tick (Hobby cron runs once a day).
-  await enqueueStaleSignalScans(5).catch((err) => {
+  await reapStuckJobs().catch((err) => {
+    console.error("[worker] reap failed:", err instanceof Error ? err.message : err);
+  });
+
+  // Refresh a few stale companies before claiming, so the daily cron also
+  // performs scheduled scans in the same tick (Hobby cron runs once a day).
+  await enqueueStaleSignalScans(3).catch((err) => {
     console.error("[worker] schedule failed:", err instanceof Error ? err.message : err);
   });
-  const jobs = await claimJobs(5);
+
+  const jobs = await claimJobs(3);
   const results: { id: number; kind: string; ok: boolean; detail?: string }[] = [];
 
-  for (const job of jobs) {
+  async function runJob(job: JobRow) {
     try {
       if (job.kind === "signal_scan") {
         const orgId = Number(job.payload?.orgId);
         if (!orgId) {
           await failJob(job, "signal_scan: missing orgId");
           results.push({ id: job.id, kind: job.kind, ok: false, detail: "missing orgId" });
-          continue;
+          return;
         }
         const result = await scanCompanySignals(orgId, job.workspace_id);
         if (!result.ok) {
           await failJob(job, result.skipped ?? "scan failed");
           results.push({ id: job.id, kind: job.kind, ok: false, detail: result.skipped });
-          continue;
+          return;
         }
         await completeJob(job.id);
         results.push({ id: job.id, kind: job.kind, ok: true, detail: `${result.created} signals` });
@@ -62,6 +93,7 @@ async function run() {
     }
   }
 
+  await Promise.all(jobs.map((job) => runJob(job)));
   return NextResponse.json({ ok: true, processed: results.length, results });
 }
 
