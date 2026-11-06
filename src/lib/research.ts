@@ -478,7 +478,7 @@ interface TinyfishSearchResult {
   url?: string;
 }
 
-async function tinyfishSearch(
+export async function searchWeb(
   query: string,
   purpose: string
 ): Promise<TinyfishSearchResult[]> {
@@ -567,7 +567,7 @@ export async function findLinkedInProfile(
   const query = companyName
     ? `site:linkedin.com/in "${cleanName}" "${companyName}"`
     : `site:linkedin.com/in "${cleanName}"`;
-  const results = await tinyfishSearch(
+  const results = await searchWeb(
     query,
     `Find the personal LinkedIn profile of ${cleanName}${
       companyName ? ` at ${companyName}` : ""

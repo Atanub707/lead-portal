@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { claimJobs, completeJob, failJob } from "@/lib/jobs";
 import { scanCompanySignals } from "@/lib/signal-scan";
 import { recomputeWorkspaceScores, scoreOrg } from "@/lib/scoring";
+import { enqueueStaleSignalScans } from "@/lib/signal-schedule";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -13,6 +14,11 @@ function authorized(request: Request): boolean {
 }
 
 async function run() {
+  // Refresh up to five stale companies before claiming, so the daily cron also
+  // performs its scheduled scans in the same tick (Hobby cron runs once a day).
+  await enqueueStaleSignalScans(5).catch((err) => {
+    console.error("[worker] schedule failed:", err instanceof Error ? err.message : err);
+  });
   const jobs = await claimJobs(5);
   const results: { id: number; kind: string; ok: boolean; detail?: string }[] = [];
 

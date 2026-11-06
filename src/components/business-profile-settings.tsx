@@ -2,6 +2,7 @@
 
 import { SubmitButton } from "@/components/submit-button";
 import { RecomputeScores } from "@/components/recompute-scores";
+import { JobSignalsScan } from "@/components/job-signals-scan";
 import {
   applyBusinessTemplate,
   createDefaultIcp,
@@ -496,6 +497,20 @@ export function BusinessProfileSettings({
           </form>
         </section>
       )}
+
+      <section className="card p-5">
+        <h2 className="text-[13px] font-semibold text-zinc-900">
+          Hiring signals
+        </h2>
+        <p className="mt-1 text-[12px] leading-relaxed text-zinc-500">
+          Scans LinkedIn job posts from the last month using your hiring signal
+          keywords (security, DevOps, marketing, sales) and attaches matching
+          signals to companies already in your pipeline.
+        </p>
+        <div className="mt-3">
+          <JobSignalsScan />
+        </div>
+      </section>
 
       <section className="card p-5">
         <h2 className="text-[13px] font-semibold text-zinc-900">Scoring</h2>
