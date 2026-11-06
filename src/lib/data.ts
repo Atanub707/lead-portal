@@ -246,18 +246,23 @@ export async function getCompanies(opts: {
   const workspaceId = await activeWorkspaceId();
   const orderBy =
     opts.sort === "oldest"
-      ? { column: "created_at", ascending: true }
+      ? { column: "created_at", ascending: true, nullsFirst: undefined }
       : opts.sort === "name"
-        ? { column: "name", ascending: true }
+        ? { column: "name", ascending: true, nullsFirst: undefined }
         : opts.sort === "name_desc"
-          ? { column: "name", ascending: false }
-          : { column: "created_at", ascending: false };
+          ? { column: "name", ascending: false, nullsFirst: undefined }
+          : opts.sort === "score"
+            ? { column: "score", ascending: false, nullsFirst: false }
+            : { column: "created_at", ascending: false, nullsFirst: undefined };
   let query = supabase
     .from("organizations")
     .select("*", { count: "exact" })
     .eq("workspace_id", workspaceId)
     .eq("list", opts.list)
-    .order(orderBy.column, { ascending: orderBy.ascending })
+    .order(orderBy.column, {
+      ascending: orderBy.ascending,
+      nullsFirst: orderBy.nullsFirst,
+    })
     .order("id", { ascending: orderBy.ascending })
     .range(from, from + per - 1);
 
