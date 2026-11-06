@@ -548,7 +548,7 @@ export async function GET(request: Request) {
     imported,
     skipped,
     cost: run.usageTotalUsd,
-    details,
+    details: { ...details, imported_ids: importedIds },
   });
 
   return NextResponse.json({
