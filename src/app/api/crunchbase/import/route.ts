@@ -25,6 +25,7 @@ import {
 import { upsertFirmographics } from "@/lib/intelligence-write";
 import { recordFundingSignal } from "@/lib/signal-scan";
 import { scoreOrg } from "@/lib/scoring";
+import { enqueueJob } from "@/lib/jobs";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const maxDuration = 60;
@@ -477,6 +478,7 @@ export async function GET(request: Request) {
   }
 
   let imported = 0;
+  let importedIds: number[] = [];
   if (rows.length > 0) {
     const { data: createdRows, error: writeError } = await admin
       .from("organizations")
@@ -495,8 +497,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ status: "failed", error: message });
     }
     imported = createdRows?.length ?? rows.length;
+    importedIds = (createdRows ?? []).map((row) => row.id as number);
 
     const byName = new Map(companies.map((company) => [company.nameKey, company]));
+    for (const created of createdRows ?? []) {
+      const company = byName.get(normalizeCompanyName(created.name as string));
+      if (company?.website) {
+        await enqueueJob(workspaceId, "signal_scan", { orgId: created.id });
+      }
+    }
     const appliedFilters =
       (previousDetails?.filters as Record<string, unknown> | undefined) ?? {};
     const appliedCategory =
@@ -542,5 +551,10 @@ export async function GET(request: Request) {
     details,
   });
 
-  return NextResponse.json({ status: "ok", imported, skipped });
+  return NextResponse.json({
+    status: "ok",
+    imported,
+    skipped,
+    importedIds,
+  });
 }
