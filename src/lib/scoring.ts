@@ -243,7 +243,6 @@ export async function scoreOrg(
     if (targets.length === 0) continue;
     hasFitCriteria = true;
     const max = FIT_POINTS[field] ?? 10;
-    fitPossible += max;
     let actual: string | null = null;
     if (field === "industry") {
       const industries = [
@@ -259,7 +258,22 @@ export async function scoreOrg(
     } else if (field === "country") {
       actual = typeof firm?.hq_country === "string" ? firm.hq_country : null;
     }
+    if (!actual) {
+      // Unknown data does not lower fit; it is surfaced as missing evidence so
+      // enrichment (research/import) can improve confidence later.
+      reasons.push({
+        rule: `fit:${field}`,
+        label,
+        category: "fit",
+        points: 0,
+        max_points: 0,
+        matched: false,
+        detail: "No data yet — run research or enrich",
+      });
+      continue;
+    }
     const matched = matchesText(actual, targets);
+    fitPossible += max;
     if (matched) fitEarned += max;
     reasons.push({
       rule: `fit:${field}`,
@@ -268,11 +282,9 @@ export async function scoreOrg(
       points: matched ? max : 0,
       max_points: max,
       matched,
-      detail: actual
-        ? matched
-          ? `${actual} matches the ICP`
-          : `${actual} is outside the ICP`
-        : "No data yet — run research or enrich",
+      detail: matched
+        ? `${actual} matches the ICP`
+        : `${actual} is outside the ICP`,
     });
   }
   const fit = hasFitCriteria
@@ -404,11 +416,11 @@ export async function scoreOrg(
     (fit * weights.fit + intent * weights.intent + reach * weights.reach) / weightSum
   );
   const grade =
-    total >= threshold + 20
+    total >= 80
       ? "A"
-      : total >= threshold + 10
+      : total >= 65
         ? "B"
-        : total >= threshold
+        : total >= 50
           ? "C"
           : "D";
 
