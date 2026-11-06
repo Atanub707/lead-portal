@@ -1,0 +1,63 @@
+// Inbound email side effects for campaigns: stop on reply, suppress on
+// unsubscribe. Kept separate from both threads-db and campaigns to avoid cycles.
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+const UNSUBSCRIBE_RE =
+  /unsubscribe|opt[\s-]?out|remove me|stop emailing|do not contact/i;
+
+export async function handleInboundCampaignEffects(
+  supabase: SupabaseClient,
+  opts: {
+    workspaceId: string;
+    userId: string;
+    orgId: number | null;
+    counterpartyEmail: string;
+    subject: string | null;
+    body: string;
+  }
+): Promise<void> {
+  if (!opts.orgId) return;
+  const unsubscribe = UNSUBSCRIBE_RE.test(`${opts.subject ?? ""} ${opts.body}`);
+
+  const { data: enrollments } = await supabase
+    .from("campaign_enrollments")
+    .select("id, campaign_id")
+    .eq("workspace_id", opts.workspaceId)
+    .eq("org_id", opts.orgId)
+    .eq("status", "active");
+
+  for (const enrollment of enrollments ?? []) {
+    await supabase
+      .from("campaign_enrollments")
+      .update({
+        status: "stopped",
+        stop_reason: unsubscribe ? "unsubscribed" : "replied",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", enrollment.id);
+    await supabase.from("campaign_events").insert({
+      workspace_id: opts.workspaceId,
+      campaign_id: enrollment.campaign_id,
+      enrollment_id: enrollment.id,
+      org_id: opts.orgId,
+      kind: unsubscribe ? "unsubscribe" : "reply",
+      payload: {
+        email: opts.counterpartyEmail,
+        subject: opts.subject,
+      },
+    });
+  }
+
+  if (unsubscribe) {
+    await supabase.from("suppression_list").upsert(
+      [
+        {
+          workspace_id: opts.workspaceId,
+          email: opts.counterpartyEmail.toLowerCase(),
+          reason: "unsubscribe",
+        },
+      ],
+      { onConflict: "workspace_id,email", ignoreDuplicates: true }
+    );
+  }
+}

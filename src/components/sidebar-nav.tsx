@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Mail,
   Rocket,
+  Send,
   ScrollText,
   Settings,
   type LucideIcon,
@@ -123,6 +124,14 @@ export function SidebarNav({
         label="Find leads"
         icon={Rocket}
         active={pathname.startsWith("/leads")}
+        collapsed={collapsed}
+        onNavigate={onNavigate}
+      />
+      <NavItem
+        href="/campaigns"
+        label="Campaigns"
+        icon={Send}
+        active={pathname.startsWith("/campaigns")}
         collapsed={collapsed}
         onNavigate={onNavigate}
       />

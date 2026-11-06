@@ -5,6 +5,7 @@ import { NO_AI_KEY_MESSAGE, pickModel } from "./ai";
 import { FLAVORS } from "./flavors";
 import { isGenericEmail } from "./people";
 import { createClient } from "./supabase/server";
+import { createAdminClient } from "./supabase/admin";
 
 // Re-exported for server-side consumers; the source lives in ./flavors so
 // client components can import it without pulling server code.
@@ -104,6 +105,7 @@ export async function generateEmailDraft(opts: {
   contactId?: number | null;
   flavor: string;
   to?: string | null;
+  admin?: boolean;
 }): Promise<EmailDraftResult> {
   const flavor = FLAVORS.find((entry) => entry.id === opts.flavor);
   if (!flavor) return { ok: false, error: "Pick a flavor first." };
@@ -111,7 +113,7 @@ export async function generateEmailDraft(opts: {
   const model = pickModel(opts.userId);
   if (!model) return { ok: false, error: NO_AI_KEY_MESSAGE };
 
-  const supabase = await createClient();
+  const supabase = opts.admin ? createAdminClient() : await createClient();
 
   const { data: org } = await supabase
     .from("organizations")

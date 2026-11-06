@@ -39,6 +39,21 @@ export async function POST(request: Request) {
 
   const supabase = await createClient();
 
+  const { data: suppressed } = await supabase
+    .from("suppression_list")
+    .select("id")
+    .eq("email", to.toLowerCase())
+    .maybeSingle();
+  if (suppressed) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "This recipient is on the suppression list (unsubscribed or manually excluded).",
+      },
+      { status: 400 }
+    );
+  }
+
   const { data: settings } = await supabase
     .from("user_email_settings")
     .select(

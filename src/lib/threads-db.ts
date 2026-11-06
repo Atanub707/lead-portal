@@ -90,6 +90,8 @@ export async function recordOutbound(
   return { threadId };
 }
 
+import { handleInboundCampaignEffects } from "./campaign-events";
+
 export async function recordInbound(
   supabase: SupabaseClient,
   opts: {
@@ -132,7 +134,7 @@ export async function recordInbound(
   if (!inserted || inserted.length === 0) return;
   const { data: thread } = await supabase
     .from("email_threads")
-    .select("unread")
+    .select("unread, org_id")
     .eq("id", opts.threadId)
     .maybeSingle();
   await supabase
@@ -142,6 +144,20 @@ export async function recordInbound(
       unread: ((thread?.unread as number | undefined) ?? 0) + 1,
     })
     .eq("id", opts.threadId);
+
+  await handleInboundCampaignEffects(supabase, {
+    workspaceId: opts.workspaceId,
+    userId: opts.userId,
+    orgId: (thread?.org_id as number | null | undefined) ?? null,
+    counterpartyEmail: opts.fromEmail,
+    subject: opts.subject,
+    body: opts.body,
+  }).catch((err) => {
+    console.error(
+      "[campaigns] inbound effects failed:",
+      err instanceof Error ? err.message : err
+    );
+  });
 }
 
 export async function getMatchIndex(

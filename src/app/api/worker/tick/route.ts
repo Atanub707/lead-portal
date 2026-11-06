@@ -4,6 +4,8 @@ import { scanCompanySignals } from "@/lib/signal-scan";
 import { recomputeWorkspaceScores, scoreOrg } from "@/lib/scoring";
 import { enqueueStaleSignalScans } from "@/lib/signal-schedule";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { enqueueJob } from "@/lib/jobs";
+import { sendCampaignTick } from "@/lib/campaigns";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -39,6 +41,26 @@ async function reapStuckJobs() {
   }
 }
 
+async function enqueueCampaignTicks() {
+  const admin = createAdminClient();
+  const { data: campaigns } = await admin
+    .from("campaigns")
+    .select("workspace_id")
+    .eq("status", "active");
+  const workspaces = [...new Set((campaigns ?? []).map((row) => row.workspace_id as string))];
+  for (const workspaceId of workspaces) {
+    const { data: queued } = await admin
+      .from("jobs")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .eq("kind", "campaign_tick")
+      .eq("status", "queued")
+      .limit(1);
+    if (queued && queued.length > 0) continue;
+    await enqueueJob(workspaceId, "campaign_tick", {});
+  }
+}
+
 async function run() {
   await reapStuckJobs().catch((err) => {
     console.error("[worker] reap failed:", err instanceof Error ? err.message : err);
@@ -48,6 +70,9 @@ async function run() {
   // performs scheduled scans in the same tick (Hobby cron runs once a day).
   await enqueueStaleSignalScans(3).catch((err) => {
     console.error("[worker] schedule failed:", err instanceof Error ? err.message : err);
+  });
+  await enqueueCampaignTicks().catch((err) => {
+    console.error("[worker] campaign enqueue failed:", err instanceof Error ? err.message : err);
   });
 
   const jobs = await claimJobs(3);
@@ -81,8 +106,16 @@ async function run() {
           await completeJob(job.id);
           results.push({ id: job.id, kind: job.kind, ok: true, detail: `${result.scored} scored` });
         }
+      } else if (job.kind === "campaign_tick") {
+        const result = await sendCampaignTick(job.workspace_id);
+        await completeJob(job.id);
+        results.push({
+          id: job.id,
+          kind: job.kind,
+          ok: true,
+          detail: `${result.sent} sent · ${result.stopped} stopped`,
+        });
       } else {
-        // Later phases add handlers here (campaign_tick, …).
         await failJob(job, `No handler for ${job.kind} yet`);
         results.push({ id: job.id, kind: job.kind, ok: false, detail: "no handler" });
       }

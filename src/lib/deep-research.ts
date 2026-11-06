@@ -12,6 +12,7 @@ export interface NormalizedLead {
   name: string;
   title: string | null;
   email: string | null;
+  emailStatus?: string | null;
   phone: string | null;
   linkedinUrl: string | null;
   companyLinkedinUrl: string | null;
@@ -78,10 +79,17 @@ export function normalizeApolloLead(raw: unknown): NormalizedLead | null {
     str(r.name) ??
     [str(r.firstName), str(r.lastName)].filter(Boolean).join(" ");
   if (!name || name.length < 2) return null;
+  const emailList = Array.isArray(r.emails) ? r.emails : [];
+  const statusFromList = emailList
+    .map((entry) => asRecord(entry))
+    .map((entry) => str(entry?.status))
+    .find((status): status is string => Boolean(status));
   return {
     name,
     title: str(r.title) ?? str(r.jobTitle) ?? str(r.headline),
     email: extractEmail(r),
+    emailStatus:
+      str(r.emailStatus) ?? str(r.email_status) ?? statusFromList ?? null,
     phone: str(r.phone) ?? str(r.mobilePhone) ?? null,
     linkedinUrl: str(r.linkedinUrl) ?? str(r.linkedin) ?? str(r.linkedin_url),
     companyLinkedinUrl:
@@ -1184,7 +1192,13 @@ export async function mergeLeads(
         phone: lead.phone,
         source,
         is_decision_maker: isDecisionTitle(lead.title),
-        email_status: contactEmail ? "found" : null,
+        email_status: contactEmail
+          ? ["verified", "valid", "deliverable"].includes(
+              (lead.emailStatus ?? "").toLowerCase()
+            )
+            ? "verified"
+            : "found"
+          : null,
         created_by: userId,
       });
       seenNames.add(byName);
