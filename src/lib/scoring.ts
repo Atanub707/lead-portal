@@ -183,7 +183,6 @@ export async function scoreOrg(
     intent: Number((modelRes.data?.weights as { intent?: number } | null)?.intent ?? 0.45),
     reach: Number((modelRes.data?.weights as { reach?: number } | null)?.reach ?? 0.15),
   };
-  const threshold = Number(modelRes.data?.threshold ?? 60);
   const modelVersion = Number(modelRes.data?.version ?? 1);
 
   const reasons: ScoreReason[] = [];
