@@ -154,6 +154,18 @@ export default async function CompaniesPage({
             <>
               <PasteUrl list={list} pipelines={pipelines} />
               <CrunchbaseImport list={list} />
+              <a
+                href={`/api/export?${(() => {
+                  const params = new URLSearchParams({ kind: "companies", list });
+                  if (q) params.set("q", q);
+                  if (kind) params.set("kindFilter", kind);
+                  if (starred) params.set("starred", "1");
+                  return params.toString();
+                })()}`}
+                className="btn-ghost"
+              >
+                Export CSV
+              </a>
             </>
           ) : null}
         </div>

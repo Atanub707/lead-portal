@@ -34,6 +34,8 @@ import {
 } from "@/lib/data";
 import { reconcileIfStale } from "@/lib/deep-research";
 import { CompanyIntelligence } from "@/components/company-intelligence";
+import { CompanyBrief } from "@/components/company-brief";
+import { latestBrief } from "@/lib/briefs";
 import {
   getCompanySignals,
   getFirmographics,
@@ -178,6 +180,7 @@ export default async function CompanyPage({
     companySignals,
     signalDefinitions,
     scoreSnapshot,
+    companyBrief,
   ] = await Promise.all([
     getCompany(companyId),
     getContacts(companyId),
@@ -193,6 +196,7 @@ export default async function CompanyPage({
     getCompanySignals(companyId),
     getSignalDefinitions(),
     getLatestScore(companyId),
+    latestBrief(companyId),
   ]);
 
   if (!company) notFound();
@@ -393,6 +397,15 @@ export default async function CompanyPage({
               signals={companySignals as never}
               definitions={signalDefinitions}
               score={scoreSnapshot}
+              canWrite={canWrite}
+            />
+          </Section>
+
+          {/* AI brief */}
+          <Section title="AI brief" className="animate-rise animate-rise-1">
+            <CompanyBrief
+              orgId={company.id}
+              initialBrief={companyBrief}
               canWrite={canWrite}
             />
           </Section>

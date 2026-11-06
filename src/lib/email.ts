@@ -129,6 +129,7 @@ export async function generateEmailDraft(opts: {
     priorResult,
     recentSendsResult,
     settingsResult,
+    briefResult,
   ] = await Promise.all([
       supabase
         .from("pipelines")
@@ -163,6 +164,13 @@ export async function generateEmailDraft(opts: {
         .from("user_email_settings")
         .select("from_name, signature_phone, signature_link")
         .eq("user_id", opts.userId)
+        .maybeSingle(),
+      supabase
+        .from("company_briefs")
+        .select("summary, priorities, likely_objections, suggested_angle")
+        .eq("org_id", opts.orgId)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle(),
     ]);
 
@@ -206,8 +214,27 @@ export async function generateEmailDraft(opts: {
     .filter(Boolean)
     .join("\n");
 
+  const brief = briefResult.data as {
+    summary: string | null;
+    priorities: string[] | null;
+    likely_objections: string[] | null;
+    suggested_angle: string | null;
+  } | null;
+  const briefBlock = brief
+    ? `Account brief: ${(brief.summary ?? "").slice(0, 500)}${
+        brief.suggested_angle
+          ? `\nSuggested angle: ${brief.suggested_angle.slice(0, 240)}`
+          : ""
+      }${
+        brief.priorities?.length
+          ? `\nTheir priorities: ${brief.priorities.slice(0, 3).join("; ")}`
+          : ""
+      }`
+    : "";
+
   const prompt = `Company: ${org.name}${org.website ? ` (${org.website})` : ""}
 What they do: ${org.notes ?? "(no description captured yet)"}
+${briefBlock}
 Recipient: ${
     contact?.name
       ? `${contact.name}${contact.title ? `, ${contact.title}` : ""}`

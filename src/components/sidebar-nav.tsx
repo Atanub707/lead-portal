@@ -7,6 +7,7 @@ import {
   Mail,
   Rocket,
   Send,
+  BarChart3,
   ScrollText,
   Settings,
   type LucideIcon,
@@ -132,6 +133,14 @@ export function SidebarNav({
         label="Campaigns"
         icon={Send}
         active={pathname.startsWith("/campaigns")}
+        collapsed={collapsed}
+        onNavigate={onNavigate}
+      />
+      <NavItem
+        href="/analytics"
+        label="Analytics"
+        icon={BarChart3}
+        active={pathname.startsWith("/analytics")}
         collapsed={collapsed}
         onNavigate={onNavigate}
       />
