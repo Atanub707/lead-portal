@@ -219,6 +219,13 @@ body:has([role="dialog"]) {
   .card {
     border-radius: 0.75rem;
   }
+
+  /* Long URLs and tokens in notes/emails must wrap instead of widening the
+     phone layout viewport. */
+  body {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
 }
 
 @keyframes sheet-up {
