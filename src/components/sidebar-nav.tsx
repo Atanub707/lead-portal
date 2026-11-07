@@ -8,6 +8,7 @@ import {
   Rocket,
   Send,
   BarChart3,
+  ChevronRight,
   ScrollText,
   Settings,
   type LucideIcon,
@@ -128,22 +129,57 @@ export function SidebarNav({
         collapsed={collapsed}
         onNavigate={onNavigate}
       />
-      <NavItem
-        href="/campaigns"
-        label="Campaigns"
-        icon={Send}
-        active={pathname.startsWith("/campaigns")}
-        collapsed={collapsed}
-        onNavigate={onNavigate}
-      />
-      <NavItem
-        href="/analytics"
-        label="Analytics"
-        icon={BarChart3}
-        active={pathname.startsWith("/analytics")}
-        collapsed={collapsed}
-        onNavigate={onNavigate}
-      />
+      {collapsed ? (
+        <>
+          <NavItem
+            href="/campaigns"
+            label="Campaigns"
+            icon={Send}
+            active={pathname.startsWith("/campaigns")}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+          <NavItem
+            href="/analytics"
+            label="Analytics"
+            icon={BarChart3}
+            active={pathname.startsWith("/analytics")}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+        </>
+      ) : (
+        <details
+          className="group"
+          open={
+            pathname.startsWith("/campaigns") ||
+            pathname.startsWith("/analytics")
+          }
+        >
+          <summary className="flex h-8 cursor-pointer list-none items-center gap-2 rounded-md px-2 text-[13px] text-zinc-500 transition duration-150 hover:bg-zinc-100 hover:text-zinc-900 [&::-webkit-details-marker]:hidden">
+            <ChevronRight className="h-4 w-4 shrink-0 transition-transform group-open:rotate-90" strokeWidth={1.75} aria-hidden="true" />
+            More
+          </summary>
+          <div className="mt-0.5 space-y-0.5">
+            <NavItem
+              href="/campaigns"
+              label="Campaigns"
+              icon={Send}
+              active={pathname.startsWith("/campaigns")}
+              collapsed={collapsed}
+              onNavigate={onNavigate}
+            />
+            <NavItem
+              href="/analytics"
+              label="Analytics"
+              icon={BarChart3}
+              active={pathname.startsWith("/analytics")}
+              collapsed={collapsed}
+              onNavigate={onNavigate}
+            />
+          </div>
+        </details>
+      )}
 
       {collapsed ? (
         <div className="mx-1 my-2.5 border-t border-zinc-200/80" />

@@ -81,6 +81,7 @@ export function CompanyIntelligence({
   const [scanning, setScanning] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [showAll, setShowAll] = useState(false);
 
   const labels = new Map(definitions.map((entry) => [entry.key, entry]));
 
@@ -267,7 +268,7 @@ export function CompanyIntelligence({
         </p>
       ) : (
         <ul className="space-y-2">
-          {signals.map((signal) => {
+          {(showAll ? signals : signals.slice(0, 5)).map((signal) => {
             const definition = labels.get(signal.signal_key);
             const snippet = evidenceText(signal.evidence);
             const url = evidenceUrl(signal.evidence);
@@ -311,9 +312,22 @@ export function CompanyIntelligence({
           })}
         </ul>
       )}
+      {signals.length > 5 ? (
+        <button
+          type="button"
+          onClick={() => setShowAll((value) => !value)}
+          className="text-[11px] font-medium text-zinc-500 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900"
+        >
+          {showAll ? "Show fewer" : `Show all ${signals.length}`}
+        </button>
+      ) : null}
 
       {canWrite ? (
-        <form action={addManualSignal} className="space-y-2 border-t border-zinc-100 pt-3">
+        <details className="border-t border-zinc-100 pt-3">
+          <summary className="cursor-pointer text-[12px] font-medium text-zinc-500 hover:text-zinc-900">
+            Add a signal manually
+          </summary>
+        <form action={addManualSignal} className="mt-2 space-y-2">
           <input type="hidden" name="org_id" value={orgId} />
           <div className="grid gap-2 sm:grid-cols-[200px_1fr]">
             <select name="signal_key" className="input" defaultValue="" required>
@@ -344,6 +358,7 @@ export function CompanyIntelligence({
             <SubmitButton pendingText="Adding…">Add signal</SubmitButton>
           </div>
         </form>
+        </details>
       ) : null}
     </div>
   );
