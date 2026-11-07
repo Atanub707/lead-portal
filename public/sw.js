@@ -1,11 +1,24 @@
-// Lead Portal service worker — minimal and safe for a live-data app:
-// - caches only immutable build assets (/_next/static/*)
-// - everything else (API, pages, auth) always goes to the network
-// - having a fetch handler is what makes the app installable (PWA criteria)
-const CACHE = "lead-portal-static-v1";
+// Lead Portal service worker — offline shell + immutable build assets.
+// Authenticated pages and APIs are never cached.
+const STATIC_CACHE = "lead-portal-static-v3";
+const OFFLINE_CACHE = "lead-portal-offline-v3";
+const PRECACHE = [
+  "/offline",
+  "/manifest.webmanifest",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/icon-maskable-512.png",
+  "/icons/apple-touch-icon.png",
+];
 
-self.addEventListener("install", () => {
-  self.skipWaiting();
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(OFFLINE_CACHE);
+      await cache.addAll(PRECACHE).catch(() => undefined);
+      await self.skipWaiting();
+    })()
+  );
 });
 
 self.addEventListener("activate", (event) => {
@@ -13,7 +26,9 @@ self.addEventListener("activate", (event) => {
     (async () => {
       const keys = await caches.keys();
       await Promise.all(
-        keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))
+        keys
+          .filter((key) => key !== STATIC_CACHE && key !== OFFLINE_CACHE)
+          .map((key) => caches.delete(key))
       );
       await self.clients.claim();
     })()
@@ -31,11 +46,30 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith("/api/")) return;
+
+  // Navigation: network first, offline shell when the network is gone.
+  if (request.mode === "navigate") {
+    event.respondWith(
+      (async () => {
+        try {
+          return await fetch(request);
+        } catch {
+          const cache = await caches.open(OFFLINE_CACHE);
+          return (
+            (await cache.match("/offline")) ??
+            new Response("Offline", { status: 503 })
+          );
+        }
+      })()
+    );
+    return;
+  }
 
   if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith(
       (async () => {
-        const cache = await caches.open(CACHE);
+        const cache = await caches.open(STATIC_CACHE);
         const hit = await cache.match(request);
         if (hit) return hit;
         const response = await fetch(request);

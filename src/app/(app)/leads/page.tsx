@@ -182,7 +182,67 @@ export default async function LeadsPage({
             <p className="mt-2 text-[13px] text-zinc-500">No companies found.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="lg:hidden">
+            {(orgsRes.data ?? []).map((org) => {
+              const contact = bestContact.get(org.id as number);
+              const email = contact?.email ?? companyEmail.get(org.id as number) ?? null;
+              return (
+                <div key={org.id as number} className="border-b border-zinc-100 px-4 py-3 last:border-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <Link href={`/companies/${org.id}`} className="block truncate text-[14px] font-medium text-zinc-900">
+                        {org.name}
+                      </Link>
+                      <p className="mt-0.5 truncate text-[11px] text-zinc-500">
+                        {contact ? `${contact.name}${contact.title ? ` · ${contact.title}` : ""}` : org.website ? String(org.website).replace(/^https?:\/\//, "") : "No contact yet"}
+                      </p>
+                    </div>
+                    <ScoreBadge score={(org.score as number | null) ?? null} grade={(org.grade as string | null) ?? null} />
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    {email ? (
+                      <span className="break-all text-[12px] text-zinc-700">
+                        {email}
+                        {isGenericEmail(email.split("@")[0] ?? "") ? (
+                          <span className="ml-1.5 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-amber-700">
+                            shared
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : (
+                      <span className="text-[12px] text-zinc-400">No email yet</span>
+                    )}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {email && smtpConfigured ? (
+                      <EmailComposer
+                        orgId={org.id as number}
+                        contactId={contact?.id ?? null}
+                        contactLabel={contact?.name ?? null}
+                        defaultTo={email}
+                        smtpConfigured={smtpConfigured}
+                        trigger="button"
+                        triggerLabel="Draft email"
+                      />
+                    ) : null}
+                    {contact?.linkedin_url || org.linkedin_url ? (
+                      <a
+                        href={(contact?.linkedin_url ?? org.linkedin_url) as string}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="text-[12px] text-zinc-500 underline decoration-zinc-300 underline-offset-2"
+                      >
+                        LinkedIn
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="hidden overflow-x-auto lg:block">
             <table className="w-full text-left text-[12px]">
               <thead>
                 <tr className="border-b border-zinc-200 text-[10px] uppercase tracking-wide text-zinc-400">
@@ -291,6 +351,7 @@ export default async function LeadsPage({
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

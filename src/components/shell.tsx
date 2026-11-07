@@ -1,17 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
+  Building2,
+  LayoutDashboard,
   LogOut,
+  Mail,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
+  Rocket,
   X,
 } from "lucide-react";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { UserAvatar } from "@/components/badges";
+import { InstallPrompt } from "@/components/install-prompt";
 import type { Pipeline } from "@/lib/types";
 import { signOut } from "@/lib/actions";
 
@@ -102,6 +109,14 @@ export function Shell({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
+  const primaryPipeline = pipelines[0]?.id ?? "pos";
+  const mobileTabs = [
+    { href: "/dashboard", label: "Home", icon: LayoutDashboard, active: pathname === "/dashboard" },
+    { href: "/leads", label: "Leads", icon: Rocket, active: pathname.startsWith("/leads") },
+    { href: "/emails", label: "Emails", icon: Mail, active: pathname.startsWith("/emails") },
+    { href: `/companies?list=${encodeURIComponent(primaryPipeline)}`, label: "Companies", icon: Building2, active: pathname.startsWith("/companies") },
+  ] as const;
 
   useEffect(() => {
     try {
@@ -222,11 +237,11 @@ export function Shell({
       </aside>
 
       {/* Mobile top bar */}
-      <div className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b border-zinc-200 bg-white/95 px-4 backdrop-blur lg:hidden">
+      <div className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-zinc-200 bg-white/95 px-3 backdrop-blur lg:hidden">
         <button
           onClick={() => setMobileOpen(true)}
           aria-label="Open menu"
-          className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
+          className="flex h-10 w-10 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
         >
           <Menu className="h-4 w-4" aria-hidden="true" />
         </button>
@@ -274,13 +289,47 @@ export function Shell({
 
       {/* Content — offset by the fixed sidebar */}
       <main
-        className={`min-h-dvh min-w-0 ${
+        className={`min-h-dvh min-w-0 pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0 ${
           collapsed ? "lg:pl-16" : "lg:pl-[220px]"
         }`}
       >
         {banner}
         {children}
       </main>
+
+      {/* Mobile bottom tab bar */}
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+        aria-label="Mobile navigation"
+      >
+        <div className="grid grid-cols-5">
+          {mobileTabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                className={`flex h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors ${
+                  tab.active ? "text-zinc-900" : "text-zinc-500"
+                }`}
+              >
+                <Icon className="h-5 w-5" strokeWidth={tab.active ? 2 : 1.75} aria-hidden="true" />
+                {tab.label}
+              </Link>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            className="flex h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-zinc-500"
+          >
+            <Menu className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
+            Menu
+          </button>
+        </div>
+      </nav>
+
+      <InstallPrompt />
     </div>
   );
 }

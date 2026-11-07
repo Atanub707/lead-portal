@@ -29,6 +29,7 @@ import {
   COMPANY_SORT_OPTIONS,
   KIND_LABEL,
   KIND_OPTIONS,
+  STATUS_LABEL,
   parseList,
   pipelineName,
   str,
@@ -248,7 +249,65 @@ export default async function CompaniesPage({
       </form>
 
       <div className="card mt-5 overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Mobile: compact company cards */}
+        <div className="lg:hidden">
+          {companies.map((company) => (
+            <div
+              key={company.id}
+              className="flex items-start gap-3 border-b border-zinc-100 px-4 py-3 last:border-0"
+            >
+              <CompanyMark name={company.name} website={company.website} />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    href={`/companies/${company.id}`}
+                    className="truncate text-[14px] font-medium text-zinc-900"
+                  >
+                    {company.name}
+                  </Link>
+                  <ScoreBadge score={company.score} grade={company.grade} />
+                </div>
+                <p className="mt-0.5 truncate text-[11px] text-zinc-500">
+                  {company.website ? host(company.website) : "No website"}
+                  {company.people_count > 0
+                    ? ` · ${company.people_count} people`
+                    : ""}
+                  {company.email_count > 0
+                    ? ` · ${company.email_count} emails`
+                    : ""}
+                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <KindBadge kind={company.kind} />
+                  <span className="rounded-full border border-zinc-200 px-1.5 py-0.5 text-[10px] text-zinc-500">
+                    {STATUS_LABEL[company.status]}
+                  </span>
+                  {company.follow_up_on ? (
+                    <span className="text-[10px] text-amber-700 tabular-nums">
+                      Follow-up {company.follow_up_on.slice(0, 10)}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <BookmarkToggle
+                  orgId={company.id}
+                  bookmarked={company.bookmarked}
+                />
+                {canWrite && company.first_email ? (
+                  <EmailComposer
+                    orgId={company.id}
+                    defaultTo={company.first_email}
+                    smtpConfigured={emailSettings.configured}
+                    trigger="button"
+                    triggerLabel="Draft"
+                  />
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden overflow-x-auto lg:block">
           <table className="min-w-full">
             <thead>
               <tr className="border-b border-zinc-200/80">

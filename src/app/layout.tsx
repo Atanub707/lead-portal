@@ -10,8 +10,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  applicationName: "Lead Portal",
   title: "Lead Portal",
-  description: "POS sales + compliance services lead tracker",
+  description: "Find companies, people and emails, run outreach and track replies.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -31,7 +32,11 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#09090b",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  colorScheme: "light",
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

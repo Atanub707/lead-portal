@@ -56,7 +56,7 @@ function NavItem({
       prefetch={prefetch}
       onClick={onNavigate}
       title={collapsed ? label : undefined}
-      className={`relative flex h-8 items-center rounded-md text-[13px] transition duration-150 active:scale-[0.98] ${
+      className={`relative flex h-10 items-center rounded-md text-[13px] transition duration-150 active:scale-[0.98] lg:h-8 ${
         collapsed ? "justify-center px-0" : "gap-2 px-2"
       } ${
         active
@@ -156,7 +156,7 @@ export function SidebarNav({
             pathname.startsWith("/analytics")
           }
         >
-          <summary className="flex h-8 cursor-pointer list-none items-center gap-2 rounded-md px-2 text-[13px] text-zinc-500 transition duration-150 hover:bg-zinc-100 hover:text-zinc-900 [&::-webkit-details-marker]:hidden">
+          <summary className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-md px-2 text-[13px] text-zinc-500 transition duration-150 hover:bg-zinc-100 hover:text-zinc-900 lg:h-8 [&::-webkit-details-marker]:hidden">
             <ChevronRight className="h-4 w-4 shrink-0 transition-transform group-open:rotate-90" strokeWidth={1.75} aria-hidden="true" />
             More
           </summary>
