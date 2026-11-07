@@ -135,7 +135,7 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_360px]">
+      <div className="mt-5 grid gap-5 [&>*]:min-w-0 lg:grid-cols-[1fr_360px]">
         {/* Pipeline cards */}
         <div className="space-y-5">
           {data.map(({ pipeline, counts, recent }, index) => {
