@@ -283,6 +283,7 @@ async function runCampaign(
       orgId: enrollment.org_id,
       contactId: contact?.id ?? null,
       flavor: step.flavor ?? "short-direct",
+      stepNo: step.step_no,
       to,
       admin: true,
     });

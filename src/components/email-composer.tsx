@@ -34,6 +34,13 @@ export function EmailComposer({
   const [to, setTo] = useState("");
   const [flavor, setFlavor] = useState("");
   const [subject, setSubject] = useState("");
+  const [alternatives, setAlternatives] = useState<string[]>([]);
+  const [quality, setQuality] = useState<{
+    score: number;
+    words: number;
+    issues: string[];
+    evidence: string[];
+  } | null>(null);
   const [body, setBody] = useState("");
   const [firstContact, setFirstContact] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -61,6 +68,8 @@ export function EmailComposer({
         : ""
     );
     setSubject("");
+    setAlternatives([]);
+    setQuality(null);
     setBody("");
     setError(null);
     setCopied(false);
@@ -84,6 +93,8 @@ export function EmailComposer({
         subject?: string;
         body?: string;
         firstContact?: boolean;
+        alternatives?: string[];
+        quality?: { score: number; words: number; issues: string[]; evidence: string[] } | null;
         error?: string;
       };
       if (!data.ok) {
@@ -91,6 +102,8 @@ export function EmailComposer({
         return;
       }
       setSubject(data.subject ?? "");
+      setAlternatives(data.alternatives ?? []);
+      setQuality(data.quality ?? null);
       setBody(data.body ?? "");
       setFirstContact(data.firstContact === true);
       setTo((prev) => prev || data.to || "");
@@ -312,7 +325,61 @@ export function EmailComposer({
                       onChange={(event) => setSubject(event.target.value)}
                       className="input"
                     />
+                    {alternatives.filter((entry) => entry !== subject).length > 0 ? (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] uppercase tracking-wide text-zinc-400">
+                          Other subjects
+                        </span>
+                        {alternatives
+                          .filter((entry) => entry !== subject)
+                          .map((entry) => (
+                            <button
+                              key={entry}
+                              type="button"
+                              onClick={() => setSubject(entry)}
+                              className="rounded-full border border-zinc-200 px-2 py-0.5 text-[10px] text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900"
+                            >
+                              {entry}
+                            </button>
+                          ))}
+                      </div>
+                    ) : null}
                   </div>
+                  {quality ? (
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[11px] font-medium text-zinc-700">Email check</p>
+                        <p
+                          className={`text-[11px] font-medium tabular-nums ${
+                            quality.score >= 85
+                              ? "text-emerald-600"
+                              : quality.score >= 70
+                                ? "text-amber-600"
+                                : "text-rose-600"
+                          }`}
+                        >
+                          {quality.score}/100 · {quality.words} words
+                        </p>
+                      </div>
+                      {quality.evidence.length > 0 ? (
+                        <p className="mt-1 text-[10px] text-zinc-500">
+                          Based on: {quality.evidence.join(" · ")}
+                        </p>
+                      ) : null}
+                      {quality.issues.length > 0 ? (
+                        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[10px] text-amber-700">
+                          {quality.issues.map((issue) => (
+                            <li key={issue}>{issue}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-1 text-[10px] text-emerald-600">
+                          Structure, length, CTA and evidence checks passed.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
+
                   <div>
                     <label
                       htmlFor={`compose-body-${orgId}-${contactId ?? 0}`}

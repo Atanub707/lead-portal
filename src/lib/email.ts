@@ -14,22 +14,36 @@ export type FlavorId = (typeof FLAVORS)[number]["id"];
 
 const DraftSchema = z.object({
   subject: z.string(),
+  alternative_subjects: z.array(z.string()).max(4).optional(),
   body: z.string(),
 });
 
-const DRAFT_SYSTEM = `You write cold outreach emails that read like a real human wrote them.
+const DRAFT_SYSTEM = `You are a senior B2B sales copywriter. Write cold emails that earn a reply, not just attention.
 
-Hard rules:
-- Start with the greeting line given to you, exactly, followed by a newline. Nothing may come before it.
-- Write in the first person ("we"/"I"). Never refer to yourself in the third person.
-- Keep it SHORT: 60-90 words total (Follow-up flavor: 30-50). Maximum two short paragraphs. Short sentences.
-- Open with one confident line about what we do, then one line on why it fits them, then a soft ask.
-- Use ONLY the facts provided. NEVER invent numbers, client names, certifications, deadlines, or claims.
-- NEVER use: "I hope this email finds you well", "I'm writing to", "leverage", "passionate", "excited", "thrilled", exclamation marks, bullet points, or listicles.
-- PUNCTUATION: never use em-dashes or en-dashes. Commas, periods, and normal hyphens only.
-- Do NOT include any signature, name, phone, link, or sign-off. The system appends it.
-- Vary structure and wording from email to email. Never reuse sentence patterns or phrases across different recipients — near-identical mass mail is a spam signal.
-- Return valid JSON only, no markdown: { "subject": string (max 8 words, no fluff), "body": string }`;
+Structure every email in this order (no headings in the email):
+1. Subject: 1-5 words, concrete and honest, tied to a real business priority. No hype, no fake Re:/Fwd:.
+2. Opening: one verified observation about the company or the recipient's role.
+3. Business problem: one plausible problem from their perspective (not a list).
+4. Credibility: one brief line on why we are relevant. Use only supplied proof; never invent clients, results, certifications or numbers.
+5. Value: the outcome, plus one useful asset when appropriate (assessment, benchmark, checklist, overview).
+6. CTA: exactly one low-friction question. Prefer interest over a meeting request.
+
+Rules:
+- Evidence only. If a personalization detail is not in the supplied evidence, use segment-level relevance instead; never fabricate.
+- One problem, one value proposition, one question.
+- Natural, conversational English. Short paragraphs (1-2 sentences). No generic intros, no "leading provider" language, no excessive adjectives.
+- Match the persona and length target supplied in the prompt.
+- Follow-ups must add a new angle; never write "just checking in" or repeating the same pitch.
+- Never use exclamation marks, em/en dashes, bullet lists, links (first contact), or a signature. The system appends the signature.
+- Vary wording from recent emails supplied to you.
+- Return valid JSON only: { "subject": string, "alternative_subjects": string[], "body": string }`;
+
+export interface EmailQuality {
+  score: number;
+  words: number;
+  issues: string[];
+  evidence: string[];
+}
 
 export interface EmailDraft {
   ok: true;
@@ -37,6 +51,8 @@ export interface EmailDraft {
   subject: string;
   body: string;
   firstContact: boolean;
+  quality: EmailQuality;
+  alternatives: string[];
 }
 
 export type EmailDraftResult = EmailDraft | { ok: false; error: string };
@@ -99,6 +115,88 @@ function greetingName(to: string, contactName: string | null): string {
   return firstNameFrom(first);
 }
 
+
+const BANNED_PHRASES = [
+  /hope (this|you)/i,
+  /i came across/i,
+  /i wanted to introduce/i,
+  /leading provider/i,
+  /world[- ]class/i,
+  /revolutionary/i,
+  /\bguarantee/i,
+  /risk[- ]free/i,
+  /just checking in/i,
+  /circle back/i,
+  /\bleverage\b/i,
+  /\bpassionate\b/i,
+  /\bexcited\b/i,
+  /\bthrilled\b/i,
+];
+
+interface Persona {
+  label: string;
+  focus: string;
+  min: number;
+  max: number;
+}
+
+function personaFor(title: string | null): Persona {
+  const value = (title ?? "").toLowerCase();
+  if (/(founder|co-?founder|ceo|owner|president|managing director)/i.test(value)) {
+    return { label: "Founder / CEO", focus: "growth, revenue, enterprise expansion, business risk", min: 50, max: 90 };
+  }
+  if (/(cto|chief technology|vp engineering|head of engineering|engineering (lead|manager))/i.test(value)) {
+    return { label: "CTO / engineering leader", focus: "infrastructure, engineering productivity, technical risk, security architecture", min: 60, max: 110 };
+  }
+  if (/(ciso|chief information security|security (lead|manager|head)|compliance (lead|manager|head)|head of compliance)/i.test(value)) {
+    return { label: "Security / compliance leader", focus: "risk management, security posture, governance, vendor requirements", min: 60, max: 110 };
+  }
+  if (/(coo|chief operating|operations (lead|manager|head)|head of operations)/i.test(value)) {
+    return { label: "Operations leader", focus: "process efficiency, cost control, operational risk, implementation effort", min: 70, max: 120 };
+  }
+  if (/(cmo|chief marketing|vp marketing|head of marketing|sales (lead|manager|head)|vp sales|cro)/i.test(value)) {
+    return { label: "Marketing / sales leader", focus: "customer acquisition, pipeline, revenue growth, conversion efficiency", min: 50, max: 110 };
+  }
+  return { label: "Decision maker", focus: "their business priorities and current initiatives", min: 50, max: 110 };
+}
+
+function pickSubject(primary: string, alternatives: string[] | undefined): string {
+  const banned = /free|guarantee|act now|limited|urgent|risk[- ]?free|!!|\?|^re:|^fwd:/i;
+  const candidates = [primary, ...(alternatives ?? [])]
+    .map((entry) => humanize(entry))
+    .filter(Boolean);
+  for (const candidate of candidates) {
+    const words = candidate.split(/\s+/).length;
+    if (words >= 1 && words <= 6 && !banned.test(candidate)) {
+      return candidate.split(/\s+/).slice(0, 8).join(" ").slice(0, 160);
+    }
+  }
+  return (candidates[0] ?? "").split(/\s+/).slice(0, 8).join(" ").slice(0, 160);
+}
+
+function qualityCheck(
+  body: string,
+  opts: { firstContact: boolean; persona: Persona; followUp: boolean }
+): { score: number; words: number; issues: string[] } {
+  const words = body.replace(/\n+/g, " ").trim().split(/\s+/).filter(Boolean).length;
+  const issues: string[] = [];
+  if (opts.followUp) {
+    if (words < 25 || words > 90) issues.push(`length ${words} words (target 30-80)`);
+  } else if (words < opts.persona.min - 15 || words > opts.persona.max + 20) {
+    issues.push(`length ${words} words (target ${opts.persona.min}-${opts.persona.max})`);
+  }
+  const questions = (body.match(/\?/g) ?? []).length;
+  if (questions > 1) issues.push("more than one question");
+  if ((body.match(/!/g) ?? []).length > 0) issues.push("exclamation marks");
+  if (BANNED_PHRASES.some((pattern) => pattern.test(body))) {
+    issues.push("generic or hype phrasing");
+  }
+  if (opts.firstContact && /https?:\/\//i.test(body)) {
+    issues.push("link in first contact");
+  }
+  return { score: Math.max(0, 100 - issues.length * 12), words, issues };
+}
+
 export async function generateEmailDraft(opts: {
   userId: string;
   orgId: number;
@@ -106,22 +204,25 @@ export async function generateEmailDraft(opts: {
   flavor: string;
   to?: string | null;
   admin?: boolean;
+  stepNo?: number;
 }): Promise<EmailDraftResult> {
   const flavor = FLAVORS.find((entry) => entry.id === opts.flavor);
   if (!flavor) return { ok: false, error: "Pick a flavor first." };
 
   const model = pickModel(opts.userId);
   if (!model) return { ok: false, error: NO_AI_KEY_MESSAGE };
+  const activeModel = model;
 
   const supabase = opts.admin ? createAdminClient() : await createClient();
 
   const { data: org } = await supabase
     .from("organizations")
-    .select("id, name, notes, website, list")
+    .select("id, name, notes, website, list, workspace_id")
     .eq("id", opts.orgId)
     .maybeSingle();
   if (!org) return { ok: false, error: "Company not found." };
 
+  const nowIso = new Date().toISOString();
   const [
     pipelineResult,
     contactResult,
@@ -130,49 +231,69 @@ export async function generateEmailDraft(opts: {
     recentSendsResult,
     settingsResult,
     briefResult,
+    signalsResult,
+    firmResult,
+    defsResult,
+    profileResult,
   ] = await Promise.all([
-      supabase
-        .from("pipelines")
-        .select("pitch, value_props, proof_points, cta")
-        .eq("id", org.list)
-        .maybeSingle(),
-      opts.contactId
-        ? supabase
-            .from("contacts")
-            .select("name, title, email")
-            .eq("id", opts.contactId)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-      supabase
-        .from("company_emails")
-        .select("email")
-        .eq("org_id", opts.orgId)
-        .limit(1),
-      supabase
-        .from("sent_emails")
-        .select("subject, created_at")
-        .eq("org_id", opts.orgId)
-        .order("created_at", { ascending: false })
-        .limit(1),
-      supabase
-        .from("sent_emails")
-        .select("body")
-        .eq("sent_by", opts.userId)
-        .order("created_at", { ascending: false })
-        .limit(3),
-      supabase
-        .from("user_email_settings")
-        .select("from_name, signature_phone, signature_link")
-        .eq("user_id", opts.userId)
-        .maybeSingle(),
-      supabase
-        .from("company_briefs")
-        .select("summary, priorities, likely_objections, suggested_angle")
-        .eq("org_id", opts.orgId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-    ]);
+    supabase
+      .from("pipelines")
+      .select("pitch, value_props, proof_points, cta")
+      .eq("id", org.list)
+      .maybeSingle(),
+    opts.contactId
+      ? supabase
+          .from("contacts")
+          .select("name, title, email")
+          .eq("id", opts.contactId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.from("company_emails").select("email").eq("org_id", opts.orgId).limit(1),
+    supabase
+      .from("sent_emails")
+      .select("subject, created_at")
+      .eq("org_id", opts.orgId)
+      .order("created_at", { ascending: false })
+      .limit(1),
+    supabase
+      .from("sent_emails")
+      .select("body")
+      .eq("sent_by", opts.userId)
+      .order("created_at", { ascending: false })
+      .limit(3),
+    supabase
+      .from("user_email_settings")
+      .select("from_name, signature_phone, signature_link")
+      .eq("user_id", opts.userId)
+      .maybeSingle(),
+    supabase
+      .from("company_briefs")
+      .select("summary, priorities, likely_objections, suggested_angle")
+      .eq("org_id", opts.orgId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("company_signals")
+      .select("signal_key, evidence, confidence, observed_at")
+      .eq("org_id", opts.orgId)
+      .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
+      .order("observed_at", { ascending: false })
+      .limit(6),
+    supabase.from("company_firmographics").select("*").eq("org_id", opts.orgId).maybeSingle(),
+    supabase
+      .from("signal_definitions")
+      .select("key, label")
+      .eq("workspace_id", org.workspace_id as string),
+    supabase
+      .from("business_profiles")
+      .select("name, service_categories, positioning")
+      .eq("workspace_id", org.workspace_id as string)
+      .eq("is_active", true)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   const pipeline = pipelineResult.data;
   const contact = contactResult.data as {
@@ -186,9 +307,6 @@ export async function generateEmailDraft(opts: {
     return { ok: false, error: "No email address on this company — add one first." };
   }
 
-  // First email to this recipient? Cold first emails must stay link-free:
-  // links are a top spam signal, and Gmail flags messages "similar to past
-  // spam". Links only appear once a thread exists (second email onward).
   const { count: priorSends } = await supabase
     .from("sent_emails")
     .select("id", { count: "exact", head: true })
@@ -198,18 +316,24 @@ export async function generateEmailDraft(opts: {
 
   const name = greetingName(to, contact?.name ?? null);
   const greeting = name ? `Hi ${name},` : "Hi there,";
-  const prior =
-    flavor.id === "follow-up" ? priorResult.data?.[0] ?? null : null;
+  const stepNo = Math.max(1, Math.round(opts.stepNo ?? 1));
+  const followUp = stepNo > 1 || flavor.id === "follow-up";
+  const prior = followUp ? priorResult.data?.[0] ?? null : null;
+  const persona = personaFor(contact?.title ?? null);
 
   const pitchLines = [
-    pipeline?.pitch ? `Our offering: ${pipeline.pitch}` : null,
+    profileResult.data?.name ? `Business profile: ${profileResult.data.name}` : null,
+    profileResult.data?.service_categories?.length
+      ? `Services: ${(profileResult.data.service_categories as string[]).join(", ")}`
+      : null,
+    pipeline?.pitch ? `Offering: ${pipeline.pitch}` : null,
     pipeline?.value_props?.length
       ? `Value we bring:\n- ${pipeline.value_props.join("\n- ")}`
       : null,
     pipeline?.proof_points?.length
-      ? `Proof points (only when they fit naturally): ${pipeline.proof_points.join("; ")}`
+      ? `Proof points (use only when relevant; never invent): ${pipeline.proof_points.join("; ")}`
       : null,
-    pipeline?.cta ? `Preferred ask: ${pipeline.cta}` : null,
+    pipeline?.cta ? `Preferred ask if natural: ${pipeline.cta}` : null,
   ]
     .filter(Boolean)
     .join("\n");
@@ -220,91 +344,116 @@ export async function generateEmailDraft(opts: {
     likely_objections: string[] | null;
     suggested_angle: string | null;
   } | null;
-  const briefBlock = brief
-    ? `Account brief: ${(brief.summary ?? "").slice(0, 500)}${
-        brief.suggested_angle
-          ? `\nSuggested angle: ${brief.suggested_angle.slice(0, 240)}`
-          : ""
-      }${
-        brief.priorities?.length
-          ? `\nTheir priorities: ${brief.priorities.slice(0, 3).join("; ")}`
-          : ""
-      }`
-    : "";
+
+  const labels = new Map(
+    (defsResult.data ?? []).map((row) => [row.key as string, row.label as string])
+  );
+  const firm = (firmResult.data ?? null) as Record<string, unknown> | null;
+  const factParts = [
+    typeof firm?.industry === "string" ? firm.industry : null,
+    typeof firm?.employee_band === "string" ? `${firm.employee_band} employees` : null,
+    [firm?.hq_city, firm?.hq_region, firm?.hq_country].filter(Boolean).join(", ") || null,
+    typeof firm?.funding_stage === "string" ? `funding: ${firm.funding_stage}` : null,
+  ].filter((value): value is string => Boolean(value));
+
+  const signalLines = ((signalsResult.data ?? []) as {
+    signal_key: string;
+    evidence: unknown;
+    confidence: number;
+  }[]).map((signal) => {
+    const label = labels.get(signal.signal_key) ?? signal.signal_key;
+    const evidence = (signal.evidence ?? {}) as Record<string, unknown>;
+    const snippet =
+      typeof evidence.snippet === "string" ? evidence.snippet.slice(0, 140) : "";
+    return `${label}${snippet ? ` — ${snippet}` : ""}`;
+  });
+
+  const evidenceLabels = [
+    ...factParts.slice(0, 2),
+    ...((signalsResult.data ?? []) as { signal_key: string }[])
+      .slice(0, 3)
+      .map((signal) => labels.get(signal.signal_key) ?? signal.signal_key),
+  ];
+
+  const stepAngle = !followUp
+    ? "First touch: open with the verified observation, introduce one problem and offer one useful next step."
+    : stepNo <= 1
+      ? "Follow-up: add one new useful perspective on the same business problem. Do not repeat the previous email."
+      : stepNo === 2
+        ? "Follow-up #2 (day 3): add a new perspective on the same problem. Do not repeat the first email."
+        : stepNo === 3
+          ? "Follow-up #3 (day 7): add useful evidence such as a checklist, benchmark or practical observation. Use only substantiated claims."
+          : "Final follow-up (day 12): polite close or referral request. Make it easy to decline.";
 
   const prompt = `Company: ${org.name}${org.website ? ` (${org.website})` : ""}
 What they do: ${org.notes ?? "(no description captured yet)"}
-${briefBlock}
-Recipient: ${
-    contact?.name
-      ? `${contact.name}${contact.title ? `, ${contact.title}` : ""}`
-      : "unknown — use the greeting line below"
-  }
+${factParts.length > 0 ? `Verified company facts: ${factParts.join(" · ")}` : "Verified company facts: none"}
+${signalLines.length > 0 ? `Verified signals (personalize only from these):\n- ${signalLines.join("\n- ")}` : "Verified signals: none — use segment-level relevance only; do not invent personalization."}
+${brief ? `Account brief: ${(brief.summary ?? "").slice(0, 500)}\nSuggested angle: ${(brief.suggested_angle ?? "").slice(0, 240)}` : ""}
+${pitchLines || "Offering: (no pitch defined — keep it a first conversation, no specifics)"}
+Recipient: ${contact?.name ? `${contact.name}${contact.title ? `, ${contact.title}` : ""}` : "unknown — use the greeting line below"}
+Persona: ${persona.label}. Focus on: ${persona.focus}. Target length: ${persona.min}-${persona.max} words.
 Greeting line to use exactly: ${greeting}
 Flavor: ${flavor.label} — ${flavor.brief}
-${pitchLines || "Our offering: (no pitch defined for this pipeline yet — keep it a first conversation, no specifics)"}
-${
-    prior
-      ? `Prior email we sent on ${prior.created_at.slice(0, 10)}, subject: “${prior.subject}” — reference it naturally in one short clause.`
-      : ""
-  }${
-    (recentSendsResult.data ?? []).length > 0
-      ? `\n\nRecent emails we already sent to OTHER recipients. Write a clearly DIFFERENT email: do not reuse their phrasing, sentence patterns, opening structure, or ask wording. Only the greeting line is fixed. Near-identical mass mail is the #1 spam signal:\n${(recentSendsResult.data ?? [])
-          .map((row, index) => `--- recent ${index + 1} ---\n${(row.body ?? "").slice(0, 450)}`)
-          .join("\n")}`
-      : ""
-  }`;
+${stepAngle}
+First contact: ${firstContact ? "yes — no links" : "no"}
+${prior ? `Prior email we sent on ${prior.created_at.slice(0, 10)}, subject: “${prior.subject}” — add a new angle; do not repeat it.` : ""}${
+  (recentSendsResult.data ?? []).length > 0
+    ? `\n\nRecent emails we sent to OTHER recipients. Write a clearly DIFFERENT email: no reused phrasing, structure or ask:\n${(recentSendsResult.data ?? [])
+        .map((row, index) => `--- recent ${index + 1} ---\n${(row.body ?? "").slice(0, 450)}`)
+        .join("\n")}`
+    : ""
+}`;
 
-  let draft: z.infer<typeof DraftSchema> | null = null;
-  const failures: string[] = [];
-
-  try {
-    const { text } = await generateText({
-      model,
-      system: `${DRAFT_SYSTEM}\n\nUse this exact greeting as the first line: ${greeting}`,
-      prompt,
-    });
-    const parsed = parseJsonObject(text);
-    if (parsed) {
-      const result = DraftSchema.safeParse(parsed);
-      if (result.success) {
-        draft = result.data;
-      } else {
-        failures.push(
-          `parse: ${result.error.issues[0]?.message ?? "schema mismatch"}`
-        );
-      }
-    } else {
-      failures.push("parse: no JSON object in the model output");
-    }
-  } catch (err) {
-    failures.push(`text: ${err instanceof Error ? err.message : String(err)}`);
-  }
-
-  if (!draft) {
+  async function attempt(extra: string) {
+    const system = `${DRAFT_SYSTEM}\n\nUse this exact greeting as the first line: ${greeting}\n${extra}`;
     try {
-      const { object } = await generateObject({
-        model,
-        schema: DraftSchema,
-        system: `${DRAFT_SYSTEM}\n\nUse this exact greeting as the first line: ${greeting}`,
-        prompt,
-      });
-      draft = object;
+      const { text } = await generateText({ model: activeModel, system, prompt });
+      const parsed = parseJsonObject(text);
+      if (parsed) {
+        const result = DraftSchema.safeParse(parsed);
+        if (result.success) return result.data;
+      }
+    } catch {
+      // Fall back to JSON mode.
+    }
+    try {
+      const { object } = await generateObject({ model: activeModel, schema: DraftSchema, system, prompt });
+      return object;
     } catch (err) {
-      failures.push(
-        `object: ${err instanceof Error ? err.message : String(err)}`
-      );
+      console.error("[email.draft] generation failed:", err instanceof Error ? err.message : err);
+      return null;
     }
   }
 
+  let draft = await attempt("");
   if (!draft) {
-    console.error("[email.draft] generation failed:", failures.join(" | "));
     return { ok: false, error: "The AI couldn't draft this email. Please try again." };
+  }
+
+  let quality = qualityCheck(humanize(draft.body), {
+    firstContact,
+    persona,
+    followUp,
+  });
+  if (quality.issues.length > 0) {
+    const retry = await attempt(`Fix these issues in the new draft: ${quality.issues.join("; ")}`);
+    if (retry) {
+      const retryQuality = qualityCheck(humanize(retry.body), {
+        firstContact,
+        persona,
+        followUp,
+      });
+      if (retryQuality.score >= quality.score) {
+        draft = retry;
+        quality = retryQuality;
+      }
+    }
   }
 
   const cleanBody = humanize(draft.body);
   const cleanSubject =
-    humanize(draft.subject).split(/\s+/).slice(0, 8).join(" ").slice(0, 160) ||
+    pickSubject(draft.subject, draft.alternative_subjects) ||
     `Quick note for ${org.name}`;
 
   const settings = settingsResult.data;
@@ -321,7 +470,23 @@ ${
     ? cleanBody.replace(/https?:\/\/\S+/gi, "").replace(/[ \t]+$/gm, "")
     : cleanBody;
   const body = signature ? `${bodyText}\n\n${signature}` : bodyText;
-  return { ok: true, to, subject: cleanSubject, body, firstContact };
+
+  const alternatives = [
+    cleanSubject,
+    ...(draft.alternative_subjects ?? []).map((entry) => humanize(entry)),
+  ]
+    .filter((entry, index, all) => entry.length > 0 && all.indexOf(entry) === index)
+    .slice(0, 3);
+
+  return {
+    ok: true,
+    to,
+    subject: cleanSubject,
+    body,
+    firstContact,
+    quality: { ...quality, evidence: evidenceLabels },
+    alternatives,
+  };
 }
 
 // ─── SMTP send ────────────────────────────────────────────────────────────────
