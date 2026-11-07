@@ -24,6 +24,7 @@ type Stage =
 
 export function QuickFind() {
   const router = useRouter();
+  const [source, setSource] = useState("all");
   const [industry, setIndustry] = useState("");
   const [location, setLocation] = useState("");
   const [band, setBand] = useState("");
@@ -46,6 +47,7 @@ export function QuickFind() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          source,
           industry: industry.trim() || undefined,
           location: location.trim() || undefined,
           employeeBand: band || undefined,
@@ -94,36 +96,12 @@ export function QuickFind() {
       }
 
       setStage("contacts");
-      setMessage(`Found ${imported} companies — finding people and emails…`);
-      const enrichRes = await fetch("/api/leads/enrich", {
+      setMessage(`Found ${imported} companies — scanning their websites for people and emails…`);
+      await fetch("/api/leads/website-enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgIds: importedIds.slice(0, 10) }),
-      });
-      const enrichJson = (await enrichRes.json().catch(() => null)) as
-        | { ok?: boolean; runs?: { orgId: number; runId: string }[]; error?: string }
-        | null;
-      const runs = enrichJson?.runs ?? [];
-      const pending = new Map(runs.map((run) => [run.runId, run]));
-      for (let round = 0; round < 60 && pending.size > 0; round += 1) {
-        await new Promise((resolve) => window.setTimeout(resolve, 5000));
-        for (const [runId, run] of [...pending.entries()]) {
-          const poll = await fetch(
-            `/api/leads/enrich?orgId=${run.orgId}&runId=${encodeURIComponent(runId)}`
-          );
-          const state = (await poll.json().catch(() => null)) as
-            | { status?: string; people?: number; emails?: number }
-            | null;
-          if (state?.status === "ok" || state?.status === "failed") {
-            pending.delete(runId);
-          }
-        }
-        if (pending.size > 0) {
-          setMessage(
-            `Finding contacts… ${runs.length - pending.size}/${runs.length} companies done`
-          );
-        }
-      }
+        body: JSON.stringify({ orgIds: importedIds.slice(0, 5) }),
+      }).catch(() => undefined);
 
       setStage("signals");
       setMessage("Checking signals and scoring…");
@@ -155,6 +133,22 @@ export function QuickFind() {
       </div>
 
       <div className="space-y-4 px-5 py-5">
+        <div>
+          <label htmlFor="qf-source" className="label">
+            Source
+          </label>
+          <select
+            id="qf-source"
+            className="input"
+            value={source}
+            onChange={(event) => setSource(event.target.value)}
+            disabled={busy}
+          >
+            <option value="all">All sources (base)</option>
+            <option value="crunchbase">Crunchbase</option>
+            <option value="apollo" disabled>Apollo — coming soon</option>
+          </select>
+        </div>
         <div>
           <label htmlFor="qf-industry" className="label">
             Who do you want to reach?
@@ -219,8 +213,9 @@ export function QuickFind() {
         </div>
 
         <p className="text-[11px] leading-relaxed text-zinc-500">
-          People and emails are fetched automatically for up to 10 companies per
-          search (roughly $1–2). Signals and scoring run in the background.
+          We scan each company&apos;s website automatically for details, people,
+          emails and LinkedIn. Deep Search is manual only — it runs when you
+          click it and uses paid credits.
         </p>
 
         {message ? (

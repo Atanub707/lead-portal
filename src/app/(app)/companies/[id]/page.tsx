@@ -339,7 +339,7 @@ export default async function CompanyPage({
         </div>
       </header>
 
-      <div className="mt-6">
+      <div className="mt-6 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         {/* ── Main column ──────────────────────────────────────────────────── */}
         <div className="space-y-5">
           {/* Identity */}
@@ -1007,6 +1007,100 @@ export default async function CompanyPage({
             )}
           </Section>
         </div>
+
+        <aside className="space-y-5 xl:sticky xl:top-6">
+          <section className="card p-5">
+            <h2 className="text-[14px] font-semibold text-zinc-900">
+              Company details
+            </h2>
+            <p className="mt-0.5 text-[11px] text-zinc-400">
+              Auto-filled from the website and Crunchbase
+            </p>
+            {company.notes ? (
+              <p className="mt-3 line-clamp-4 whitespace-pre-wrap text-[13px] leading-relaxed text-zinc-700">
+                {company.notes}
+              </p>
+            ) : (
+              <p className="mt-3 text-[12px] text-zinc-500">
+                No website details yet. Use Signals or Deep Search.
+              </p>
+            )}
+            <dl className="mt-4 space-y-2">
+              {(
+                [
+                  ["Employees", companyFacts?.employees ?? firmographics?.employee_band ?? null],
+                  ["Location", companyFacts?.address ?? null],
+                  ["Industry", firmographics?.industry ?? null],
+                  ["Funding", firmographics?.funding_stage ?? null],
+                  ["Founded", companyFacts?.founded ?? (firmographics?.founded_year ? String(firmographics.founded_year) : null)],
+                ] as const
+              )
+                .filter(([, value]) => Boolean(value))
+                .map(([label, value]) => (
+                  <div key={label} className="flex items-baseline justify-between gap-3">
+                    <dt className="text-[11px] uppercase tracking-wide text-zinc-400">{label}</dt>
+                    <dd className="text-right text-[12px] text-zinc-800">{value}</dd>
+                  </div>
+                ))}
+            </dl>
+            {companyFacts?.phone ? (
+              <div className="mt-3 border-t border-zinc-100 pt-3">
+                <p className="text-[11px] uppercase tracking-wide text-zinc-400">Phone</p>
+                <a
+                  href={`tel:${String(companyFacts.phone).replace(/[^+0-9]/g, "")}`}
+                  className="text-[13px] text-zinc-800 hover:underline"
+                >
+                  {companyFacts.phone}
+                </a>
+              </div>
+            ) : null}
+            <div className="mt-3 border-t border-zinc-100 pt-3">
+              <p className="text-[11px] uppercase tracking-wide text-zinc-400">
+                Reach
+              </p>
+              <p className="mt-1 text-[12px] text-zinc-700">
+                {contacts.length} contacts · {companyEmails.length} company emails
+              </p>
+              {companyEmails.slice(0, 3).map((email) => (
+                <p key={email.id} className="mt-0.5 truncate text-[12px] text-zinc-600">
+                  {email.email}
+                </p>
+              ))}
+              {companyEmails.length > 3 ? (
+                <p className="mt-0.5 text-[11px] text-zinc-400">
+                  +{companyEmails.length - 3} more
+                </p>
+              ) : null}
+            </div>
+            <div className="mt-3 border-t border-zinc-100 pt-3">
+              <p className="text-[11px] uppercase tracking-wide text-zinc-400">
+                Links
+              </p>
+              <div className="mt-1 space-y-1">
+                {company.website ? (
+                  <a
+                    href={company.website}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block truncate text-[12px] text-zinc-700 hover:underline"
+                  >
+                    {company.website.replace(/^https?:\/\//, "")}
+                  </a>
+                ) : null}
+                {company.linkedin_url ? (
+                  <a
+                    href={company.linkedin_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block text-[12px] text-zinc-700 hover:underline"
+                  >
+                    LinkedIn
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          </section>
+        </aside>
 
       </div>
     </div>

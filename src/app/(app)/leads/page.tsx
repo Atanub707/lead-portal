@@ -295,8 +295,9 @@ export default async function LeadsPage({
       </div>
 
       <p className="mt-3 text-[11px] leading-relaxed text-zinc-500">
-        Contacts and emails are fetched for the first 10 companies automatically.
-        If a row has no email, open the company to enrich it further.
+        Website details, people and emails are filled automatically for the first
+        five companies. Deep Search is manual only — open a company and click it
+        if you need more contacts.
       </p>
     </div>
   );

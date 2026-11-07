@@ -33,6 +33,7 @@ export function CrunchbaseImport({
   const isPage = variant === "page";
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [source, setSource] = useState("all");
   const [pipeline, setPipeline] = useState(pipelines?.[0]?.id ?? list);
   const [category, setCategory] = useState("");
   const [location, setLocation] = useState("");
@@ -57,6 +58,7 @@ export function CrunchbaseImport({
   );
 
   function resetForm() {
+    setSource("all");
     setCategory("");
     setLocation("");
     setEmployees([]);
@@ -103,6 +105,7 @@ export function CrunchbaseImport({
               status?: string;
               imported?: number;
               skipped?: number;
+              importedIds?: number[];
               error?: string | null;
             }
           | null;
@@ -117,7 +120,18 @@ export function CrunchbaseImport({
             skipped: Number(json.skipped ?? 0),
           });
           setStatus("done");
-          router.refresh();
+          const ids = (json.importedIds ?? []).slice(0, 5);
+          if (ids.length > 0) {
+            fetch("/api/leads/website-enrich", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ orgIds: ids }),
+            })
+              .then(() => router.refresh())
+              .catch(() => undefined);
+          } else {
+            router.refresh();
+          }
         } else if (json?.status === "failed") {
           setError(json.error ?? "The import failed. Please try again.");
           setStatus("idle");
@@ -219,10 +233,10 @@ export function CrunchbaseImport({
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-semibold text-zinc-900">
-            Find companies
+            Find leads
           </p>
           <p className="truncate text-[11px] text-zinc-500">
-            Filter Crunchbase — no login or cookies needed
+            Pick a source, then filter — no login or cookies needed
           </p>
         </div>
         {isPage ? null : (
@@ -290,6 +304,22 @@ export function CrunchbaseImport({
         </div>
       ) : (
         <div className="space-y-4 px-5 py-5">
+          <div>
+            <label htmlFor="cb-source" className="mb-1.5 block text-[12px] font-medium text-zinc-700">
+              Source
+            </label>
+            <select
+              id="cb-source"
+              value={source}
+              onChange={(event) => setSource(event.target.value)}
+              className="input"
+            >
+              <option value="all">All sources (base)</option>
+              <option value="crunchbase">Crunchbase</option>
+              <option value="apollo" disabled>Apollo — coming soon</option>
+            </select>
+          </div>
+
           {pipelines && pipelines.length > 0 ? (
             <div>
               <label
@@ -521,7 +551,7 @@ export function CrunchbaseImport({
     <>
       <button onClick={openModal} className="btn-ghost">
         <Rocket className="h-3.5 w-3.5" aria-hidden="true" />
-        Crunchbase leads
+        Find leads
       </button>
 
       {open && typeof document !== "undefined"

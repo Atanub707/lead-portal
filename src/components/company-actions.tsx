@@ -149,7 +149,7 @@ export function CompanyActions({
               type="button"
               onClick={findContacts}
               disabled={busy !== null}
-              title="Find decision-makers and their emails"
+              title="Manual only — uses paid credits. Not automatic."
               className={hasEmail ? "btn-ghost" : "btn-primary"}
             >
               {busy === "contacts" ? (
@@ -157,7 +157,7 @@ export function CompanyActions({
               ) : (
                 <Search className="h-3.5 w-3.5" aria-hidden="true" />
               )}
-              Find contacts
+              Deep Search
             </button>
             <button
               type="button"
@@ -194,11 +194,10 @@ export function CompanyActions({
           Edit
         </Link>
       </div>
-      {!hasEmail ? (
-        <p className="text-[11px] text-zinc-500">
-          No email yet — find contacts, or scan the website for a published address.
-        </p>
-      ) : null}
+      <p className="text-[11px] text-zinc-500">
+        Website details and emails are filled automatically. Deep Search is
+        manual only and uses paid credits.
+      </p>
       {status ? <p className="text-[11px] text-emerald-600">{status}</p> : null}
       {error ? <p className="text-[11px] text-rose-600">{error}</p> : null}
     </div>
