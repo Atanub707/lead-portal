@@ -183,6 +183,15 @@ body:has([role="dialog"]) {
 }
 
 @media (max-width: 639px) {
+  /* Phones use overlay scrollbars; hiding the classic scrollbar keeps the
+     layout viewport equal to the visual viewport (no 7-11px side gap). */
+  html {
+    scrollbar-width: none;
+  }
+  html::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Dialogs become bottom sheets, safe-area aware and full width. */
   .fixed.inset-0.z-50 {
     align-items: flex-end !important;
