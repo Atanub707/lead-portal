@@ -41,8 +41,6 @@ const GENERIC_LOCALS = new Set([
   "procurement",
   "partnerships",
   "partners",
-  "founder",
-  "founders",
   // Common role inboxes in other languages (recipients' filters often treat
   // cold mail to these as spam; they are never a person's own address).
   "contacto",

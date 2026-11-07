@@ -356,6 +356,12 @@ export function EmailComposer({
                 </p>
               ) : null}
 
+              <p className="text-[10px] leading-relaxed text-zinc-400">
+                Cold email can still be filtered. Sends are capped at 30/day,
+                first emails avoid links, and follow-ups stop when someone
+                replies.
+              </p>
+
               <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                 <div className="flex items-center gap-2">
                   <button
