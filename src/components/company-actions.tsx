@@ -126,10 +126,12 @@ export function CompanyActions({
     }
   }
 
+  const hasEmail = Boolean(email);
+
   return (
     <div className="space-y-1.5">
       <div className="flex flex-wrap items-center gap-2">
-        {canWrite && email ? (
+        {canWrite && hasEmail ? (
           <EmailComposer
             orgId={orgId}
             contactId={contactId}
@@ -148,7 +150,7 @@ export function CompanyActions({
               onClick={findContacts}
               disabled={busy !== null}
               title="Find decision-makers and their emails"
-              className="btn-ghost"
+              className={hasEmail ? "btn-ghost" : "btn-primary"}
             >
               {busy === "contacts" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
@@ -192,6 +194,11 @@ export function CompanyActions({
           Edit
         </Link>
       </div>
+      {!hasEmail ? (
+        <p className="text-[11px] text-zinc-500">
+          No email yet — find contacts, or scan the website for a published address.
+        </p>
+      ) : null}
       {status ? <p className="text-[11px] text-emerald-600">{status}</p> : null}
       {error ? <p className="text-[11px] text-rose-600">{error}</p> : null}
     </div>
