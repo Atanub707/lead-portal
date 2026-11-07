@@ -8,7 +8,7 @@ export default function AppError({
   reset: () => void;
 }) {
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
+    <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
       <div className="card max-w-lg p-6" role="alert">
         <h1 className="text-base font-semibold tracking-tight text-zinc-900">
           Something went wrong

@@ -27,7 +27,7 @@ export default async function LeadsPage({
   const runId = Number(sp.run);
   if (!Number.isFinite(runId) || runId <= 0) {
     return (
-      <div className="mx-auto w-full max-w-[760px] px-4 py-8 sm:px-8">
+      <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
         <header>
           <h1 className="text-lg font-semibold tracking-tight text-zinc-900">
             Find leads
@@ -55,7 +55,7 @@ export default async function LeadsPage({
   const run = runData as ImportRow | null;
   if (!run) {
     return (
-      <div className="mx-auto w-full max-w-[760px] px-4 py-8 sm:px-8">
+      <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
         <div className="card p-6 text-center">
           <p className="text-[13px] text-zinc-600">Search not found.</p>
           <Link href="/leads" className="btn-primary mt-3 inline-flex">
@@ -69,7 +69,7 @@ export default async function LeadsPage({
   const ids = run.details?.imported_ids ?? [];
   if (ids.length === 0) {
     return (
-      <div className="mx-auto w-full max-w-[760px] px-4 py-8 sm:px-8">
+      <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
         <div className="card p-6 text-center">
           <p className="text-[13px] font-medium text-zinc-800">
             This search is still finishing.
@@ -145,7 +145,7 @@ export default async function LeadsPage({
     [...companyEmail.keys()].filter((orgId) => !bestContact.has(orgId)).length;
 
   return (
-    <div className="mx-auto w-full max-w-[900px] px-4 py-8 sm:px-8">
+    <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
       <Link
         href="/leads"
         className="inline-flex items-center gap-1.5 text-[12px] text-zinc-500 hover:text-zinc-900"

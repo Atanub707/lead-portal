@@ -22,7 +22,7 @@ export default async function AnalyticsPage() {
   ] as const;
 
   return (
-    <div className="mx-auto w-full max-w-[1000px] px-4 py-8 sm:px-8">
+    <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold tracking-tight text-zinc-900">Analytics</h1>

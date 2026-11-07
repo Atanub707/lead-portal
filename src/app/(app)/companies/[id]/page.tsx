@@ -248,7 +248,7 @@ export default async function CompanyPage({
   const dateOnly = (iso: string) => new Date(iso).toISOString().slice(0, 10);
 
   return (
-    <div className="mx-auto w-full max-w-[880px] px-4 py-8 sm:px-8">
+    <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
       <Link
         href={`/companies?list=${company.list}`}
         className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900"
@@ -326,7 +326,7 @@ export default async function CompanyPage({
             className="animate-rise animate-rise-1"
           >
             {company.notes ? (
-              <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-zinc-700">
+              <p className="mt-2 max-w-[80ch] whitespace-pre-wrap text-[14px] leading-relaxed text-zinc-700">
                 {company.notes}
               </p>
             ) : (

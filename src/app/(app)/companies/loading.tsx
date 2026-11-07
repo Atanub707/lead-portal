@@ -3,7 +3,7 @@ export default function Loading() {
   const line = "animate-pulse rounded bg-zinc-100 motion-reduce:animate-none";
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
+    <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
       <div className="flex items-end justify-between gap-3">
         <div>
           <div className={`h-5 w-44 ${bar}`} />

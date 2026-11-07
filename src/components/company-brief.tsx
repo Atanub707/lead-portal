@@ -74,7 +74,7 @@ export function CompanyBrief({
       </div>
 
       {brief ? (
-        <div className="space-y-3 text-[13px] leading-relaxed text-zinc-700">
+        <div className="max-w-[90ch] space-y-3 text-[14px] leading-relaxed text-zinc-700">
           <p>{brief.summary}</p>
           {brief.suggested_angle ? (
             <p>

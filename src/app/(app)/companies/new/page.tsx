@@ -25,7 +25,7 @@ export default async function NewCompanyPage({
   const listName = pipelineName(pipelines, list);
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
+    <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
       <div className="max-w-xl">
         <Link
           href={`/companies?list=${list}`}

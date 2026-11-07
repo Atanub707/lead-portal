@@ -41,7 +41,7 @@ export default async function CampaignDetailPage({
   const pipeline = pipelines.find((entry) => entry.id === campaign.pipeline_id);
 
   return (
-    <div className="mx-auto w-full max-w-[900px] px-4 py-8 sm:px-8">
+    <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
       <Link
         href="/campaigns"
         className="inline-flex items-center gap-1.5 text-[12px] text-zinc-500 hover:text-zinc-900"

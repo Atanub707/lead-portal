@@ -38,7 +38,7 @@ export default async function EditCompanyPage({
   if (!company) notFound();
   if (workspaceCtx?.canWrite === false) {
     return (
-      <div className="mx-auto w-full max-w-[720px] px-4 py-8 sm:px-8">
+      <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
         <div className="card p-6">
           <p className="text-[14px] text-zinc-600">
             Read-only account — ask the workspace owner to unlock changes.
@@ -55,7 +55,7 @@ export default async function EditCompanyPage({
   const isOwner = profile?.role === "owner";
 
   return (
-    <div className="mx-auto w-full max-w-[720px] px-4 py-8 sm:px-8">
+    <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
       <Link
         href={`/companies/${company.id}`}
         className="inline-flex items-center gap-1.5 text-[13px] text-zinc-500 hover:text-zinc-900"

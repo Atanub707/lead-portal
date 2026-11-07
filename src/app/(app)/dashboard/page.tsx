@@ -101,7 +101,7 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
+    <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
       <header className="flex items-end justify-between gap-3">
         <h1 className="text-lg font-semibold tracking-tight text-zinc-900">
           Dashboard

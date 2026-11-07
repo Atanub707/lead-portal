@@ -9,7 +9,7 @@ export default async function EmailsPage() {
   const threads = await getReplyThreads();
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
+    <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
       <SyncOnLoad />
 
       <header>

@@ -10,7 +10,7 @@ export default async function SettingsLayout({
   const isOwner = profile?.role === "owner";
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
+    <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
       <h1 className="text-lg font-semibold tracking-tight text-zinc-900">
         Settings
       </h1>

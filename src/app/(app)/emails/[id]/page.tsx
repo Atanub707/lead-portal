@@ -43,7 +43,7 @@ export default async function ReplyThreadPage({
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-8">
+    <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
       <Link
         href="/emails"
         className="text-[13px] text-zinc-500 transition-colors hover:text-zinc-900"
