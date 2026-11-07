@@ -17,10 +17,12 @@ export function CompanyBrief({
   orgId,
   initialBrief,
   canWrite,
+  showAction = true,
 }: {
   orgId: number;
   initialBrief: Brief | null;
   canWrite: boolean;
+  showAction?: boolean;
 }) {
   const router = useRouter();
   const [brief, setBrief] = useState<Brief | null>(initialBrief);
@@ -55,7 +57,7 @@ export function CompanyBrief({
   return (
     <div className="mt-3 space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        {canWrite ? (
+        {canWrite && showAction ? (
           <button type="button" onClick={generate} disabled={busy} className="btn-ghost">
             {busy ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />

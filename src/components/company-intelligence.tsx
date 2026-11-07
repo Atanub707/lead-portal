@@ -69,6 +69,7 @@ export function CompanyIntelligence({
   definitions,
   score,
   canWrite,
+  hideScan = false,
 }: {
   orgId: number;
   firmographics: Firmographics | null;
@@ -76,6 +77,7 @@ export function CompanyIntelligence({
   definitions: SignalDefinition[];
   score: ScoreView | null;
   canWrite: boolean;
+  hideScan?: boolean;
 }) {
   const router = useRouter();
   const [scanning, setScanning] = useState(false);
@@ -129,7 +131,7 @@ export function CompanyIntelligence({
   return (
     <div className="mt-3 space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        {canWrite ? (
+        {canWrite && !hideScan ? (
           <button
             type="button"
             onClick={scan}

@@ -6,7 +6,6 @@ import { CompanyMark } from "@/components/company-mark";
 import { EmailComposer } from "@/components/email-composer";
 import { LinkedInBadge } from "@/components/icons";
 import { ConfirmSubmit } from "@/components/confirm-submit";
-import { DeepResearch } from "@/components/deep-research";
 import { FindLinkedInButton } from "@/components/find-linkedin-button";
 import { FollowUpControl } from "@/components/follow-up-control";
 import { SubmitButton } from "@/components/submit-button";
@@ -23,7 +22,6 @@ import {
   getCompanyEmails,
   getContacts,
   getCurrentProfile,
-  getDeepResearchMonthSpend,
   getDeepResearchState,
   getEnrichmentRuns,
   getInteractions,
@@ -35,6 +33,8 @@ import {
 import { reconcileIfStale } from "@/lib/deep-research";
 import { CompanyIntelligence } from "@/components/company-intelligence";
 import { CompanyBrief } from "@/components/company-brief";
+import { CompanyActions } from "@/components/company-actions";
+import { ScoreBadge } from "@/components/score-badge";
 import { latestBrief } from "@/lib/briefs";
 import {
   getCompanySignals,
@@ -238,14 +238,16 @@ export default async function CompanyPage({
   const decisionMakers = contacts.filter(
     (contact) => contact.is_decision_maker
   ).length;
-  // Deep Research is always available (one run at a time, monthly cap
-  // enforced server-side).
-  const monthSpend = await getDeepResearchMonthSpend();
   const companyFacts =
     deepResearchState.latest?.status === "ok"
       ? deepResearchCompanyFacts(deepResearchState.latest.details)
       : null;
   const dateOnly = (iso: string) => new Date(iso).toISOString().slice(0, 10);
+  const bestContact =
+    contacts.find((contact) => contact.is_decision_maker && contact.email) ??
+    contacts.find((contact) => Boolean(contact.email)) ??
+    null;
+  const bestEmail = bestContact?.email ?? companyEmails[0]?.email ?? null;
 
   return (
     <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
@@ -257,8 +259,7 @@ export default async function CompanyPage({
       </Link>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="mt-3 flex items-start justify-between gap-3">
-        <div className="min-w-0">
+      <header className="mt-3">
         <div className="flex flex-wrap items-center gap-3">
           <CompanyMark
             name={company.name}
@@ -268,6 +269,10 @@ export default async function CompanyPage({
           <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
             {company.name}
           </h1>
+          <ScoreBadge
+            score={scoreSnapshot?.total ?? null}
+            grade={scoreSnapshot?.grade ?? null}
+          />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <KindBadge kind={company.kind} />
@@ -306,15 +311,16 @@ export default async function CompanyPage({
             </a>
           ) : null}
         </div>
+        <div className="mt-4">
+          <CompanyActions
+            orgId={company.id}
+            email={bestEmail}
+            contactId={bestContact?.id ?? null}
+            contactLabel={bestContact?.name ?? null}
+            smtpConfigured={emailSettings.configured}
+            canWrite={canWrite}
+          />
         </div>
-        {canWrite ? (
-          <Link
-            href={`/companies/${company.id}/edit`}
-            className="btn-ghost shrink-0"
-          >
-            Edit
-          </Link>
-        ) : null}
       </header>
 
       <div className="mt-6">
@@ -353,7 +359,16 @@ export default async function CompanyPage({
                           {label}
                         </dt>
                         <dd className="mt-1 text-[13px] text-zinc-800 tabular-nums">
-                          {value}
+                          {label === "Phone" && value ? (
+                            <a
+                              href={`tel:${String(value).replace(/[^+0-9]/g, "")}`}
+                              className="hover:underline"
+                            >
+                              {value}
+                            </a>
+                          ) : (
+                            value
+                          )}
                         </dd>
                       </div>
                     ))}
@@ -408,6 +423,7 @@ export default async function CompanyPage({
               definitions={signalDefinitions}
               score={scoreSnapshot}
               canWrite={canWrite}
+              hideScan
             />
           </Section>
 
@@ -417,21 +433,13 @@ export default async function CompanyPage({
               orgId={company.id}
               initialBrief={companyBrief}
               canWrite={canWrite}
+              showAction={false}
             />
           </Section>
 
-          {/* Deep research */}
-          {canWrite ? (
-            <DeepResearch
-              orgId={company.id}
-              initialActiveRun={deepResearchState.activeRunId !== null}
-              monthSpend={monthSpend}
-            />
-          ) : null}
-
           {/* Reach */}
           <Section
-            title="Reach"
+            title="Company emails"
             count={companyEmails.length}
             className="animate-rise animate-rise-1"
           >
@@ -486,7 +494,7 @@ export default async function CompanyPage({
           {/* Emails */}
           {orgThreads.length > 0 ? (
             <Section
-              title="Emails"
+              title="Conversations"
               count={orgThreads.length}
               className="animate-rise animate-rise-2"
             >

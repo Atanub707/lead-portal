@@ -17,6 +17,7 @@ export function EmailComposer({
   smtpConfigured,
   trigger = "icon",
   triggerLabel = "Draft email",
+  triggerClassName = "",
 }: {
   orgId: number;
   contactId?: number | null;
@@ -26,6 +27,7 @@ export function EmailComposer({
   smtpConfigured: boolean;
   trigger?: "icon" | "button";
   triggerLabel?: string;
+  triggerClassName?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -150,7 +152,10 @@ export function EmailComposer({
         <button
           type="button"
           onClick={openDialog}
-          className="inline-flex items-center gap-1 text-[12px] text-zinc-500 transition-colors hover:text-zinc-900"
+          className={
+            triggerClassName ||
+            "inline-flex items-center gap-1 text-[12px] text-zinc-500 transition-colors hover:text-zinc-900"
+          }
         >
           <MailPlus className="h-3.5 w-3.5" aria-hidden="true" />
           {triggerLabel}
