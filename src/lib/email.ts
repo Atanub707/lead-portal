@@ -14,7 +14,7 @@ export type FlavorId = (typeof FLAVORS)[number]["id"];
 
 const DraftSchema = z.object({
   subject: z.string(),
-  alternative_subjects: z.array(z.string()).max(4).optional(),
+  alternative_subjects: z.array(z.string()).min(2).max(4),
   body: z.string(),
 });
 
@@ -36,6 +36,7 @@ Rules:
 - Follow-ups must add a new angle; never write "just checking in" or repeating the same pitch.
 - Never use exclamation marks, em/en dashes, bullet lists, links (first contact), or a signature. The system appends the signature.
 - Vary wording from recent emails supplied to you.
+- Always provide three subject options: "subject" (the best) plus exactly two in "alternative_subjects", each 1-5 words, honest and concrete.
 - Return valid JSON only: { "subject": string, "alternative_subjects": string[], "body": string }`;
 
 export interface EmailQuality {
@@ -369,10 +370,12 @@ export async function generateEmailDraft(opts: {
   });
 
   const evidenceLabels = [
-    ...factParts.slice(0, 2),
-    ...((signalsResult.data ?? []) as { signal_key: string }[])
-      .slice(0, 3)
-      .map((signal) => labels.get(signal.signal_key) ?? signal.signal_key),
+    ...new Set([
+      ...factParts.slice(0, 2),
+      ...((signalsResult.data ?? []) as { signal_key: string }[])
+        .slice(0, 3)
+        .map((signal) => labels.get(signal.signal_key) ?? signal.signal_key),
+    ]),
   ];
 
   const stepAngle = !followUp
