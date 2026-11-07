@@ -51,7 +51,7 @@ export default async function AnalyticsPage() {
         ))}
       </div>
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+      <div className="mt-5 grid gap-5 [&>*]:min-w-0 lg:grid-cols-2">
         <section className="card p-5">
           <h2 className="text-[13px] font-semibold text-zinc-900">Funnel</h2>
           <ul className="mt-3 space-y-2.5">
@@ -79,7 +79,7 @@ export default async function AnalyticsPage() {
 
         <section className="card p-5">
           <h2 className="text-[13px] font-semibold text-zinc-900">Pipelines</h2>
-          <div className="mt-3 overflow-x-auto">
+          <div className="mt-3 min-w-0 overflow-x-auto">
             <table className="w-full text-left text-[12px]">
               <thead>
                 <tr className="border-b border-zinc-200 text-[10px] uppercase tracking-wide text-zinc-400">
@@ -112,7 +112,7 @@ export default async function AnalyticsPage() {
           {data.signals.length === 0 ? (
             <p className="mt-2 text-[12px] text-zinc-500">No signals observed yet.</p>
           ) : (
-            <div className="mt-3 overflow-x-auto">
+            <div className="mt-3 min-w-0 overflow-x-auto">
               <table className="w-full text-left text-[12px]">
                 <thead>
                   <tr className="border-b border-zinc-200 text-[10px] uppercase tracking-wide text-zinc-400">
@@ -179,7 +179,7 @@ export default async function AnalyticsPage() {
         {data.campaigns.length === 0 ? (
           <p className="mt-2 text-[12px] text-zinc-500">No campaigns yet.</p>
         ) : (
-          <div className="mt-3 overflow-x-auto">
+          <div className="mt-3 min-w-0 overflow-x-auto">
             <table className="w-full text-left text-[12px]">
               <thead>
                 <tr className="border-b border-zinc-200 text-[10px] uppercase tracking-wide text-zinc-400">
