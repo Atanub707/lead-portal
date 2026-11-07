@@ -377,7 +377,16 @@ async function runCampaign(
       enrollment_id: enrollment.id,
       org_id: enrollment.org_id,
       kind: "sent",
-      payload: { step: step.step_no, subject: draft.subject, to },
+      payload: {
+        step: step.step_no,
+        subject: draft.subject,
+        to,
+        recipient_type: draft.recipient.type,
+        inbox_category: draft.recipient.category,
+        draft_strategy: draft.recipient.strategy,
+        personalization_level: draft.recipient.personalizationLevel,
+        cta_type: draft.recipient.ctaType,
+      },
     });
     sent += 1;
     if (sent >= remaining) break;

@@ -4,6 +4,7 @@ import { logActivity } from "@/lib/activity";
 import { decryptSecret } from "@/lib/crypto";
 import { sendEmailViaSmtp } from "@/lib/email";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { classifyRecipient } from "@/lib/recipient";
 import { createClient } from "@/lib/supabase/server";
 import { recordOutbound } from "@/lib/threads-db";
 
@@ -74,6 +75,19 @@ export async function POST(request: Request) {
     .select("name, workspace_id")
     .eq("id", orgId)
     .maybeSingle();
+  const { data: contactInfo } = body.contactId
+    ? await supabase
+        .from("contacts")
+        .select("name, title, email_status")
+        .eq("id", body.contactId)
+        .maybeSingle()
+    : { data: null };
+  const recipientProfile = classifyRecipient({
+    email: to,
+    contactName: contactInfo?.name ?? null,
+    contactTitle: contactInfo?.title ?? null,
+    emailStatus: contactInfo?.email_status ?? null,
+  });
 
   // Daily cap per mailbox: high daily volume from one address is a top spam
   // signal. Keep cold outreach slow and human-paced.
@@ -167,6 +181,14 @@ export async function POST(request: Request) {
     targetType: "company",
     targetId: orgId,
     summary: `Sent “${subject}” to ${org?.name ?? "company"} (${to})`,
+    details: {
+      recipient_type: recipientProfile.type,
+      inbox_category: recipientProfile.category,
+      draft_strategy: recipientProfile.strategy,
+      personalization_level: recipientProfile.personalizationLevel,
+      cta_type: recipientProfile.ctaType,
+      verification: recipientProfile.verification,
+    },
   });
 
   const { error: interactionError } = await supabase.from("interactions").insert({

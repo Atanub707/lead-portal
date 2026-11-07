@@ -3,7 +3,13 @@ import nodemailer from "nodemailer";
 import { z } from "zod";
 import { NO_AI_KEY_MESSAGE, pickModel } from "./ai";
 import { FLAVORS } from "./flavors";
-import { isGenericEmail } from "./people";
+import {
+  classifyRecipient,
+  ctaInstruction,
+  firstNameOf,
+  strategyInstruction,
+  type RecipientProfile,
+} from "./recipient";
 import { createClient } from "./supabase/server";
 import { createAdminClient } from "./supabase/admin";
 
@@ -54,6 +60,7 @@ export interface EmailDraft {
   firstContact: boolean;
   quality: EmailQuality;
   alternatives: string[];
+  recipient: RecipientProfile;
 }
 
 export type EmailDraftResult = EmailDraft | { ok: false; error: string };
@@ -89,31 +96,6 @@ function humanize(value: string): string {
     .replace(/,\s*,/g, ",")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
-}
-
-function firstNameFrom(name: string | null): string {
-  if (!name) return "";
-  const first = name.trim().split(/\s+/)[0] ?? "";
-  if (first.length < 2) return "";
-  // Titles like "Sales Team" or company-ish tokens are not personal names.
-  if (/^(sales|team|info|contact|support|admin|hello|hr|marketing|office)$/i.test(first)) {
-    return "";
-  }
-  return first[0].toUpperCase() + first.slice(1);
-}
-
-function greetingName(to: string, contactName: string | null): string {
-  const fromContact = firstNameFrom(contactName);
-  if (fromContact) return fromContact;
-  const local = to.split("@")[0]?.replace(/[._-]+/g, " ").trim() ?? "";
-  if (!local || isGenericEmail(local.split(/\s+/)[0] ?? "")) return "";
-  // Only treat the local part as a name when it clearly looks like one
-  // (letters with separators, e.g. "dana.smith") — never machine-ish strings.
-  const rawLocal = to.split("@")[0] ?? "";
-  if (!/^[a-zA-Z]+([._-][a-zA-Z]+){1,3}$/.test(rawLocal)) return "";
-  const first = local.split(/\s+/)[0] ?? "";
-  if (first.length < 4) return "";
-  return firstNameFrom(first);
 }
 
 
@@ -177,12 +159,20 @@ function pickSubject(primary: string, alternatives: string[] | undefined): strin
 
 function qualityCheck(
   body: string,
-  opts: { firstContact: boolean; persona: Persona; followUp: boolean }
+  opts: {
+    firstContact: boolean;
+    persona: Persona;
+    followUp: boolean;
+    recipient: RecipientProfile;
+    contactName?: string | null;
+  }
 ): { score: number; words: number; issues: string[] } {
   const words = body.replace(/\n+/g, " ").trim().split(/\s+/).filter(Boolean).length;
   const issues: string[] = [];
   if (opts.followUp) {
     if (words < 25 || words > 90) issues.push(`length ${words} words (target 30-80)`);
+  } else if (opts.recipient.type === "shared") {
+    if (words < 35 || words > 100) issues.push(`length ${words} words (target 40-90)`);
   } else if (words < opts.persona.min - 15 || words > opts.persona.max + 20) {
     issues.push(`length ${words} words (target ${opts.persona.min}-${opts.persona.max})`);
   }
@@ -194,6 +184,23 @@ function qualityCheck(
   }
   if (opts.firstContact && /https?:\/\//i.test(body)) {
     issues.push("link in first contact");
+  }
+  if (opts.recipient.type === "shared") {
+    if (opts.contactName && body.includes(firstNameOf(opts.contactName))) {
+      issues.push("personal name used in a shared-inbox email");
+    }
+    if (
+      opts.recipient.strategy !== "do_not_contact" &&
+      !/(point me|who (handles|is responsible)|forward|right (person|team|contact|department)|appropriate (person|team|contact)|direct me|reach the right)/i.test(body)
+    ) {
+      issues.push("shared-inbox email needs a routing question");
+    }
+    if (opts.recipient.strategy === "do_not_contact") {
+      issues.push("no-reply address — find another contact");
+    }
+  }
+  if (opts.recipient.type === "personal" && /hello team/i.test(body)) {
+    issues.push("team greeting used for a personal recipient");
   }
   return { score: Math.max(0, 100 - issues.length * 12), words, issues };
 }
@@ -245,7 +252,7 @@ export async function generateEmailDraft(opts: {
     opts.contactId
       ? supabase
           .from("contacts")
-          .select("name, title, email")
+          .select("name, title, email, email_status")
           .eq("id", opts.contactId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -301,6 +308,7 @@ export async function generateEmailDraft(opts: {
     name: string | null;
     title: string | null;
     email: string | null;
+    email_status: string | null;
   } | null;
   const to =
     opts.to?.trim() || contact?.email || emailsResult.data?.[0]?.email || null;
@@ -315,12 +323,27 @@ export async function generateEmailDraft(opts: {
     .eq("to_email", to);
   const firstContact = (priorSends ?? 0) === 0;
 
-  const name = greetingName(to, contact?.name ?? null);
-  const greeting = name ? `Hi ${name},` : "Hi there,";
+  const companyEmail = (emailsResult.data ?? [])[0] as
+    | { email?: string; verified?: boolean }
+    | undefined;
+  const recipient = classifyRecipient({
+    email: to,
+    contactName: contact?.name ?? null,
+    contactTitle: contact?.title ?? null,
+    emailStatus: contact?.email_status ?? null,
+    verified:
+      companyEmail?.email?.toLowerCase() === to.toLowerCase()
+        ? Boolean(companyEmail?.verified)
+        : undefined,
+  });
+  const greeting = recipient.greeting;
   const stepNo = Math.max(1, Math.round(opts.stepNo ?? 1));
   const followUp = stepNo > 1 || flavor.id === "follow-up";
   const prior = followUp ? priorResult.data?.[0] ?? null : null;
-  const persona = personaFor(contact?.title ?? null);
+  const persona =
+    recipient.type === "personal"
+      ? personaFor(contact?.title ?? null)
+      : { label: "Team inbox", focus: "routing the message to the right owner", min: 40, max: 100 };
 
   const pitchLines = [
     profileResult.data?.name ? `Business profile: ${profileResult.data.name}` : null,
@@ -380,7 +403,9 @@ export async function generateEmailDraft(opts: {
 
   const stepAngle = !followUp
     ? "First touch: open with the verified observation, introduce one problem and offer one useful next step."
-    : stepNo <= 1
+    : recipient.type === "shared"
+      ? "Shared-inbox follow-up: keep it shorter; ask whether the note reached the right team. Do not repeat the pitch."
+      : stepNo <= 1
       ? "Follow-up: add one new useful perspective on the same business problem. Do not repeat the previous email."
       : stepNo === 2
         ? "Follow-up #2 (day 3): add a new perspective on the same problem. Do not repeat the first email."
@@ -395,8 +420,12 @@ ${signalLines.length > 0 ? `Verified signals (personalize only from these):\n- $
 ${brief ? `Account brief: ${(brief.summary ?? "").slice(0, 500)}\nSuggested angle: ${(brief.suggested_angle ?? "").slice(0, 240)}` : ""}
 ${pitchLines || "Offering: (no pitch defined — keep it a first conversation, no specifics)"}
 Recipient: ${contact?.name ? `${contact.name}${contact.title ? `, ${contact.title}` : ""}` : "unknown — use the greeting line below"}
+Recipient classification: ${recipient.label} (${recipient.strategyLabel}). Verification: ${recipient.verification}.
+${strategyInstruction(recipient)}
+${ctaInstruction(recipient)}
 Persona: ${persona.label}. Focus on: ${persona.focus}. Target length: ${persona.min}-${persona.max} words.
 Greeting line to use exactly: ${greeting}
+${recipient.type === "shared" ? "Never use a person's name in the body; the reader may be any team member and the message should be easy to forward." : ""}
 Flavor: ${flavor.label} — ${flavor.brief}
 ${stepAngle}
 First contact: ${firstContact ? "yes — no links" : "no"}
@@ -438,6 +467,8 @@ ${prior ? `Prior email we sent on ${prior.created_at.slice(0, 10)}, subject: “
     firstContact,
     persona,
     followUp,
+    recipient,
+    contactName: contact?.name ?? null,
   });
   if (quality.issues.length > 0) {
     const retry = await attempt(`Fix these issues in the new draft: ${quality.issues.join("; ")}`);
@@ -446,6 +477,8 @@ ${prior ? `Prior email we sent on ${prior.created_at.slice(0, 10)}, subject: “
         firstContact,
         persona,
         followUp,
+        recipient,
+        contactName: contact?.name ?? null,
       });
       if (retryQuality.score >= quality.score) {
         draft = retry;
@@ -489,6 +522,7 @@ ${prior ? `Prior email we sent on ${prior.created_at.slice(0, 10)}, subject: “
     firstContact,
     quality: { ...quality, evidence: evidenceLabels },
     alternatives,
+    recipient,
   };
 }
 

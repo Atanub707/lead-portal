@@ -41,6 +41,13 @@ export function EmailComposer({
     issues: string[];
     evidence: string[];
   } | null>(null);
+  const [recipient, setRecipient] = useState<{
+    type: "personal" | "shared" | "unknown";
+    label: string;
+    strategyLabel: string;
+    verification: "verified" | "unverified" | "unknown";
+    warning?: string;
+  } | null>(null);
   const [body, setBody] = useState("");
   const [firstContact, setFirstContact] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -70,6 +77,7 @@ export function EmailComposer({
     setSubject("");
     setAlternatives([]);
     setQuality(null);
+    setRecipient(null);
     setBody("");
     setError(null);
     setCopied(false);
@@ -95,6 +103,13 @@ export function EmailComposer({
         firstContact?: boolean;
         alternatives?: string[];
         quality?: { score: number; words: number; issues: string[]; evidence: string[] } | null;
+        recipient?: {
+          type: "personal" | "shared" | "unknown";
+          label: string;
+          strategyLabel: string;
+          verification: "verified" | "unverified" | "unknown";
+          warning?: string;
+        } | null;
         error?: string;
       };
       if (!data.ok) {
@@ -104,6 +119,7 @@ export function EmailComposer({
       setSubject(data.subject ?? "");
       setAlternatives(data.alternatives ?? []);
       setQuality(data.quality ?? null);
+      setRecipient(data.recipient ?? null);
       setBody(data.body ?? "");
       setFirstContact(data.firstContact === true);
       setTo((prev) => prev || data.to || "");
@@ -228,31 +244,85 @@ export function EmailComposer({
                   placeholder="name@company.com"
                   className="input"
                 />
-                {to.includes("@") && isGenericEmail(to.split("@")[0]) ? (
+                {recipient ? (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                    <span
+                      className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${
+                        recipient.type === "personal"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : recipient.type === "shared"
+                            ? "border-amber-200 bg-amber-50 text-amber-700"
+                            : "border-zinc-200 bg-zinc-50 text-zinc-600"
+                      }`}
+                    >
+                      {recipient.type === "personal"
+                        ? "Personal"
+                        : recipient.type === "shared"
+                          ? "Shared inbox"
+                          : "Unknown"}
+                    </span>
+                    <span className="text-zinc-600">{recipient.label}</span>
+                    <span className="text-zinc-400">· {recipient.strategyLabel}</span>
+                    <span
+                      className={
+                        recipient.verification === "verified"
+                          ? "font-medium text-emerald-600"
+                          : recipient.verification === "unverified"
+                            ? "font-medium text-amber-600"
+                            : "font-medium text-zinc-400"
+                      }
+                    >
+                      {recipient.verification === "verified"
+                        ? "Verified"
+                        : recipient.verification === "unverified"
+                          ? "Unverified"
+                          : "Unknown"}
+                    </span>
+                  </div>
+                ) : null}
+
+                {recipient?.type === "shared" ? (
                   <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
                     <p className="text-[11px] font-semibold text-amber-800">
                       Shared inbox — delivery isn&apos;t guaranteed
                     </p>
                     <p className="mt-1 text-[11px] leading-relaxed text-amber-800">
-                      Addresses like legal@, info@ or support@ are shared team
-                      inboxes. Your email can still be delivered, but spam
-                      filters and low attention make a reply less likely. A
-                      personal address usually reaches the inbox and gets
-                      answered more often.
+                      {recipient.label} is a shared team inbox. Your email can
+                      still be delivered, but spam filters and low attention make
+                      a reply less likely. The draft asks for the right person
+                      instead of assuming who reads it.
                     </p>
-                    <p className="mt-1.5 text-[11px] font-medium text-amber-900">
-                      To improve delivery:
-                    </p>
-                    <ol className="mt-0.5 list-decimal space-y-0.5 pl-4 text-[11px] leading-relaxed text-amber-800">
-                      <li>Close this draft and click Find contacts on the company page.</li>
-                      <li>If a decision-maker&apos;s personal email appears, draft to that person.</li>
-                      <li>No personal email? You can still send here — keep it short, no links, one clear ask.</li>
-                    </ol>
+                    {recipient.warning ? (
+                      <p className="mt-1.5 text-[11px] font-medium text-amber-900">
+                        {recipient.warning}
+                      </p>
+                    ) : (
+                      <>
+                        <p className="mt-1.5 text-[11px] font-medium text-amber-900">
+                          To improve delivery:
+                        </p>
+                        <ol className="mt-0.5 list-decimal space-y-0.5 pl-4 text-[11px] leading-relaxed text-amber-800">
+                          <li>Use Deep Search on the company page to look for a personal address.</li>
+                          <li>If a decision-maker&apos;s email appears, draft to that person.</li>
+                          <li>No personal email? Send here — short, no links, one routing question.</li>
+                        </ol>
+                      </>
+                    )}
                   </div>
-                ) : to.includes("@") ? (
+                ) : recipient?.type === "personal" && recipient.verification !== "verified" ? (
+                  <p className="mt-1 text-[11px] text-amber-700">
+                    {recipient.warning ??
+                      "This personal address is not verified yet. Verify it before high-volume sending."}
+                  </p>
+                ) : recipient?.type === "personal" ? (
                   <p className="mt-1 text-[11px] text-emerald-700">
                     Personal address — a better chance of reaching the inbox and
                     getting a reply.
+                  </p>
+                ) : recipient?.type === "unknown" ? (
+                  <p className="mt-1 text-[11px] text-amber-700">
+                    {recipient.warning ??
+                      "Recipient type is unclear. Verify the address before sending."}
                   </p>
                 ) : null}
               </div>
