@@ -36,6 +36,7 @@ import { CompanyBrief } from "@/components/company-brief";
 import { CompanyActions } from "@/components/company-actions";
 import { ScoreBadge } from "@/components/score-badge";
 import { latestBrief } from "@/lib/briefs";
+import { parseNotes } from "@/lib/intelligence";
 import {
   getCompanySignals,
   getFirmographics,
@@ -238,9 +239,23 @@ export default async function CompanyPage({
   const decisionMakers = contacts.filter(
     (contact) => contact.is_decision_maker
   ).length;
-  const companyFacts =
+  const deepFacts =
     deepResearchState.latest?.status === "ok"
       ? deepResearchCompanyFacts(deepResearchState.latest.details)
+      : null;
+  const noteFacts = parseNotes(company.notes);
+  const companyFacts =
+    deepFacts ||
+    noteFacts.phone ||
+    noteFacts.location ||
+    noteFacts.founded ||
+    noteFacts.employees
+      ? {
+          phone: deepFacts?.phone ?? noteFacts.phone ?? null,
+          address: deepFacts?.address ?? noteFacts.location ?? null,
+          founded: deepFacts?.founded ?? noteFacts.founded ?? null,
+          employees: deepFacts?.employees ?? noteFacts.employees ?? null,
+        }
       : null;
   const dateOnly = (iso: string) => new Date(iso).toISOString().slice(0, 10);
   const bestContact =
@@ -373,7 +388,9 @@ export default async function CompanyPage({
                       </div>
                     ))}
                 </dl>
-                <p className="mt-2 text-[11px] text-zinc-400">via deep research</p>
+                <p className="mt-2 text-[11px] text-zinc-400">
+                  via research and import details
+                </p>
               </div>
             ) : null}
             <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-5">
