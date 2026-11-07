@@ -124,7 +124,7 @@ export function CompanyBrief({
       ) : (
         <p className="text-[13px] text-zinc-500">
           No brief yet. Generate one from firmographics, signals and contacts —
-          it's also used to personalize email drafts.
+          it&apos;s also used to personalize email drafts.
         </p>
       )}
     </div>

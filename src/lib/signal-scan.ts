@@ -4,7 +4,6 @@ import { createAdminClient } from "./supabase/admin";
 import { scoreOrg } from "./scoring";
 import { researchWebsite, searchWeb, tinyfishEnabled } from "./research";
 import {
-  collapse,
   expiryFor,
   extractKeywords,
   findKeywordMatches,
