@@ -6,6 +6,7 @@ import { QuickFind } from "@/components/quick-find";
 import { ScoreBadge } from "@/components/score-badge";
 import { activeWorkspaceId } from "@/lib/data";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isGenericEmail } from "@/lib/people";
 
 export const dynamic = "force-dynamic";
 
@@ -232,7 +233,17 @@ export default async function LeadsPage({
                       </td>
                       <td className="py-2 pr-3 text-zinc-700">
                         {email ? (
-                          <span className="break-all">{email}</span>
+                          <span className="break-all">
+                            {email}
+                            {isGenericEmail(email.split("@")[0] ?? "") ? (
+                              <span
+                                className="ml-1.5 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-amber-700"
+                                title="Shared team inbox — may be filtered. A personal address gets better replies."
+                              >
+                                shared
+                              </span>
+                            ) : null}
+                          </span>
                         ) : (
                           <span className="text-zinc-300">—</span>
                         )}

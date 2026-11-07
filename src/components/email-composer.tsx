@@ -216,10 +216,30 @@ export function EmailComposer({
                   className="input"
                 />
                 {to.includes("@") && isGenericEmail(to.split("@")[0]) ? (
-                  <p className="mt-1 text-[11px] text-amber-700">
-                    A role inbox like this often filters cold email. A decision
-                    maker&apos;s personal email lands better — find one with
-                    Deep Research on the company page.
+                  <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+                    <p className="text-[11px] font-semibold text-amber-800">
+                      Shared inbox — delivery isn&apos;t guaranteed
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-amber-800">
+                      Addresses like legal@, info@ or support@ are shared team
+                      inboxes. Your email can still be delivered, but spam
+                      filters and low attention make a reply less likely. A
+                      personal address usually reaches the inbox and gets
+                      answered more often.
+                    </p>
+                    <p className="mt-1.5 text-[11px] font-medium text-amber-900">
+                      To improve delivery:
+                    </p>
+                    <ol className="mt-0.5 list-decimal space-y-0.5 pl-4 text-[11px] leading-relaxed text-amber-800">
+                      <li>Close this draft and click Find contacts on the company page.</li>
+                      <li>If a decision-maker&apos;s personal email appears, draft to that person.</li>
+                      <li>No personal email? You can still send here — keep it short, no links, one clear ask.</li>
+                    </ol>
+                  </div>
+                ) : to.includes("@") ? (
+                  <p className="mt-1 text-[11px] text-emerald-700">
+                    Personal address — a better chance of reaching the inbox and
+                    getting a reply.
                   </p>
                 ) : null}
               </div>

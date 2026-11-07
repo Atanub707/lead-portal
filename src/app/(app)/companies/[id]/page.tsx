@@ -37,6 +37,7 @@ import { CompanyActions } from "@/components/company-actions";
 import { ScoreBadge } from "@/components/score-badge";
 import { latestBrief } from "@/lib/briefs";
 import { parseNotes } from "@/lib/intelligence";
+import { isGenericEmail } from "@/lib/people";
 import {
   getCompanySignals,
   getFirmographics,
@@ -465,6 +466,15 @@ export default async function CompanyPage({
                 No company emails yet — run Paste URL with AI.
               </p>
             ) : (
+              <>
+              {companyEmails.some((email) =>
+                isGenericEmail(email.email.split("@")[0] ?? "")
+              ) ? (
+                <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+                  Shared inboxes (info@, legal@) are often spam-filtered. A
+                  personal address gets more replies — use Find contacts above.
+                </p>
+              ) : null}
               <ul className="mt-1 divide-y divide-zinc-100">
                 {companyEmails.map((email) => (
                   <li
@@ -484,6 +494,14 @@ export default async function CompanyPage({
                     <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] text-zinc-500">
                       {EMAIL_KIND_LABEL[email.kind] ?? email.kind}
                     </span>
+                    {isGenericEmail(email.email.split("@")[0] ?? "") ? (
+                      <span
+                        className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] text-amber-700"
+                        title="Shared team inbox — may be filtered. Personal addresses get better replies."
+                      >
+                        shared
+                      </span>
+                    ) : null}
                     {email.verified ? (
                       <span className="text-[10px] font-medium text-emerald-600">
                         verified
@@ -505,6 +523,7 @@ export default async function CompanyPage({
                   </li>
                 ))}
               </ul>
+              </>
             )}
           </Section>
 
