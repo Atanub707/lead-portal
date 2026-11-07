@@ -177,6 +177,7 @@ body {
 
 /* ─── Mobile app feel ─────────────────────────────────────────────────────── */
 
+html:has([role="dialog"]),
 body:has([role="dialog"]) {
   overflow: hidden;
 }
@@ -187,9 +188,13 @@ body:has([role="dialog"]) {
     align-items: flex-end !important;
     padding: 0 !important;
   }
+  .fixed.inset-0.z-50 {
+    width: 100vw;
+    max-width: 100vw;
+  }
   .fixed.inset-0.z-50 > [role="dialog"] {
     width: 100% !important;
-    max-width: 100% !important;
+    max-width: 100vw !important;
     max-height: calc(100dvh - 0.5rem) !important;
     overflow-y: auto;
     overscroll-behavior: contain;
