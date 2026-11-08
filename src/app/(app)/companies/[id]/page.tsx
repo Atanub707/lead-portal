@@ -263,7 +263,8 @@ export default async function CompanyPage({
     contacts.find((contact) => contact.is_decision_maker && contact.email) ??
     contacts.find((contact) => Boolean(contact.email)) ??
     null;
-  const bestEmail = bestContact?.email ?? companyEmails[0]?.email ?? null;
+  const bestEmail =
+    bestContact?.email ?? companyEmails[0]?.email ?? noteFacts.email ?? null;
   const emailRecipientOptions = [
     ...contacts
       .filter((contact) => Boolean(contact.email))
@@ -279,6 +280,16 @@ export default async function CompanyPage({
       kind: "company" as const,
       contactId: null,
     })),
+    ...(noteFacts.email
+      ? [
+          {
+            email: noteFacts.email,
+            label: "From research notes",
+            kind: "company" as const,
+            contactId: null,
+          },
+        ]
+      : []),
   ];
 
   return (
