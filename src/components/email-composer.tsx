@@ -8,12 +8,20 @@ import { Check, Copy, Loader2, Mail, MailPlus, Sparkles, X } from "lucide-react"
 import { FLAVORS } from "@/lib/flavors";
 import { isGenericEmail } from "@/lib/people";
 
+export interface EmailRecipientOption {
+  email: string;
+  label: string;
+  kind: "contact" | "company";
+  contactId?: number | null;
+}
+
 export function EmailComposer({
   orgId,
   contactId = null,
   contactLabel = null,
   defaultTo = null,
   defaultFlavor = null,
+  emailOptions = [],
   smtpConfigured,
   trigger = "icon",
   triggerLabel = "Draft email",
@@ -24,6 +32,7 @@ export function EmailComposer({
   contactLabel?: string | null;
   defaultTo?: string | null;
   defaultFlavor?: string | null;
+  emailOptions?: EmailRecipientOption[];
   smtpConfigured: boolean;
   trigger?: "icon" | "button";
   triggerLabel?: string;
@@ -55,20 +64,78 @@ export function EmailComposer({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [sent, setSent] = useState(false);
+  const [customRecipient, setCustomRecipient] = useState(false);
   const toRef = useRef<HTMLInputElement>(null);
+  const selectRef = useRef<HTMLSelectElement>(null);
+
+  const recipientOptions = (() => {
+    const map = new Map<string, EmailRecipientOption>();
+    const add = (option: EmailRecipientOption) => {
+      const key = option.email.trim().toLowerCase();
+      if (!key || map.has(key)) return;
+      map.set(key, option);
+    };
+    for (const option of emailOptions) add(option);
+    if (defaultTo) {
+      add({
+        email: defaultTo,
+        label: contactLabel ?? "Selected email",
+        kind: contactId ? "contact" : "company",
+        contactId,
+      });
+    }
+    return [...map.values()];
+  })();
+  const hasMultipleRecipients = recipientOptions.length > 1;
+  const selectedRecipient = recipientOptions.find(
+    (option) => option.email.trim().toLowerCase() === to.trim().toLowerCase()
+  );
+  const activeContactId = customRecipient
+    ? null
+    : selectedRecipient?.contactId ??
+      (to.trim().toLowerCase() === (defaultTo ?? "").trim().toLowerCase()
+        ? contactId
+        : null);
 
   useEffect(() => {
     if (!open) return;
-    toRef.current?.focus();
+    if (hasMultipleRecipients && !customRecipient) selectRef.current?.focus();
+    else toRef.current?.focus();
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape" && !generating && !sending) setOpen(false);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, generating, sending]);
+  }, [open, generating, sending, customRecipient, hasMultipleRecipients]);
+
+  function chooseRecipient(next: string) {
+    if (next.trim().toLowerCase() === to.trim().toLowerCase()) return;
+    setTo(next);
+    setSubject("");
+    setAlternatives([]);
+    setQuality(null);
+    setRecipient(null);
+    setBody("");
+    setFirstContact(false);
+    setSent(false);
+  }
+
+  function onRecipientSelect(value: string) {
+    if (value === "__custom") {
+      setCustomRecipient(true);
+      chooseRecipient("");
+      setTo("");
+      window.setTimeout(() => toRef.current?.focus(), 0);
+      return;
+    }
+    setCustomRecipient(false);
+    chooseRecipient(value);
+  }
 
   function openDialog() {
-    setTo(defaultTo ?? "");
+    const fallback = defaultTo ?? recipientOptions[0]?.email ?? "";
+    setTo(fallback);
+    setCustomRecipient(recipientOptions.length === 0);
     setFlavor(
       FLAVORS.some((entry) => entry.id === defaultFlavor)
         ? (defaultFlavor ?? "")
@@ -93,7 +160,7 @@ export function EmailComposer({
       const res = await fetch("/api/email/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgId, contactId, flavor, to: to || null }),
+        body: JSON.stringify({ orgId, contactId: activeContactId, flavor, to: to || null }),
       });
       const data = (await res.json()) as {
         ok: boolean;
@@ -148,7 +215,7 @@ export function EmailComposer({
       const res = await fetch("/api/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgId, contactId, to, subject, body }),
+        body: JSON.stringify({ orgId, contactId: activeContactId, to, subject, body }),
       });
       const data = (await res.json()) as { ok: boolean; error?: string };
       if (!data.ok) {
@@ -235,15 +302,53 @@ export function EmailComposer({
                 <label htmlFor={`compose-to-${orgId}-${contactId ?? 0}`} className="label">
                   To
                 </label>
-                <input
-                  ref={toRef}
-                  id={`compose-to-${orgId}-${contactId ?? 0}`}
-                  type="email"
-                  value={to}
-                  onChange={(event) => setTo(event.target.value)}
-                  placeholder="name@company.com"
-                  className="input"
-                />
+                {hasMultipleRecipients && !customRecipient ? (
+                  <select
+                    ref={selectRef}
+                    id={`compose-to-${orgId}-${contactId ?? 0}`}
+                    value={to}
+                    onChange={(event) => onRecipientSelect(event.target.value)}
+                    className="input"
+                  >
+                    {recipientOptions.map((option) => (
+                      <option key={option.email} value={option.email}>
+                        {option.label && option.label !== option.email
+                          ? `${option.label} — ${option.email}`
+                          : option.email}
+                      </option>
+                    ))}
+                    <option value="__custom">Other email…</option>
+                  </select>
+                ) : (
+                  <input
+                    ref={toRef}
+                    id={`compose-to-${orgId}-${contactId ?? 0}`}
+                    type="email"
+                    value={to}
+                    onChange={(event) => setTo(event.target.value)}
+                    placeholder="name@company.com"
+                    className="input"
+                  />
+                )}
+                {hasMultipleRecipients ? (
+                  <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-zinc-400">
+                    {recipientOptions.length} saved emails
+                    {customRecipient ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const fallback = defaultTo ?? recipientOptions[0]?.email ?? "";
+                          setCustomRecipient(false);
+                          chooseRecipient(fallback);
+                          setTo(fallback);
+                        }}
+                        className="font-medium text-zinc-600 underline-offset-2 hover:underline"
+                      >
+                        Use a saved email
+                      </button>
+                    ) : null}
+                  </p>
+                ) : null}
                 {recipient ? (
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
                     <span

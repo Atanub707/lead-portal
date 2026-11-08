@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Radar, Search, Sparkles } from "lucide-react";
-import { EmailComposer } from "@/components/email-composer";
+import { EmailComposer, type EmailRecipientOption } from "@/components/email-composer";
 
 type Busy = "contacts" | "brief" | "signals" | null;
 
@@ -13,6 +13,7 @@ export function CompanyActions({
   email,
   contactId,
   contactLabel,
+  emailOptions = [],
   smtpConfigured,
   canWrite,
 }: {
@@ -20,6 +21,7 @@ export function CompanyActions({
   email: string | null;
   contactId: number | null;
   contactLabel: string | null;
+  emailOptions?: EmailRecipientOption[];
   smtpConfigured: boolean;
   canWrite: boolean;
 }) {
@@ -137,6 +139,7 @@ export function CompanyActions({
             contactId={contactId}
             contactLabel={contactLabel}
             defaultTo={email}
+            emailOptions={emailOptions}
             smtpConfigured={smtpConfigured}
             trigger="button"
             triggerLabel="Draft email"

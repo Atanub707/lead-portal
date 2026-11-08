@@ -264,6 +264,22 @@ export default async function CompanyPage({
     contacts.find((contact) => Boolean(contact.email)) ??
     null;
   const bestEmail = bestContact?.email ?? companyEmails[0]?.email ?? null;
+  const emailRecipientOptions = [
+    ...contacts
+      .filter((contact) => Boolean(contact.email))
+      .map((contact) => ({
+        email: contact.email as string,
+        label: contact.title ? `${contact.name} · ${contact.title}` : contact.name,
+        kind: "contact" as const,
+        contactId: contact.id,
+      })),
+    ...companyEmails.map((email) => ({
+      email: email.email,
+      label: "Company inbox",
+      kind: "company" as const,
+      contactId: null,
+    })),
+  ];
 
   return (
     <div className="w-full px-4 py-8 sm:px-8 xl:px-10">
@@ -333,6 +349,7 @@ export default async function CompanyPage({
             email={bestEmail}
             contactId={bestContact?.id ?? null}
             contactLabel={bestContact?.name ?? null}
+            emailOptions={emailRecipientOptions}
             smtpConfigured={emailSettings.configured}
             canWrite={canWrite}
           />
@@ -517,6 +534,7 @@ export default async function CompanyPage({
                         orgId={company.id}
                         defaultTo={email.email}
                         defaultFlavor={defaultFlavor}
+                        emailOptions={emailRecipientOptions}
                         smtpConfigured={emailSettings.configured}
                       />
                     ) : null}
@@ -667,6 +685,7 @@ export default async function CompanyPage({
                             }`}
                             defaultTo={contact.email ?? null}
                             defaultFlavor={defaultFlavor}
+                            emailOptions={emailRecipientOptions}
                             smtpConfigured={emailSettings.configured}
                           />
                         ) : null}
