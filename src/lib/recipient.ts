@@ -165,13 +165,6 @@ export function classifyRecipient(input: {
       : (input.emailStatus ?? "").toLowerCase() === "found"
         ? "unverified"
         : "unknown";
-  const personalizationLevel =
-    input.contactName && input.contactTitle
-      ? "contact"
-      : input.contactName
-        ? "company"
-        : "segment";
-
   if (role) {
     const greeting = "Hello Team,";
     const isNoReply = role.strategy === "do_not_contact";

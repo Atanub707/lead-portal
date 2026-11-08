@@ -31,8 +31,10 @@ export function InstallPrompt() {
     const ua = window.navigator.userAgent;
     const isIOS = /iPad|iPhone|iPod/.test(ua);
     if (isIOS) {
-      setIos(true);
-      const timer = window.setTimeout(() => setVisible(true), 2500);
+      const timer = window.setTimeout(() => {
+        setIos(true);
+        setVisible(true);
+      }, 2500);
       return () => window.clearTimeout(timer);
     }
 
