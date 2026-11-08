@@ -552,6 +552,12 @@ export async function POST(request: Request) {
     );
   }
 
+  run = {
+    ...run,
+    leaseUntil: new Date(Date.now() + 65_000).toISOString(),
+  };
+  const leaseWarning = await persist(run, userId, workspaceId);
+
   let outcome: StepOutcome;
   try {
     outcome = await executeStep(request, step, run.state, workspaceId, run.importId);
@@ -575,7 +581,10 @@ export async function POST(request: Request) {
       status: "running",
     };
     const warning = await persist(nextRun, userId, workspaceId);
-    return runResponse(nextRun, "pending", { result: outcome.result, warning });
+    return runResponse(nextRun, "pending", {
+      result: outcome.result,
+      warning: leaseWarning ?? warning,
+    });
   }
 
   if (outcome.result.status === "failed") {
@@ -588,7 +597,10 @@ export async function POST(request: Request) {
       status: "failed",
     };
     const warning = await persist(nextRun, userId, workspaceId);
-    return runResponse(nextRun, "failed", { result: outcome.result, warning });
+    return runResponse(nextRun, "failed", {
+      result: outcome.result,
+      warning: leaseWarning ?? warning,
+    });
   }
 
   const nextCursor = run.cursor + 1;
@@ -605,6 +617,6 @@ export async function POST(request: Request) {
   return runResponse(
     nextRun,
     nextRun.status === "done" ? "done" : "continue",
-    { result: outcome.result, warning }
+    { result: outcome.result, warning: leaseWarning ?? warning }
   );
 }
