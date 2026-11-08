@@ -2,14 +2,25 @@ import { auth } from "@clerk/nextjs/server";
 import { generateText } from "ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { pickModel, NO_AI_KEY_MESSAGE } from "@/lib/ai";
+import { pickModel } from "@/lib/ai";
 import { requireWorkspaceId } from "@/lib/data";
 import { toolsPrompt } from "@/lib/agent/tools";
-import { PlanSchema, type AgentPlan } from "@/lib/agent/types";
+import {
+  AgentHistoryMessageSchema,
+  PlanSchema,
+  type AgentPlan,
+} from "@/lib/agent/types";
 import { EMPLOYEE_BANDS } from "@/lib/crunchbase-options";
 import { FLAVORS } from "@/lib/flavors";
 
 export const maxDuration = 45;
+
+const BodySchema = z.object({
+  goal: z.string().max(600).optional(),
+  plan: PlanSchema.optional(),
+  instruction: z.string().max(400).optional(),
+  history: z.array(AgentHistoryMessageSchema).max(12).default([]),
+});
 
 function parseJson(text: string): unknown {
   const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
@@ -144,22 +155,71 @@ function clampPlan(plan: AgentPlan): AgentPlan {
   };
 }
 
+function historyPrompt(history: z.infer<typeof AgentHistoryMessageSchema>[]): string {
+  if (history.length === 0) return "";
+  return `\nConversation so far:\n${history
+    .slice(-8)
+    .map((message) => `${message.role === "user" ? "User" : "Copilot"}: ${message.text.slice(0, 300)}`)
+    .join("\n")}\n`;
+}
+
 export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ ok: false, error: "Not signed in" }, { status: 401 });
   await requireWorkspaceId();
 
-  const body = (await request.json().catch(() => null)) as { goal?: unknown } | null;
-  const goal = typeof body?.goal === "string" ? body.goal.trim().slice(0, 600) : "";
-  if (!goal) return NextResponse.json({ ok: false, error: "Describe what you want to do." }, { status: 400 });
+  const body = (await request.json().catch(() => null)) as unknown;
+  const parsed = BodySchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ ok: false, error: "Invalid planning request" }, { status: 400 });
+  }
+  const { plan: previousPlan, instruction, history } = parsed.data;
+  const goal = (parsed.data.goal ?? "").trim().slice(0, 600);
+  const refining = Boolean(instruction?.trim() && previousPlan);
+  if (!refining && !goal) {
+    return NextResponse.json({ ok: false, error: "Describe what you want to do." }, { status: 400 });
+  }
 
   const model = pickModel(userId);
   if (!model) {
+    if (refining && previousPlan) {
+      return NextResponse.json({
+        ok: true,
+        plan: previousPlan,
+        ai: false,
+        refined: false,
+        warning: "AI is unavailable, so the current plan was kept unchanged.",
+      });
+    }
     return NextResponse.json({ ok: true, plan: clampPlan(fallbackPlan(goal)), ai: false });
   }
 
-  const prompt = `User command: "${goal}"
+  const prompt = refining && previousPlan
+    ? `The user is refining an existing outreach plan.
 
+Original command: "${goal || previousPlan.title}"
+Current plan:
+${JSON.stringify(previousPlan, null, 2)}
+${historyPrompt(history)}
+New instruction: "${instruction}"
+
+Available tools:
+${toolsPrompt()}
+
+Return ONLY the complete revised plan as JSON:
+{ "title": string, "summary": string, "steps": [ { "tool": string, "reason": string, "args": object } ], "warnings": string[] }
+
+Rules:
+- Apply the new instruction to the current plan. Keep steps the instruction does not mention.
+- If the user says to remove, skip or stop an action, remove that step. Never re-add a step the user asked to remove.
+- You may reorder, add, remove or retune steps, and update quantities and draft flavor.
+- Never invent tools. Use only the listed names.
+- Maximum 6 steps. Always keep a company source (search_companies or list_companies) if the plan has one.
+- Sending is not available; draft_emails only creates drafts.
+- Use deep_search only if the user explicitly asks for more contacts/people.
+- Return the full plan, not a diff.`
+    : `User command: "${goal}"
+${historyPrompt(history)}
 Available tools:
 ${toolsPrompt()}
 
@@ -179,17 +239,46 @@ Rules:
     const { text } = await generateText({
       model,
       system:
-        "You are the planning layer of a B2B outreach copilot. You never execute actions; you only produce a safe, minimal tool plan. Be conservative and never promise sending.",
+        "You are the planning layer of a B2B outreach copilot. You never execute actions; you only produce or revise a safe, minimal tool plan. Be conservative and never promise sending.",
       prompt,
     });
-    const parsed = parseJson(text);
-    const result = PlanSchema.safeParse(parsed);
-    if (!result.success) {
+    const parsedPlan = PlanSchema.safeParse(parseJson(text));
+    if (!parsedPlan.success) {
+      if (refining && previousPlan) {
+        return NextResponse.json({
+          ok: true,
+          plan: previousPlan,
+          ai: false,
+          refined: false,
+          warning: "I could not apply that refinement. The previous plan is unchanged.",
+        });
+      }
       return NextResponse.json({ ok: true, plan: clampPlan(augmentPlan(fallbackPlan(goal), goal)), ai: false });
     }
-    return NextResponse.json({ ok: true, plan: clampPlan(augmentPlan(result.data, goal)), ai: true });
+    if (refining) {
+      return NextResponse.json({
+        ok: true,
+        plan: clampPlan(parsedPlan.data),
+        ai: true,
+        refined: true,
+      });
+    }
+    return NextResponse.json({
+      ok: true,
+      plan: clampPlan(augmentPlan(parsedPlan.data, goal)),
+      ai: true,
+    });
   } catch (err) {
     console.error("[agent.plan] failed:", err instanceof Error ? err.message : err);
+    if (refining && previousPlan) {
+      return NextResponse.json({
+        ok: true,
+        plan: previousPlan,
+        ai: false,
+        refined: false,
+        warning: "I could not apply that refinement. The previous plan is unchanged.",
+      });
+    }
     return NextResponse.json({ ok: true, plan: clampPlan(augmentPlan(fallbackPlan(goal), goal)), ai: false });
   }
 }

@@ -4,29 +4,26 @@ import { z } from "zod";
 import { requireWorkspaceId } from "@/lib/data";
 import { toolByName } from "@/lib/agent/tools";
 import {
+  AgentHistoryMessageSchema,
   PlanSchema,
-  type AgentPlan,
+  type AgentRun,
   type AgentState,
   type PlanStep,
   type StepResult,
 } from "@/lib/agent/types";
-import { logActivity } from "@/lib/activity";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createAgentRun, getAgentRun, updateAgentRun } from "@/lib/agent/runs";
 
 export const maxDuration = 60;
 
 const BodySchema = z.object({
-  goal: z.string().max(600).default(""),
-  plan: PlanSchema,
-  cursor: z.number().int().min(0).default(0),
+  goal: z.string().max(600).optional(),
+  plan: PlanSchema.optional(),
   approved: z.array(z.number().int()).default([]),
-  state: z
-    .object({
-      companyIds: z.array(z.number()).default([]),
-      pipeline: z.string().nullable().default(null),
-    })
-    .default({ companyIds: [], pipeline: null }),
-  importId: z.number().nullable().optional(),
+  history: z.array(AgentHistoryMessageSchema).max(12).default([]),
+  runId: z.number().int().positive().optional(),
+  retry: z.boolean().default(false),
+  skip: z.boolean().default(false),
 });
 
 async function callApi(
@@ -59,12 +56,18 @@ function stepResult(
   return { tool, status, summary, data };
 }
 
+type StepOutcome = {
+  result: StepResult;
+  importId?: number | null;
+  pending?: boolean;
+};
+
 async function runSearch(
   request: Request,
   step: PlanStep,
   state: AgentState,
   importId: number | null | undefined
-): Promise<{ result: StepResult; importId?: number | null; pending?: boolean }> {
+): Promise<StepOutcome> {
   let id = importId ?? null;
   if (!id) {
     const start = await callApi(request, "/api/leads/find", {
@@ -132,7 +135,7 @@ async function runList(
   step: PlanStep,
   state: AgentState,
   workspaceId: string
-): Promise<{ result: StepResult }> {
+): Promise<StepOutcome> {
   const admin = createAdminClient();
   const limit = Math.min(30, Math.max(1, Number(step.args.limit ?? 10)));
   const minScore = Math.min(100, Math.max(0, Number(step.args.minScore ?? 0)));
@@ -176,7 +179,7 @@ async function runEnrich(
   request: Request,
   step: PlanStep,
   state: AgentState
-): Promise<{ result: StepResult }> {
+): Promise<StepOutcome> {
   const limit = Math.min(5, Math.max(1, Number(step.args.limit ?? 3)));
   const orgIds = state.companyIds.slice(0, limit);
   if (orgIds.length === 0) {
@@ -211,7 +214,7 @@ async function runScore(
   request: Request,
   step: PlanStep,
   state: AgentState
-): Promise<{ result: StepResult }> {
+): Promise<StepOutcome> {
   const limit = Math.min(10, Math.max(1, Number(step.args.limit ?? 5)));
   const orgIds = state.companyIds.slice(0, limit);
   if (orgIds.length === 0) {
@@ -242,7 +245,7 @@ async function runDeepSearch(
   request: Request,
   step: PlanStep,
   state: AgentState
-): Promise<{ result: StepResult }> {
+): Promise<StepOutcome> {
   const limit = Math.min(3, Math.max(1, Number(step.args.limit ?? 2)));
   const orgIds = state.companyIds.slice(0, limit);
   if (orgIds.length === 0) {
@@ -275,7 +278,7 @@ async function runDraft(
   step: PlanStep,
   state: AgentState,
   workspaceId: string
-): Promise<{ result: StepResult }> {
+): Promise<StepOutcome> {
   const limit = Math.min(2, Math.max(1, Number(step.args.limit ?? 2)));
   const flavor =
     typeof step.args.flavor === "string" ? step.args.flavor : "short-direct";
@@ -366,7 +369,7 @@ async function executeStep(
   state: AgentState,
   workspaceId: string,
   importId: number | null | undefined
-) {
+): Promise<StepOutcome> {
   if (!toolByName(step.tool)) {
     return { result: stepResult(step.tool, "failed", "Unknown tool") };
   }
@@ -386,6 +389,40 @@ async function executeStep(
   }
 }
 
+function resultsThrough(run: AgentRun, cursor: number, result: StepResult): StepResult[] {
+  const results = run.results.slice(0, cursor);
+  results.push(result);
+  return results;
+}
+
+function runResponse(
+  run: AgentRun,
+  status: "continue" | "pending" | "done" | "failed",
+  options?: { result?: StepResult; warning?: string }
+) {
+  return NextResponse.json({
+    ok: true,
+    runId: run.id,
+    status,
+    cursor: run.cursor,
+    state: run.state,
+    results: run.results,
+    importId: run.importId,
+    error: run.error,
+    result: options?.result,
+    warning: options?.warning,
+  });
+}
+
+async function persist(
+  run: AgentRun,
+  actorId: string,
+  workspaceId: string
+): Promise<string | undefined> {
+  const error = await updateAgentRun(run, actorId, workspaceId);
+  return error ? `Run state may not be saved: ${error}` : undefined;
+}
+
 export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ ok: false, error: "Not signed in" }, { status: 401 });
@@ -394,61 +431,180 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as unknown;
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: "Invalid plan" }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Invalid run request" }, { status: 400 });
   }
-  const { goal, plan, cursor, approved, state, importId } = parsed.data;
-  if (cursor >= plan.steps.length) {
-    return NextResponse.json({ ok: true, status: "done", cursor, state });
-  }
-  const step = plan.steps[cursor];
-  const tool = toolByName(step.tool);
-  const isApproved = !tool?.requiresApproval || approved.includes(cursor);
+  const { goal, plan, approved, history, runId, retry, skip } = parsed.data;
 
-  if (!isApproved) {
-    return NextResponse.json({
-      ok: true,
-      status: "continue",
-      cursor: cursor + 1,
-      state,
-      result: stepResult(step.tool, "skipped", "Skipped (not approved)"),
-    });
-  }
-
-  const outcome = await executeStep(request, step, state, workspaceId, importId);
-  if (outcome.pending) {
-    return NextResponse.json({
-      ok: true,
-      status: "pending",
-      cursor,
-      state,
-      importId: outcome.importId ?? null,
-      result: outcome.result,
-    });
-  }
-
-  const nextCursor = cursor + 1;
-  if (nextCursor >= plan.steps.length) {
-    await logActivity({
+  let run: AgentRun;
+  if (runId) {
+    const loaded = await getAgentRun(runId, userId, workspaceId);
+    if (!loaded) {
+      return NextResponse.json({ ok: false, error: "Run not found" }, { status: 404 });
+    }
+    run = loaded;
+    if (run.status === "done") {
+      return runResponse(run, "done");
+    }
+    const leased =
+      run.status === "running" &&
+      run.leaseUntil !== null &&
+      Date.parse(run.leaseUntil) > Date.now();
+    if (leased && !retry && !skip) {
+      return NextResponse.json(
+        {
+          ok: false,
+          busy: true,
+          error: "This run is still executing. It will resume automatically in a moment.",
+        },
+        { status: 409 }
+      );
+    }
+    if (skip) {
+      if (run.cursor >= run.plan.steps.length) {
+        return runResponse({ ...run, status: "done" }, "done");
+      }
+      const step = run.plan.steps[run.cursor];
+      const nextCursor = run.cursor + 1;
+      const nextRun: AgentRun = {
+        ...run,
+        cursor: nextCursor,
+        results: resultsThrough(
+          run,
+          run.cursor,
+          stepResult(step.tool, "skipped", "Skipped by user")
+        ),
+        importId: null,
+        error: null,
+        leaseUntil: null,
+        status: nextCursor >= run.plan.steps.length ? "done" : "running",
+      };
+      const warning = await persist(nextRun, userId, workspaceId);
+      return runResponse(
+        nextRun,
+        nextRun.status === "done" ? "done" : "continue",
+        { warning }
+      );
+    }
+    if (run.status === "failed" && !retry) {
+      return runResponse(run, "failed", { warning: "Retry or skip the failed step to continue." });
+    }
+    if (retry) {
+      run = {
+        ...run,
+        status: "running",
+        error: null,
+        leaseUntil: new Date(Date.now() + 65_000).toISOString(),
+      };
+    }
+  } else {
+    if (!goal?.trim() || !plan) {
+      return NextResponse.json(
+        { ok: false, error: "A goal and plan are required to start a run" },
+        { status: 400 }
+      );
+    }
+    const created = await createAgentRun({
       actorId: userId,
-      action: "agent.run",
-      targetType: "agent",
-      targetId: crypto.randomUUID(),
-      summary: goal || plan.title,
-      details: {
-        title: plan.title,
-        goal,
-        plan,
-        approved,
-        result: outcome.result,
-      },
+      workspaceId,
+      goal: goal.trim(),
+      plan,
+      approved,
+      history,
     });
+    if (!created.run) {
+      return NextResponse.json(
+        { ok: false, error: created.error ?? "Could not start the run" },
+        { status: 500 }
+      );
+    }
+    run = created.run;
   }
 
-  return NextResponse.json({
-    ok: true,
-    status: nextCursor >= plan.steps.length ? "done" : "continue",
+  if (run.cursor >= run.plan.steps.length) {
+    const done = { ...run, status: "done" as const, leaseUntil: null };
+    const warning = await persist(done, userId, workspaceId);
+    return runResponse(done, "done", { warning });
+  }
+
+  const step = run.plan.steps[run.cursor];
+  const tool = toolByName(step.tool);
+  const isApproved = !tool?.requiresApproval || run.approved.includes(run.cursor);
+  if (!isApproved) {
+    const nextCursor = run.cursor + 1;
+    const nextRun: AgentRun = {
+      ...run,
+      cursor: nextCursor,
+      results: resultsThrough(
+        run,
+        run.cursor,
+        stepResult(step.tool, "skipped", "Skipped (not approved)")
+      ),
+      importId: null,
+      error: null,
+      leaseUntil: null,
+      status: nextCursor >= run.plan.steps.length ? "done" : "running",
+    };
+    const warning = await persist(nextRun, userId, workspaceId);
+    return runResponse(
+      nextRun,
+      nextRun.status === "done" ? "done" : "continue",
+      { warning }
+    );
+  }
+
+  let outcome: StepOutcome;
+  try {
+    outcome = await executeStep(request, step, run.state, workspaceId, run.importId);
+  } catch (err) {
+    outcome = {
+      result: stepResult(
+        step.tool,
+        "failed",
+        err instanceof Error ? err.message : "Step failed unexpectedly"
+      ),
+    };
+  }
+
+  if (outcome.pending) {
+    const nextRun: AgentRun = {
+      ...run,
+      results: resultsThrough(run, run.cursor, outcome.result),
+      importId: outcome.importId ?? run.importId,
+      error: null,
+      leaseUntil: null,
+      status: "running",
+    };
+    const warning = await persist(nextRun, userId, workspaceId);
+    return runResponse(nextRun, "pending", { result: outcome.result, warning });
+  }
+
+  if (outcome.result.status === "failed") {
+    const nextRun: AgentRun = {
+      ...run,
+      results: resultsThrough(run, run.cursor, outcome.result),
+      importId: null,
+      error: outcome.result.summary,
+      leaseUntil: null,
+      status: "failed",
+    };
+    const warning = await persist(nextRun, userId, workspaceId);
+    return runResponse(nextRun, "failed", { result: outcome.result, warning });
+  }
+
+  const nextCursor = run.cursor + 1;
+  const nextRun: AgentRun = {
+    ...run,
     cursor: nextCursor,
-    state,
-    result: outcome.result,
-  });
+    results: resultsThrough(run, run.cursor, outcome.result),
+    importId: null,
+    error: null,
+    leaseUntil: null,
+    status: nextCursor >= run.plan.steps.length ? "done" : "running",
+  };
+  const warning = await persist(nextRun, userId, workspaceId);
+  return runResponse(
+    nextRun,
+    nextRun.status === "done" ? "done" : "continue",
+    { result: outcome.result, warning }
+  );
 }

@@ -1,30 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, Copy, Loader2, Play, Sparkles, TriangleAlert } from "lucide-react";
+import {
+  Check,
+  Copy,
+  History,
+  Loader2,
+  Play,
+  RotateCcw,
+  RotateCw,
+  SkipForward,
+  Sparkles,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 import { AGENT_TOOLS } from "@/lib/agent/tools";
-
-interface PlanStep {
-  tool: string;
-  reason: string;
-  args: Record<string, unknown>;
-}
-
-interface AgentPlan {
-  title: string;
-  summary: string;
-  steps: PlanStep[];
-  warnings: string[];
-}
-
-interface StepResult {
-  tool: string;
-  status: "ok" | "failed" | "skipped" | "pending";
-  summary: string;
-  data?: unknown;
-}
+import type {
+  AgentHistoryMessage,
+  AgentPlan,
+  AgentRun,
+  StepResult,
+} from "@/lib/agent/types";
 
 interface Draft {
   orgId: number;
@@ -36,13 +34,7 @@ interface Draft {
   quality?: { score: number; words: number; issues: string[] };
 }
 
-interface RecentRun {
-  id: number;
-  summary: string;
-  createdAt: string;
-  steps: number;
-  status: string;
-}
+type RunStatus = "idle" | "running" | "done" | "failed";
 
 const EXAMPLES = [
   "List the top 5 compliance companies and draft emails for 2 of them",
@@ -50,12 +42,22 @@ const EXAMPLES = [
   "Enrich websites for the top 3 companies and score them",
 ];
 
+const STATUS_STYLES: Record<string, string> = {
+  running: "border-sky-200 bg-sky-50 text-sky-700",
+  failed: "border-rose-200 bg-rose-50 text-rose-700",
+  done: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  paused: "border-amber-200 bg-amber-50 text-amber-700",
+  idle: "border-zinc-200 bg-zinc-50 text-zinc-600",
+};
+
 function toolMeta(name: string) {
   return AGENT_TOOLS.find((tool) => tool.name === name);
 }
 
 function argsLabel(args: Record<string, unknown>): string {
-  const entries = Object.entries(args).filter(([, value]) => value !== undefined && value !== null && value !== "");
+  const entries = Object.entries(args).filter(
+    ([, value]) => value !== undefined && value !== null && value !== ""
+  );
   if (entries.length === 0) return "no options";
   return entries.map(([key, value]) => `${key}: ${String(value)}`).join(" · ");
 }
@@ -73,46 +75,139 @@ function estimateFor(plan: AgentPlan): number {
   return total;
 }
 
-export function AgentCopilot({ recentRuns }: { recentRuns: RecentRun[] }) {
+function defaultApprovals(plan: AgentPlan): Set<number> {
+  const next = new Set<number>();
+  plan.steps.forEach((step, index) => {
+    if (!toolMeta(step.tool)?.requiresApproval) next.add(index);
+  });
+  return next;
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function statusLabel(status: string): string {
+  if (status === "running") return "Running";
+  if (status === "failed") return "Failed";
+  if (status === "paused") return "Paused";
+  return "Done";
+}
+
+export function AgentCopilot({
+  recentRuns,
+  activeRun,
+}: {
+  recentRuns: AgentRun[];
+  activeRun: AgentRun | null;
+}) {
   const router = useRouter();
   const [goal, setGoal] = useState("");
   const [plan, setPlan] = useState<AgentPlan | null>(null);
   const [approved, setApproved] = useState<Set<number>>(new Set());
+  const [messages, setMessages] = useState<AgentHistoryMessage[]>([]);
+  const [instruction, setInstruction] = useState("");
   const [planning, setPlanning] = useState(false);
+  const [refining, setRefining] = useState(false);
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState<StepResult[]>([]);
+  const [runId, setRunId] = useState<number | null>(null);
+  const [status, setStatus] = useState<RunStatus>("idle");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
+  const [dismissedRun, setDismissedRun] = useState<number | null>(null);
+  const runningRef = useRef(false);
+
+  function beginPlan(nextPlan: AgentPlan) {
+    setPlan(nextPlan);
+    setApproved(defaultApprovals(nextPlan));
+    setRunId(null);
+    setResults([]);
+    setStatus("idle");
+  }
 
   async function makePlan() {
-    if (!goal.trim() || planning) return;
+    if (!goal.trim() || planning || running) return;
     setPlanning(true);
     setError("");
-    setResults([]);
+    setNotice("");
     try {
       const res = await fetch("/api/agent/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal: goal.trim() }),
+        body: JSON.stringify({ goal: goal.trim(), history: messages }),
       });
       const json = (await res.json().catch(() => null)) as
-        | { ok?: boolean; plan?: AgentPlan; error?: string }
+        | { ok?: boolean; plan?: AgentPlan; ai?: boolean; error?: string }
         | null;
       if (!res.ok || !json?.plan) {
         setError(json?.error ?? "Could not build a plan");
         return;
       }
-      setPlan(json.plan);
-      const next = new Set<number>();
-      json.plan.steps.forEach((step, index) => {
-        const tool = toolMeta(step.tool);
-        if (!tool?.requiresApproval) next.add(index);
-      });
-      setApproved(next);
+      beginPlan(json.plan);
+      setMessages((current) => [
+        ...current,
+        { role: "user", text: goal.trim() },
+        { role: "assistant", text: `Plan ready: ${json.plan?.title ?? "Untitled plan"}` },
+      ]);
+      if (json.ai === false) {
+        setNotice("AI planning was unavailable, so this is a safe default plan.");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not build a plan");
     } finally {
       setPlanning(false);
+    }
+  }
+
+  async function refinePlan() {
+    if (!plan || !instruction.trim() || refining || running) return;
+    setRefining(true);
+    setError("");
+    setNotice("");
+    try {
+      const res = await fetch("/api/agent/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          goal: goal.trim() || plan.title,
+          plan,
+          instruction: instruction.trim(),
+          history: messages,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            plan?: AgentPlan;
+            refined?: boolean;
+            warning?: string;
+            error?: string;
+          }
+        | null;
+      if (!res.ok || !json?.plan) {
+        setError(json?.error ?? "Could not refine the plan");
+        return;
+      }
+      beginPlan(json.plan);
+      const changed = json.refined !== false;
+      setMessages((current) => [
+        ...current,
+        { role: "user", text: instruction.trim() },
+        {
+          role: "assistant",
+          text: changed
+            ? `Plan updated: ${json.plan?.title ?? "Untitled plan"}`
+            : "Plan unchanged.",
+        },
+      ]);
+      setInstruction("");
+      if (json.warning) setNotice(json.warning);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not refine the plan");
+    } finally {
+      setRefining(false);
     }
   }
 
@@ -125,80 +220,140 @@ export function AgentCopilot({ recentRuns }: { recentRuns: RecentRun[] }) {
     });
   }
 
-  async function execute() {
-    if (!plan || running) return;
+  async function runLoop(
+    existingRunId: number | null,
+    options?: { retry?: boolean; skip?: boolean }
+  ) {
+    if (runningRef.current) return;
+    runningRef.current = true;
     setRunning(true);
     setError("");
-    setResults([]);
-    let cursor = 0;
-    let state: { companyIds: number[]; pipeline: string | null } = {
-      companyIds: [],
-      pipeline: null,
-    };
-    let importId: number | null = null;
-    let guard = 0;
+    setNotice("");
+    let rid = existingRunId;
+    let first = true;
     try {
-      while (cursor < plan.steps.length && guard < 40) {
-        guard += 1;
+      for (let guard = 0; guard < 40; guard += 1) {
+        const payload: Record<string, unknown> = rid
+          ? { runId: rid }
+          : {
+              goal: goal.trim(),
+              plan,
+              approved: [...approved],
+              history: messages,
+            };
+        if (rid && first && options?.retry) payload.retry = true;
+        if (rid && first && options?.skip) payload.skip = true;
+
         const res = await fetch("/api/agent/execute", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            goal,
-            plan,
-            cursor,
-            approved: [...approved],
-            state,
-            importId,
-          }),
+          body: JSON.stringify(payload),
         });
         const json = (await res.json().catch(() => null)) as
           | {
               ok?: boolean;
-              status?: "continue" | "pending" | "done";
-              cursor?: number;
-              state?: { companyIds: number[]; pipeline: string | null };
-              importId?: number | null;
-              result?: StepResult;
+              busy?: boolean;
+              runId?: number;
+              status?: "continue" | "pending" | "done" | "failed";
+              results?: StepResult[];
+              warning?: string;
               error?: string;
             }
           | null;
-        if (!res.ok || !json?.ok) {
-          setError(json?.error ?? "The copilot could not finish that step");
-          break;
-        }
-        if (json.result) {
-          setResults((current) => [...current.filter((r) => r.tool !== "pending"), json.result as StepResult]);
-        }
-        if (json.status === "pending") {
-          await new Promise((resolve) => window.setTimeout(resolve, 4000));
+        if (res.status === 409 && json?.busy) {
+          setNotice("This run is still executing. Reconnecting…");
+          await wait(5000);
+          first = false;
           continue;
         }
-        state = json.state ?? state;
-        cursor = json.cursor ?? cursor + 1;
-        importId = null;
-        if (json.status === "done") break;
+        if (!res.ok || !json?.ok) {
+          setError(json?.error ?? "The copilot could not finish that step");
+          if (rid) setStatus("failed");
+          return;
+        }
+        if (typeof json.runId === "number") {
+          rid = json.runId;
+          setRunId(json.runId);
+        }
+        if (Array.isArray(json.results)) setResults(json.results);
+        if (json.warning) setNotice(json.warning);
+        if (json.status === "failed") {
+          setStatus("failed");
+          setError(json.error ?? "A step failed. Retry it or skip it.");
+          return;
+        }
+        if (json.status === "done") {
+          setStatus("done");
+          router.refresh();
+          return;
+        }
+        if (json.status === "pending") {
+          setStatus("running");
+          await wait(4000);
+          first = false;
+          continue;
+        }
+        setStatus("running");
+        first = false;
       }
-      if (cursor >= plan.steps.length) {
-        router.refresh();
-      }
+      setError("This run is taking longer than expected. Open it from Recent runs to resume.");
+      if (rid) setStatus("failed");
     } catch (err) {
       setError(err instanceof Error ? err.message : "The copilot run failed");
+      if (rid) setStatus("failed");
     } finally {
+      runningRef.current = false;
       setRunning(false);
     }
   }
 
+  function loadRun(run: AgentRun, resume: boolean) {
+    if (running) return;
+    setGoal(run.goal);
+    setPlan(run.plan);
+    setApproved(new Set(run.approved));
+    setMessages(run.history);
+    setResults(run.results);
+    setRunId(run.id);
+    setStatus(run.status === "paused" ? "running" : run.status);
+    setError(run.error ?? "");
+    setNotice("");
+    setDismissedRun(run.id);
+    if (resume && run.status === "running") {
+      void runLoop(run.id);
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function resetPlan() {
+    setPlan(null);
+    setApproved(new Set());
+    setMessages([]);
+    setInstruction("");
+    setResults([]);
+    setRunId(null);
+    setStatus("idle");
+    setError("");
+    setNotice("");
+  }
+
   async function copyDraft(draft: Draft) {
-    await navigator.clipboard.writeText(`${draft.subject}\n\n${draft.body}`).catch(() => undefined);
+    await navigator.clipboard
+      .writeText(`${draft.subject}\n\n${draft.body}`)
+      .catch(() => undefined);
     setCopied(`${draft.orgId}-${draft.subject}`);
     setTimeout(() => setCopied(null), 2000);
   }
 
   const drafts = results.flatMap((result) => {
-    const data = result.data as { drafts?: Draft[] } | undefined;
+    const data = result?.data as { drafts?: Draft[] } | undefined;
     return data?.drafts ?? [];
   });
+  const locked = runId !== null;
+  const steps = plan?.steps.length ?? 0;
+  const currentStep = plan ? Math.min(steps, results.length + (running ? 1 : 0)) : 0;
+  const showActiveBanner =
+    activeRun && activeRun.id !== runId && activeRun.id !== dismissedRun && !running;
 
   return (
     <div className="space-y-5">
@@ -210,7 +365,7 @@ export function AgentCopilot({ recentRuns }: { recentRuns: RecentRun[] }) {
           <div>
             <h2 className="text-[15px] font-semibold text-zinc-900">Copilot</h2>
             <p className="text-[12px] text-zinc-500">
-              Command the pipeline in plain English. It plans first, then asks you to approve.
+              Describe the outcome. Review the plan, then approve the steps you want.
             </p>
           </div>
         </div>
@@ -239,7 +394,7 @@ export function AgentCopilot({ recentRuns }: { recentRuns: RecentRun[] }) {
           <button
             type="button"
             onClick={makePlan}
-            disabled={!goal.trim() || planning}
+            disabled={!goal.trim() || planning || running}
             className="btn-primary"
           >
             {planning ? (
@@ -247,10 +402,10 @@ export function AgentCopilot({ recentRuns }: { recentRuns: RecentRun[] }) {
             ) : (
               <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
             )}
-            {planning ? "Planning…" : "Plan it"}
+            {planning ? "Planning…" : plan ? "Plan again" : "Plan it"}
           </button>
           <span className="text-[11px] text-zinc-400">
-            Phase 1: search, enrich, score, draft. No sending.
+            Phase 1–2: search, enrich, score, draft. No sending.
           </span>
         </div>
 
@@ -259,7 +414,46 @@ export function AgentCopilot({ recentRuns }: { recentRuns: RecentRun[] }) {
             {error}
           </p>
         ) : null}
+        {notice ? (
+          <p role="status" className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+            {notice}
+          </p>
+        ) : null}
       </section>
+
+      {showActiveBanner && activeRun ? (
+        <section className="card border-sky-200 bg-sky-50/60 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-sky-700">
+                Unfinished run
+              </p>
+              <p className="mt-1 truncate text-[12px] text-zinc-800">{activeRun.goal}</p>
+              <p className="text-[10px] text-zinc-500">
+                {statusLabel(activeRun.status)} · step {Math.min(activeRun.cursor + 1, activeRun.plan.steps.length)} of{" "}
+                {activeRun.plan.steps.length}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => loadRun(activeRun, activeRun.status === "running")}
+                className="btn-primary"
+              >
+                {activeRun.status === "running" ? "Resume run" : "Review failed run"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDismissedRun(activeRun.id)}
+                className="rounded-md p-2 text-zinc-400 hover:bg-white hover:text-zinc-700"
+                aria-label="Dismiss unfinished run"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {plan ? (
         <section className="card p-5">
@@ -268,9 +462,16 @@ export function AgentCopilot({ recentRuns }: { recentRuns: RecentRun[] }) {
               <h3 className="text-[14px] font-semibold text-zinc-900">{plan.title}</h3>
               <p className="mt-0.5 text-[12px] leading-relaxed text-zinc-500">{plan.summary}</p>
             </div>
-            <p className="text-[11px] text-zinc-400 tabular-nums">
-              est. ${estimateFor(plan).toFixed(2)}
-            </p>
+            <div className="flex items-center gap-2">
+              {locked ? (
+                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLES[status] ?? STATUS_STYLES.idle}`}>
+                  {running ? "Running" : statusLabel(status)}
+                </span>
+              ) : null}
+              <p className="text-[11px] text-zinc-400 tabular-nums">
+                est. ${estimateFor(plan).toFixed(2)}
+              </p>
+            </div>
           </div>
 
           {plan.warnings.length > 0 ? (
@@ -284,19 +485,43 @@ export function AgentCopilot({ recentRuns }: { recentRuns: RecentRun[] }) {
             </div>
           ) : null}
 
+          {locked ? (
+            <p className="mt-3 text-[11px] text-zinc-400">
+              Saved run #{runId} · step {Math.min(currentStep, steps)} of {steps}
+              {running ? " — safe to leave; resume from Recent runs." : ""}
+            </p>
+          ) : null}
+
           <ol className="mt-4 space-y-2">
             {plan.steps.map((step, index) => {
               const tool = toolMeta(step.tool);
               const paid = Boolean(tool?.requiresApproval);
+              const result = results[index];
               return (
                 <li key={`${step.tool}-${index}`} className="flex items-start gap-3 rounded-lg border border-zinc-200 px-3 py-2.5">
-                  <input
-                    type="checkbox"
-                    checked={approved.has(index)}
-                    onChange={() => toggle(index)}
-                    className="mt-1 h-3.5 w-3.5 rounded border-zinc-300"
-                    aria-label={`Approve step ${index + 1}`}
-                  />
+                  {locked ? (
+                    <span className="mt-0.5 flex h-4 w-4 items-center justify-center">
+                      {result?.status === "ok" ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
+                      ) : result?.status === "failed" ? (
+                        <X className="h-3.5 w-3.5 text-rose-600" aria-hidden="true" />
+                      ) : result?.status === "skipped" ? (
+                        <span className="text-[11px] text-zinc-400">–</span>
+                      ) : result?.status === "pending" ? (
+                        <Loader2 className="h-3 w-3 animate-spin text-amber-500 motion-reduce:animate-none" aria-hidden="true" />
+                      ) : (
+                        <span className="h-1.5 w-1.5 rounded-full bg-zinc-300" aria-hidden="true" />
+                      )}
+                    </span>
+                  ) : (
+                    <input
+                      type="checkbox"
+                      checked={approved.has(index)}
+                      onChange={() => toggle(index)}
+                      className="mt-1 h-3.5 w-3.5 rounded border-zinc-300"
+                      aria-label={`Approve step ${index + 1}`}
+                    />
+                  )}
                   <div className="min-w-0 flex-1">
                     <p className="text-[12px] font-medium text-zinc-900">
                       {index + 1}. {tool?.label ?? step.tool}
@@ -308,41 +533,135 @@ export function AgentCopilot({ recentRuns }: { recentRuns: RecentRun[] }) {
                     </p>
                     <p className="mt-0.5 text-[11px] text-zinc-500">{step.reason}</p>
                     <p className="mt-0.5 text-[10px] text-zinc-400">{argsLabel(step.args)}</p>
+                    {result && result.status !== "ok" ? (
+                      <p className="mt-0.5 text-[10px] text-zinc-500">{result.summary}</p>
+                    ) : null}
                   </div>
                 </li>
               );
             })}
           </ol>
 
-          <div className="mt-4 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={execute}
-              disabled={running || approved.size === 0}
-              className="btn-primary"
-            >
-              {running ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
-              ) : (
-                <Play className="h-3.5 w-3.5" aria-hidden="true" />
-              )}
-              {running ? "Running…" : "Approve & run"}
-            </button>
-            <span className="text-[11px] text-zinc-400">
-              {approved.size} of {plan.steps.length} steps approved
-            </span>
-          </div>
+          {!locked ? (
+            <>
+              <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50/60 p-3">
+                <label htmlFor="agent-refine" className="text-[11px] font-medium text-zinc-700">
+                  Refine this plan
+                </label>
+                <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    id="agent-refine"
+                    value={instruction}
+                    onChange={(event) => setInstruction(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void refinePlan();
+                      }
+                    }}
+                    className="input flex-1"
+                    placeholder='e.g. "only 3 companies", "skip scoring", "warmer tone"'
+                  />
+                  <button
+                    type="button"
+                    onClick={refinePlan}
+                    disabled={!instruction.trim() || refining}
+                    className="btn-ghost"
+                  >
+                    {refining ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                    ) : (
+                      <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                    {refining ? "Refining…" : "Refine"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => runLoop(null)}
+                  disabled={running || approved.size === 0}
+                  className="btn-primary"
+                >
+                  {running ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                  ) : (
+                    <Play className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
+                  {running ? "Running…" : "Approve & run"}
+                </button>
+                <span className="text-[11px] text-zinc-400">
+                  {approved.size} of {plan.steps.length} steps approved
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {status === "failed" && runId ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => runLoop(runId, { retry: true })}
+                    disabled={running}
+                    className="btn-primary"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                    Retry step
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => runLoop(runId, { skip: true })}
+                    disabled={running}
+                    className="btn-ghost"
+                  >
+                    <SkipForward className="h-3.5 w-3.5" aria-hidden="true" />
+                    Skip step
+                  </button>
+                </>
+              ) : null}
+              {status === "done" ? (
+                <button type="button" onClick={resetPlan} className="btn-ghost">
+                  <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                  Start a new plan
+                </button>
+              ) : null}
+            </div>
+          )}
         </section>
       ) : null}
 
-      {results.length > 0 ? (
-        <section className="card p-5">
-          <h3 className="text-[14px] font-semibold text-zinc-900">Run</h3>
+      {runId !== null || results.length > 0 ? (
+        <section className="card p-5" aria-live="polite">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-[14px] font-semibold text-zinc-900">
+              {status === "done"
+                ? "Run complete"
+                : status === "failed"
+                  ? "Run stopped"
+                  : "Run in progress"}
+            </h3>
+            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLES[status] ?? STATUS_STYLES.idle}`}>
+              {statusLabel(status)}
+            </span>
+          </div>
           <ol className="mt-3 space-y-2">
             {results.map((result, index) => (
               <li key={`${result.tool}-${index}`} className="rounded-lg border border-zinc-200 px-3 py-2">
                 <div className="flex items-center gap-2">
-                  <span className={`h-1.5 w-1.5 rounded-full ${result.status === "ok" ? "bg-emerald-500" : result.status === "pending" ? "bg-amber-500" : "bg-rose-500"}`} aria-hidden="true" />
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      result.status === "ok"
+                        ? "bg-emerald-500"
+                        : result.status === "pending"
+                          ? "bg-amber-500"
+                          : result.status === "skipped"
+                            ? "bg-zinc-400"
+                            : "bg-rose-500"
+                    }`}
+                    aria-hidden="true"
+                  />
                   <p className="text-[12px] font-medium text-zinc-800">
                     {toolMeta(result.tool)?.label ?? result.tool}
                   </p>
@@ -399,21 +718,44 @@ export function AgentCopilot({ recentRuns }: { recentRuns: RecentRun[] }) {
 
       {recentRuns.length > 0 ? (
         <section className="card p-5">
-          <h3 className="text-[14px] font-semibold text-zinc-900">Recent copilot runs</h3>
+          <div className="flex items-center gap-2">
+            <History className="h-3.5 w-3.5 text-zinc-400" aria-hidden="true" />
+            <h3 className="text-[14px] font-semibold text-zinc-900">Recent runs</h3>
+          </div>
           <ul className="mt-3 space-y-2">
-            {recentRuns.map((run) => (
-              <li key={run.id} className="flex items-center gap-3 rounded-lg border border-zinc-100 px-3 py-2">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[12px] text-zinc-800">{run.summary}</p>
-                  <p className="text-[10px] text-zinc-400">
-                    {run.steps} steps · {run.status}
-                  </p>
-                </div>
-                <span className="text-[10px] text-zinc-400 tabular-nums">
-                  {new Date(run.createdAt).toISOString().slice(0, 10)}
-                </span>
-              </li>
-            ))}
+            {recentRuns.map((run) => {
+              const doneSteps = Math.min(run.cursor, run.plan.steps.length);
+              return (
+                <li key={run.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-100 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[12px] text-zinc-800">{run.goal || run.summary}</p>
+                    <p className="text-[10px] text-zinc-400">
+                      {doneSteps}/{run.plan.steps.length} steps · {run.plan.title}
+                    </p>
+                  </div>
+                  <span className={`rounded-full border px-2 py-0.5 text-[9px] font-medium ${STATUS_STYLES[run.status] ?? STATUS_STYLES.idle}`}>
+                    {statusLabel(run.status)}
+                  </span>
+                  <span className="text-[10px] text-zinc-400 tabular-nums">
+                    {new Date(run.createdAt).toISOString().slice(0, 10)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => loadRun(run, run.status === "running")}
+                    disabled={running || run.id === runId}
+                    className="text-[11px] font-medium text-zinc-600 hover:text-zinc-900 disabled:text-zinc-300"
+                  >
+                    {run.id === runId
+                      ? "Open"
+                      : run.status === "running"
+                        ? "Resume"
+                        : run.status === "failed"
+                          ? "Review"
+                          : "Open"}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </section>
       ) : null}
