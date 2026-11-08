@@ -9,6 +9,7 @@ import {
   Send,
   Sparkles,
   BarChart3,
+  CalendarClock,
   ChevronRight,
   ScrollText,
   Settings,
@@ -141,6 +142,14 @@ export function SidebarNav({
       {collapsed ? (
         <>
           <NavItem
+            href="/sending"
+            label="Sending"
+            icon={CalendarClock}
+            active={pathname.startsWith("/sending")}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+          <NavItem
             href="/campaigns"
             label="Campaigns"
             icon={Send}
@@ -161,6 +170,7 @@ export function SidebarNav({
         <details
           className="group"
           open={
+            pathname.startsWith("/sending") ||
             pathname.startsWith("/campaigns") ||
             pathname.startsWith("/analytics")
           }
@@ -170,6 +180,14 @@ export function SidebarNav({
             More
           </summary>
           <div className="mt-0.5 space-y-0.5">
+            <NavItem
+              href="/sending"
+              label="Sending"
+              icon={CalendarClock}
+              active={pathname.startsWith("/sending")}
+              collapsed={collapsed}
+              onNavigate={onNavigate}
+            />
             <NavItem
               href="/campaigns"
               label="Campaigns"

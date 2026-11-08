@@ -4,7 +4,9 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
+  CalendarClock,
   Check,
+  Coins,
   Copy,
   History,
   Loader2,
@@ -23,10 +25,12 @@ import type {
   AgentRun,
   StepResult,
 } from "@/lib/agent/types";
+import type { SendDayBalance, SendOverview, SendQueueItem } from "@/lib/send-queue";
 
 interface Draft {
   orgId: number;
   orgName: string;
+  contactId?: number | null;
   to: string;
   subject: string;
   body: string;
@@ -94,12 +98,29 @@ function statusLabel(status: string): string {
   return "Done";
 }
 
+function formatSlot(iso: string, timezone: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(iso));
+  } catch {
+    return new Date(iso).toLocaleString();
+  }
+}
+
 export function AgentCopilot({
   recentRuns,
   activeRun,
+  sendOverview,
 }: {
   recentRuns: AgentRun[];
   activeRun: AgentRun | null;
+  sendOverview: SendOverview | null;
 }) {
   const router = useRouter();
   const [goal, setGoal] = useState("");
@@ -117,6 +138,17 @@ export function AgentCopilot({
   const [notice, setNotice] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
   const [dismissedRun, setDismissedRun] = useState<number | null>(null);
+  const [day, setDay] = useState<SendDayBalance | null>(
+    sendOverview?.days[0] ?? null
+  );
+  const [draftEdits, setDraftEdits] = useState<
+    Record<string, { to: string; subject: string; body: string }>
+  >({});
+  const [scheduled, setScheduled] = useState<Record<string, SendQueueItem>>({});
+  const [sendErrors, setSendErrors] = useState<Record<string, string>>({});
+  const [sendWarnings, setSendWarnings] = useState<Record<string, string[]>>({});
+  const [approving, setApproving] = useState<string | null>(null);
+  const [canceling, setCanceling] = useState<string | null>(null);
   const runningRef = useRef(false);
 
   function beginPlan(nextPlan: AgentPlan) {
@@ -337,12 +369,139 @@ export function AgentCopilot({
     setNotice("");
   }
 
+  function draftKey(draft: Draft): string {
+    return `${runId ?? 0}:${draft.orgId}`;
+  }
+
+  function draftEdit(draft: Draft) {
+    const key = draftKey(draft);
+    return draftEdits[key] ?? { to: draft.to, subject: draft.subject, body: draft.body };
+  }
+
+  function updateDraft(draft: Draft, patch: Partial<{ to: string; subject: string; body: string }>) {
+    const key = draftKey(draft);
+    setDraftEdits((current) => ({
+      ...current,
+      [key]: { ...draftEdit(draft), ...patch },
+    }));
+  }
+
+  function queueForDraft(draft: Draft): SendQueueItem | null {
+    const key = draftKey(draft);
+    if (scheduled[key]) return scheduled[key];
+    const match = sendOverview?.queue.find(
+      (item) =>
+        item.agent_run_id === runId &&
+        item.org_id === draft.orgId &&
+        ["scheduled", "sending", "sent"].includes(item.status)
+    );
+    return match ?? null;
+  }
+
   async function copyDraft(draft: Draft) {
+    const key = draftKey(draft);
+    const edit = draftEdit(draft);
     await navigator.clipboard
-      .writeText(`${draft.subject}\n\n${draft.body}`)
+      .writeText(`${edit.subject}\n\n${edit.body}`)
       .catch(() => undefined);
-    setCopied(`${draft.orgId}-${draft.subject}`);
+    setCopied(key);
     setTimeout(() => setCopied(null), 2000);
+  }
+
+  async function approveDraft(draft: Draft) {
+    const key = draftKey(draft);
+    if (approving || running) return;
+    if (!sendOverview?.available) {
+      setSendErrors((current) => ({
+        ...current,
+        [key]: "Sending is not set up yet. Configure it in Sending first.",
+      }));
+      return;
+    }
+    const edit = draftEdit(draft);
+    setApproving(key);
+    setSendErrors((current) => ({ ...current, [key]: "" }));
+    setSendWarnings((current) => ({ ...current, [key]: [] }));
+    try {
+      const res = await fetch("/api/sending/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orgId: draft.orgId,
+          contactId: draft.contactId ?? null,
+          to: edit.to,
+          subject: edit.subject,
+          body: edit.body,
+          agentRunId: runId,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            queue?: SendQueueItem;
+            day?: SendDayBalance;
+            warnings?: string[];
+            error?: string;
+            errors?: string[];
+          }
+        | null;
+      if (!res.ok || !json?.ok || !json.queue) {
+        setSendErrors((current) => ({
+          ...current,
+          [key]: json?.errors?.join(" · ") ?? json?.error ?? "Could not schedule this send",
+        }));
+        return;
+      }
+      setScheduled((current) => ({ ...current, [key]: json.queue as SendQueueItem }));
+      if (json.day) setDay(json.day);
+      setSendWarnings((current) => ({ ...current, [key]: json.warnings ?? [] }));
+      router.refresh();
+    } catch (err) {
+      setSendErrors((current) => ({
+        ...current,
+        [key]: err instanceof Error ? err.message : "Could not schedule this send",
+      }));
+    } finally {
+      setApproving(null);
+    }
+  }
+
+  async function cancelDraft(draft: Draft) {
+    const key = draftKey(draft);
+    const queue = queueForDraft(draft);
+    if (!queue || canceling) return;
+    setCanceling(key);
+    setSendErrors((current) => ({ ...current, [key]: "" }));
+    try {
+      const res = await fetch("/api/sending/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ queueId: queue.id }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { ok?: boolean; error?: string }
+        | null;
+      if (!res.ok || !json?.ok) {
+        setSendErrors((current) => ({
+          ...current,
+          [key]: json?.error ?? "Could not cancel this send",
+        }));
+        return;
+      }
+      setScheduled((current) => ({
+        ...current,
+        [key]: { ...queue, status: "cancelled" },
+      }));
+      router.refresh();
+    } catch (err) {
+      setSendErrors((current) => ({
+        ...current,
+        [key]: err instanceof Error ? err.message : "Could not cancel this send",
+      }));
+    } finally {
+      setCanceling(null);
+    }
   }
 
   const drafts = results.flatMap((result) => {
@@ -675,42 +834,178 @@ export function AgentCopilot({
           </ol>
 
           {drafts.length > 0 ? (
-            <div className="mt-4 space-y-3">
-              <p className="text-[12px] font-medium text-zinc-800">Drafts for review (nothing sent)</p>
-              {drafts.map((draft) => (
-                <article key={`${draft.orgId}-${draft.subject}`} className="rounded-lg border border-zinc-200 p-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link href={`/companies/${draft.orgId}`} className="text-[12px] font-semibold text-zinc-900 hover:underline">
-                      {draft.orgName}
-                    </Link>
-                    <span className="text-[11px] text-zinc-400">→ {draft.to}</span>
-                    {draft.recipient ? (
-                      <span className="rounded-full border border-zinc-200 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-zinc-500">
-                        {draft.recipient.label}
-                      </span>
+            <div className="mt-5 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[12px] font-medium text-zinc-800">Drafts for review</p>
+                <Link href="/sending" className="inline-flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-900">
+                  <Coins className="h-3 w-3" aria-hidden="true" />
+                  {sendOverview?.available && day
+                    ? `${day.remaining}/${day.cap} send coins left · ${day.date}`
+                    : "Set up send coins"}
+                </Link>
+              </div>
+              <p className="text-[10px] text-zinc-400">
+                Edit the draft, then approve it. Approval mints one send coin; delivery waits for a human-paced slot.
+              </p>
+              {drafts.map((draft) => {
+                const key = draftKey(draft);
+                const edit = draftEdit(draft);
+                const queued = queueForDraft(draft);
+                const queuedStatus = queued?.status;
+                const lockedDraft =
+                  queuedStatus === "scheduled" ||
+                  queuedStatus === "sending" ||
+                  queuedStatus === "sent";
+                const draftError = sendErrors[key];
+                const warnings = sendWarnings[key] ?? [];
+                return (
+                  <article key={key} className="rounded-lg border border-zinc-200 p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link href={`/companies/${draft.orgId}`} className="text-[12px] font-semibold text-zinc-900 hover:underline">
+                        {draft.orgName}
+                      </Link>
+                      <span className="text-[11px] text-zinc-400">→ {edit.to}</span>
+                      {draft.recipient ? (
+                        <span className="rounded-full border border-zinc-200 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-zinc-500">
+                          {draft.recipient.label}
+                        </span>
+                      ) : null}
+                      {draft.quality ? (
+                        <span className="text-[10px] text-zinc-400 tabular-nums">
+                          {draft.quality.score}/100 · {draft.quality.words}w
+                        </span>
+                      ) : null}
+                      {queuedStatus ? (
+                        <span
+                          className={`rounded-full border px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide ${
+                            queuedStatus === "sent"
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : queuedStatus === "failed"
+                                ? "border-rose-200 bg-rose-50 text-rose-700"
+                                : queuedStatus === "cancelled"
+                                  ? "border-zinc-200 bg-zinc-50 text-zinc-500"
+                                  : "border-sky-200 bg-sky-50 text-sky-700"
+                          }`}
+                        >
+                          {queuedStatus === "scheduled"
+                            ? "Coin minted"
+                            : queuedStatus === "sending"
+                              ? "Sending"
+                              : queuedStatus}
+                        </span>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => copyDraft(draft)}
+                        className="ml-auto inline-flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-900"
+                      >
+                        {copied === key ? (
+                          <Check className="h-3 w-3 text-emerald-600" aria-hidden="true" />
+                        ) : (
+                          <Copy className="h-3 w-3" aria-hidden="true" />
+                        )}
+                        {copied === key ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+
+                    <div className="mt-2 grid gap-2">
+                      <div>
+                        <label htmlFor={`send-to-${key}`} className="label">To</label>
+                        <input
+                          id={`send-to-${key}`}
+                          type="email"
+                          value={edit.to}
+                          onChange={(event) => updateDraft(draft, { to: event.target.value })}
+                          disabled={lockedDraft}
+                          className="input"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor={`send-subject-${key}`} className="label">Subject</label>
+                        <input
+                          id={`send-subject-${key}`}
+                          value={edit.subject}
+                          onChange={(event) => updateDraft(draft, { subject: event.target.value })}
+                          disabled={lockedDraft}
+                          className="input"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor={`send-body-${key}`} className="label">Body</label>
+                        <textarea
+                          id={`send-body-${key}`}
+                          rows={7}
+                          value={edit.body}
+                          onChange={(event) => updateDraft(draft, { body: event.target.value })}
+                          disabled={lockedDraft}
+                          className="input"
+                        />
+                      </div>
+                    </div>
+
+                    {queued && (queuedStatus === "scheduled" || queuedStatus === "sending") ? (
+                      <div className="mt-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-2">
+                        <p className="flex items-center gap-1.5 text-[11px] font-medium text-sky-800">
+                          <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" />
+                          {queuedStatus === "sending"
+                            ? "Sending now"
+                            : `Scheduled ${formatSlot(queued.scheduled_for, sendOverview?.policy.timezone ?? "UTC")}`}
+                        </p>
+                        <p className="mt-0.5 text-[10px] text-sky-700">
+                          One send coin used. Cancel before delivery to edit again.
+                        </p>
+                        {queuedStatus === "scheduled" ? (
+                          <button
+                            type="button"
+                            onClick={() => cancelDraft(draft)}
+                            disabled={canceling === key}
+                            className="mt-1 text-[11px] font-medium text-sky-800 underline-offset-2 hover:underline disabled:opacity-50"
+                          >
+                            {canceling === key ? "Cancelling…" : "Cancel schedule"}
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : queuedStatus === "sent" ? (
+                      <p className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-800">
+                        Sent · send coin used. Replies appear in Emails.
+                      </p>
+                    ) : (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => approveDraft(draft)}
+                          disabled={Boolean(approving) || running || !sendOverview?.available}
+                          className="btn-primary"
+                        >
+                          {approving === key ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                          ) : (
+                            <Coins className="h-3.5 w-3.5" aria-hidden="true" />
+                          )}
+                          {approving === key ? "Approving…" : "Approve & schedule"}
+                        </button>
+                        <span className="text-[10px] text-zinc-400">
+                          Uses 1 send coin · nothing sends immediately
+                        </span>
+                      </div>
+                    )}
+
+                    {draftError ? (
+                      <p role="alert" className="mt-2 rounded-md bg-rose-50 px-3 py-2 text-[11px] text-rose-700">{draftError}</p>
                     ) : null}
-                    {draft.quality ? (
-                      <span className="text-[10px] text-zinc-400 tabular-nums">
-                        {draft.quality.score}/100 · {draft.quality.words}w
-                      </span>
+                    {warnings.length > 0 ? (
+                      <ul className="mt-2 space-y-0.5">
+                        {warnings.map((warning) => (
+                          <li key={warning} className="flex items-start gap-1.5 text-[10px] text-amber-700">
+                            <TriangleAlert className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+                            {warning}
+                          </li>
+                        ))}
+                      </ul>
                     ) : null}
-                    <button
-                      type="button"
-                      onClick={() => copyDraft(draft)}
-                      className="ml-auto inline-flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-900"
-                    >
-                      {copied === `${draft.orgId}-${draft.subject}` ? (
-                        <Check className="h-3 w-3 text-emerald-600" aria-hidden="true" />
-                      ) : (
-                        <Copy className="h-3 w-3" aria-hidden="true" />
-                      )}
-                      {copied === `${draft.orgId}-${draft.subject}` ? "Copied" : "Copy"}
-                    </button>
-                  </div>
-                  <p className="mt-2 text-[12px] font-medium text-zinc-800">{draft.subject}</p>
-                  <p className="mt-1 whitespace-pre-wrap text-[12px] leading-relaxed text-zinc-600">{draft.body}</p>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
           ) : null}
         </section>

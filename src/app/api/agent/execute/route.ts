@@ -343,6 +343,7 @@ async function runDraft(
     drafts.push({
       orgId,
       orgName: orgNames.get(orgId) ?? `#${orgId}`,
+      contactId: contact?.id ?? null,
       to,
       subject: res.json.subject,
       body: res.json.body,
