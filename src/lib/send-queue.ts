@@ -122,15 +122,16 @@ export async function getSendPolicy(
   timezone?: string
 ): Promise<SendPolicy> {
   const admin = createAdminClient();
-  const { data } = await admin
+  const { data, error } = await admin
     .from("email_send_policies")
     .select("*")
     .eq("workspace_id", workspaceId)
     .maybeSingle();
+  if (error) throw new Error(error.message);
   if (data) return data as SendPolicy;
 
   const defaults = policyDefaults(workspaceId, timezone);
-  const { data: created } = await admin
+  const { data: created, error: insertError } = await admin
     .from("email_send_policies")
     .insert({
       workspace_id: workspaceId,
@@ -146,6 +147,17 @@ export async function getSendPolicy(
     })
     .select("*")
     .maybeSingle();
+  if (insertError) {
+    if (insertError.code === "23505") {
+      const { data: raced } = await admin
+        .from("email_send_policies")
+        .select("*")
+        .eq("workspace_id", workspaceId)
+        .maybeSingle();
+      if (raced) return raced as SendPolicy;
+    }
+    throw new Error(insertError.message);
+  }
   return (created as SendPolicy | null) ?? defaults;
 }
 
