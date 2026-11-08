@@ -51,6 +51,52 @@ function fallbackPlan(goal: string): AgentPlan {
   };
 }
 
+function augmentPlan(plan: AgentPlan, goal: string): AgentPlan {
+  const steps = [...plan.steps];
+  const has = (tool: string) => steps.some((step) => step.tool === tool);
+  const hasSource = has("search_companies") || has("list_companies");
+  const warnings = [...plan.warnings];
+
+  const insertBeforeOutreach = (step: AgentPlan["steps"][number]) => {
+    const draftIndex = steps.findIndex(
+      (entry) => entry.tool === "draft_emails" || entry.tool === "deep_search"
+    );
+    if (draftIndex === -1) steps.push(step);
+    else steps.splice(draftIndex, 0, step);
+  };
+
+  if (!hasSource) {
+    steps.unshift({
+      tool: "list_companies",
+      reason: "Start from the highest-scoring companies already in the pipeline.",
+      args: { limit: 5 },
+    });
+    warnings.push("Added a company list so the remaining steps have a source.");
+  }
+  if (/enrich|website|research the site/i.test(goal) && !has("enrich_websites")) {
+    insertBeforeOutreach({
+      tool: "enrich_websites",
+      reason: "The command asked to enrich company websites.",
+      args: { limit: 3 },
+    });
+  }
+  if (/scor(e|ing)/i.test(goal) && !has("score_companies")) {
+    insertBeforeOutreach({
+      tool: "score_companies",
+      reason: "The command asked to score companies.",
+      args: { limit: 5 },
+    });
+  }
+  if (/draft|email|write|outreach/i.test(goal) && !has("draft_emails")) {
+    steps.push({
+      tool: "draft_emails",
+      reason: "The command asked for email drafts.",
+      args: { limit: 2, flavor: "short-direct" },
+    });
+  }
+  return { ...plan, steps: steps.slice(0, 6), warnings: warnings.slice(0, 4) };
+}
+
 function clampPlan(plan: AgentPlan): AgentPlan {
   const bands = new Set<string>(EMPLOYEE_BANDS);
   const flavors = new Set<string>(FLAVORS.map((flavor) => flavor.id));
@@ -126,6 +172,7 @@ Rules:
 - If the command asks to email someone, use draft_emails only. Sending is not available in this phase.
 - Use deep_search only if the user explicitly asks for more people/contacts and accept that it costs credits.
 - Prefer list_companies when the command refers to existing leads; use search_companies when it asks to find new companies.
+- Include every action the user explicitly asks for, in order: search/list → enrich websites → score → deep search (only if asked) → draft emails.
 - Respect the user's requested quantities, clamped to tool limits.`;
 
   try {
@@ -138,11 +185,11 @@ Rules:
     const parsed = parseJson(text);
     const result = PlanSchema.safeParse(parsed);
     if (!result.success) {
-      return NextResponse.json({ ok: true, plan: clampPlan(fallbackPlan(goal)), ai: false });
+      return NextResponse.json({ ok: true, plan: clampPlan(augmentPlan(fallbackPlan(goal), goal)), ai: false });
     }
-    return NextResponse.json({ ok: true, plan: clampPlan(result.data), ai: true });
+    return NextResponse.json({ ok: true, plan: clampPlan(augmentPlan(result.data, goal)), ai: true });
   } catch (err) {
     console.error("[agent.plan] failed:", err instanceof Error ? err.message : err);
-    return NextResponse.json({ ok: true, plan: clampPlan(fallbackPlan(goal)), ai: false });
+    return NextResponse.json({ ok: true, plan: clampPlan(augmentPlan(fallbackPlan(goal), goal)), ai: false });
   }
 }
