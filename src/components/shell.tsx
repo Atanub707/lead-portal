@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Building2,
   LayoutDashboard,
   LogOut,
   Mail,
@@ -12,6 +11,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Rocket,
+  Sparkles,
   X,
 } from "lucide-react";
 import { SidebarNav } from "@/components/sidebar-nav";
@@ -115,7 +115,7 @@ export function Shell({
     { href: "/dashboard", label: "Home", icon: LayoutDashboard, active: pathname === "/dashboard" },
     { href: "/leads", label: "Leads", icon: Rocket, active: pathname.startsWith("/leads") },
     { href: "/emails", label: "Emails", icon: Mail, active: pathname.startsWith("/emails") },
-    { href: `/companies?list=${encodeURIComponent(primaryPipeline)}`, label: "Companies", icon: Building2, active: pathname.startsWith("/companies") },
+    { href: "/agent", label: "Copilot", icon: Sparkles, active: pathname.startsWith("/agent") },
   ] as const;
 
   useEffect(() => {

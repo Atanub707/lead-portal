@@ -7,6 +7,7 @@ import {
   Mail,
   Rocket,
   Send,
+  Sparkles,
   BarChart3,
   ChevronRight,
   ScrollText,
@@ -126,6 +127,14 @@ export function SidebarNav({
         label="Find leads"
         icon={Rocket}
         active={pathname.startsWith("/leads")}
+        collapsed={collapsed}
+        onNavigate={onNavigate}
+      />
+      <NavItem
+        href="/agent"
+        label="Copilot"
+        icon={Sparkles}
+        active={pathname.startsWith("/agent")}
         collapsed={collapsed}
         onNavigate={onNavigate}
       />
