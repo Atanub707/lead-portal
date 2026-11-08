@@ -361,6 +361,7 @@ export default async function CompanyPage({
             contactId={bestContact?.id ?? null}
             contactLabel={bestContact?.name ?? null}
             emailOptions={emailRecipientOptions}
+            website={company.website}
             smtpConfigured={emailSettings.configured}
             canWrite={canWrite}
           />

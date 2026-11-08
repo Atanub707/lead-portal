@@ -116,6 +116,7 @@ function titleTag(html: string): string | null {
 interface SiteLinks {
   linkedin_company: string[];
   linkedin_people: string[];
+  linkedin_people_named: { url: string; name: string }[];
   emails: string[];
   socials: string[];
 }
@@ -144,6 +145,7 @@ function collectLinks(html: string, base: URL): SiteLinks {
     emails: new Set<string>(),
     socials: new Set<string>(),
   };
+  const peopleNames = new Map<string, string>();
 
   const hrefRe = /href=["']([^"']+)["']/gi;
   let match: RegExpExecArray | null;
@@ -164,7 +166,18 @@ function collectLinks(html: string, base: URL): SiteLinks {
     const clean = url.origin + url.pathname.replace(/\/$/, "");
     if (host.endsWith("linkedin.com")) {
       if (url.pathname.startsWith("/company/")) sets.linkedin_company.add(clean);
-      else if (url.pathname.startsWith("/in/")) sets.linkedin_people.add(clean);
+      else if (url.pathname.startsWith("/in/")) {
+        sets.linkedin_people.add(clean);
+        const nearby = html.slice(match.index, Math.min(html.length, match.index + 1800));
+        const names = [...nearby.matchAll(/alt=["']([^"']+)["']/gi)]
+          .map((entry) => decodeEntities(entry[1]).trim())
+          .filter(
+            (name) =>
+              name.length > 1 &&
+              !/linkedin|logo|icon|avatar|profile|photo|image/i.test(name)
+          );
+        if (names[0]) peopleNames.set(clean, names[0]);
+      }
     } else if (
       host.endsWith("instagram.com") ||
       host.endsWith("twitter.com") ||
@@ -187,6 +200,9 @@ function collectLinks(html: string, base: URL): SiteLinks {
   return {
     linkedin_company: [...sets.linkedin_company].slice(0, 5),
     linkedin_people: [...sets.linkedin_people].slice(0, 15),
+    linkedin_people_named: [...peopleNames]
+      .map(([url, name]) => ({ url, name }))
+      .slice(0, 15),
     emails: [...sets.emails].slice(0, 10),
     socials: [...sets.socials].slice(0, 8),
   };
@@ -231,6 +247,15 @@ function mergeSiteLinks(target: SiteLinks, links: SiteLinks) {
   target.linkedin_people = [
     ...new Set([...target.linkedin_people, ...links.linkedin_people]),
   ].slice(0, 15);
+  const named = new Map(
+    target.linkedin_people_named.map((person) => [person.url, person.name])
+  );
+  for (const person of links.linkedin_people_named) {
+    if (!named.has(person.url)) named.set(person.url, person.name);
+  }
+  target.linkedin_people_named = [...named]
+    .map(([url, name]) => ({ url, name }))
+    .slice(0, 15);
   target.emails = [...new Set([...target.emails, ...links.emails])].slice(0, 10);
   target.socials = [...new Set([...target.socials, ...links.socials])].slice(0, 8);
 }
@@ -274,6 +299,7 @@ function collectLinksFromText(text: string): SiteLinks {
   return {
     linkedin_company: [...sets.linkedin_company].slice(0, 5),
     linkedin_people: [...sets.linkedin_people].slice(0, 15),
+    linkedin_people_named: [],
     emails: [...sets.emails].slice(0, 10),
     socials: [...sets.socials].slice(0, 8),
   };
@@ -376,6 +402,7 @@ function extractLinksFromScriptText(scriptText: string): SiteLinks {
   return {
     linkedin_company: [...sets.linkedin_company].slice(0, 5),
     linkedin_people: [...sets.linkedin_people].slice(0, 15),
+    linkedin_people_named: [],
     emails: [...sets.emails].slice(0, 10),
     socials: [...sets.socials].slice(0, 8),
   };
@@ -615,6 +642,7 @@ async function researchWebsiteTinyfish(
   const allLinks: SiteLinks = {
     linkedin_company: [],
     linkedin_people: [],
+    linkedin_people_named: [],
     emails: [],
     socials: [],
   };
@@ -682,6 +710,7 @@ function mergeResearch(
   const links: SiteLinks = {
     linkedin_company: [],
     linkedin_people: [],
+    linkedin_people_named: [],
     emails: [],
     socials: [],
   };
@@ -737,6 +766,7 @@ async function researchWebsiteDirect(url: URL, rawUrl: string): Promise<WebsiteR
   const allLinks: SiteLinks = {
     linkedin_company: [],
     linkedin_people: [],
+    linkedin_people_named: [],
     emails: [],
     socials: [],
   };

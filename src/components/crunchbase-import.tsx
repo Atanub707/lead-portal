@@ -120,18 +120,7 @@ export function CrunchbaseImport({
             skipped: Number(json.skipped ?? 0),
           });
           setStatus("done");
-          const ids = (json.importedIds ?? []).slice(0, 5);
-          if (ids.length > 0) {
-            fetch("/api/leads/website-enrich", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ orgIds: ids }),
-            })
-              .then(() => router.refresh())
-              .catch(() => undefined);
-          } else {
-            router.refresh();
-          }
+          router.refresh();
         } else if (json?.status === "failed") {
           setError(json.error ?? "The import failed. Please try again.");
           setStatus("idle");

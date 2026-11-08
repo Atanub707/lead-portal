@@ -213,6 +213,11 @@ export async function enrichCompanyFromWebsite(
       .map((row) => (row.email as string | null)?.toLowerCase())
       .filter((value): value is string => Boolean(value))
   );
+  const seenLinkedIn = new Set(
+    (existing ?? [])
+      .map((row) => (row.linkedin_url as string | null)?.toLowerCase())
+      .filter((value): value is string => Boolean(value))
+  );
   const rows: Record<string, unknown>[] = [];
   let contactsAdded = 0;
 
@@ -233,6 +238,7 @@ export async function enrichCompanyFromWebsite(
         : null) || matchLinkedInProfile(name, research.links.linkedin_people);
     seenNames.add(key);
     if (email) seenEmails.add(email);
+    if (linkedin) seenLinkedIn.add(linkedin.toLowerCase());
     rows.push({
       org_id: orgId,
       workspace_id: workspaceId,
@@ -243,6 +249,31 @@ export async function enrichCompanyFromWebsite(
       source: "website",
       is_decision_maker: isDecisionTitle(contact.title ?? null),
       email_status: email ? "found" : null,
+    });
+    contactsAdded += 1;
+  }
+
+  // Website team sections often link people by LinkedIn only. Keep those
+  // named profiles even when the AI extractor finds no biography text.
+  for (const person of research.links.linkedin_people_named) {
+    const linkedin = person.url?.trim();
+    const name = person.name?.trim();
+    if (!linkedin || !name) continue;
+    if (seenLinkedIn.has(linkedin.toLowerCase())) continue;
+    const key = normalizeCompanyName(name);
+    if (!key || seenNames.has(key)) continue;
+    seenNames.add(key);
+    seenLinkedIn.add(linkedin.toLowerCase());
+    rows.push({
+      org_id: orgId,
+      workspace_id: workspaceId,
+      name,
+      title: null,
+      email: null,
+      linkedin_url: linkedin,
+      source: "website",
+      is_decision_maker: false,
+      email_status: null,
     });
     contactsAdded += 1;
   }

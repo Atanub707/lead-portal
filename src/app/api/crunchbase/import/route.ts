@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { getActorRun, getDatasetItems } from "@/lib/apify";
 import {
   bareDomain,
@@ -24,8 +24,9 @@ import {
 } from "@/lib/intelligence";
 import { upsertFirmographics } from "@/lib/intelligence-write";
 import { recordFundingSignal } from "@/lib/signal-scan";
+import { enrichCompanyFromWebsite } from "@/lib/website-enrich";
 import { scoreOrg } from "@/lib/scoring";
-import { enqueueJob } from "@/lib/jobs";
+import { completeJob, enqueueJob } from "@/lib/jobs";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const maxDuration = 60;
@@ -59,6 +60,41 @@ function redactSecrets(message: string, secrets: (string | null | undefined)[]) 
   return safe
     .replace(/token=[^&\s]+/gi, "token=[redacted]")
     .slice(0, 400);
+}
+
+async function enrichImportedBatch(
+  admin: Admin,
+  targets: { orgId: number; jobId: number | null }[],
+  workspaceId: string,
+  userId: string
+) {
+  if (targets.length === 0) return;
+  const deadline = Date.now() + 45_000;
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < targets.length && Date.now() < deadline) {
+      const target = targets[cursor++];
+      try {
+        await enrichCompanyFromWebsite(target.orgId, workspaceId, userId);
+        await scoreOrg(target.orgId, workspaceId).catch((err) => {
+          console.error(
+            "[crunchbase] post-enrichment score failed:",
+            err instanceof Error ? err.message : err
+          );
+        });
+        if (target.jobId) await completeJob(target.jobId);
+      } catch (err) {
+        // Leave the queued job in place for the worker to retry.
+        console.error(
+          "[crunchbase] immediate enrichment failed:",
+          err instanceof Error ? err.message : err
+        );
+      }
+    }
+  }
+
+  await Promise.all([worker(), worker(), worker()]);
 }
 
 function sampleOf(item: unknown) {
@@ -479,6 +515,7 @@ export async function GET(request: Request) {
 
   let imported = 0;
   let importedIds: number[] = [];
+  const enrichTargets: { orgId: number; jobId: number | null }[] = [];
   if (rows.length > 0) {
     const { data: createdRows, error: writeError } = await admin
       .from("organizations")
@@ -503,7 +540,12 @@ export async function GET(request: Request) {
     for (const created of createdRows ?? []) {
       const company = byName.get(normalizeCompanyName(created.name as string));
       if (company?.website) {
-        await enqueueJob(workspaceId, "signal_scan", { orgId: created.id });
+        const jobId = await enqueueJob(workspaceId, "signal_scan", {
+          orgId: created.id,
+          enrich: true,
+          userId,
+        });
+        enrichTargets.push({ orgId: created.id as number, jobId });
       }
     }
     const appliedFilters =
@@ -564,6 +606,14 @@ export async function GET(request: Request) {
     cost: run.usageTotalUsd,
     details: { ...details, imported_ids: importedIds },
   });
+
+  // Enrich every imported website immediately after the response. The same
+  // work is already queued as a durable fallback job; completing a job here
+  // prevents the worker from repeating it. Anything not finished inside the
+  // time budget stays queued and is claimed with priority by the worker.
+  if (enrichTargets.length > 0) {
+    after(() => enrichImportedBatch(admin, enrichTargets, workspaceId, userId));
+  }
 
   return NextResponse.json({
     status: "ok",

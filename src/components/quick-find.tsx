@@ -95,14 +95,6 @@ export function QuickFind() {
         return;
       }
 
-      setStage("contacts");
-      setMessage(`Found ${imported} companies — scanning their websites for people and emails…`);
-      await fetch("/api/leads/website-enrich", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgIds: importedIds.slice(0, 5) }),
-      }).catch(() => undefined);
-
       setStage("signals");
       setMessage("Checking signals and scoring…");
       await Promise.allSettled(

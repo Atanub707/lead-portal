@@ -3,10 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Pencil, Radar, Search, Sparkles } from "lucide-react";
+import { Globe, Loader2, Pencil, Radar, Search, Sparkles } from "lucide-react";
 import { EmailComposer, type EmailRecipientOption } from "@/components/email-composer";
 
-type Busy = "contacts" | "brief" | "signals" | null;
+type Busy = "contacts" | "brief" | "signals" | "website" | null;
 
 export function CompanyActions({
   orgId,
@@ -14,6 +14,7 @@ export function CompanyActions({
   contactId,
   contactLabel,
   emailOptions = [],
+  website = null,
   smtpConfigured,
   canWrite,
 }: {
@@ -22,6 +23,7 @@ export function CompanyActions({
   contactId: number | null;
   contactLabel: string | null;
   emailOptions?: EmailRecipientOption[];
+  website?: string | null;
   smtpConfigured: boolean;
   canWrite: boolean;
 }) {
@@ -100,6 +102,42 @@ export function CompanyActions({
     }
   }
 
+  async function scanWebsite() {
+    if (!website) return;
+    setBusy("website");
+    setError("");
+    setStatus("Reading the website for people, emails and LinkedIn…");
+    try {
+      const res = await fetch("/api/leads/website-enrich", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgIds: [orgId] }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            results?: { contacts?: number; emails?: number; skipped?: string }[];
+            error?: string;
+          }
+        | null;
+      if (!res.ok || !json?.ok) {
+        setError(json?.error ?? "Website scan failed");
+        return;
+      }
+      const row = json.results?.[0];
+      setStatus(
+        row?.skipped
+          ? `Website scan: ${row.skipped}`
+          : `Website scan: ${row?.contacts ?? 0} contacts · ${row?.emails ?? 0} emails`
+      );
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Website scan failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function scanSignals() {
     setBusy("signals");
     setError("");
@@ -145,6 +183,22 @@ export function CompanyActions({
             triggerLabel="Draft email"
             triggerClassName="btn-primary"
           />
+        ) : null}
+        {canWrite && website ? (
+          <button
+            type="button"
+            onClick={scanWebsite}
+            disabled={busy !== null}
+            title="Read the website for emails, people and LinkedIn profiles"
+            className="btn-ghost"
+          >
+            {busy === "website" ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            ) : (
+              <Globe className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+            Scan website
+          </button>
         ) : null}
         {canWrite ? (
           <>

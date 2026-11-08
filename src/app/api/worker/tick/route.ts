@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
-import { claimJobs, completeJob, failJob, type JobRow } from "@/lib/jobs";
+import {
+  claimEnrichmentJobs,
+  claimJobs,
+  completeJob,
+  failJob,
+  type JobRow,
+} from "@/lib/jobs";
 import { scanCompanySignals } from "@/lib/signal-scan";
 import { recomputeWorkspaceScores, scoreOrg } from "@/lib/scoring";
 import { enqueueStaleSignalScans } from "@/lib/signal-schedule";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enqueueJob } from "@/lib/jobs";
 import { sendCampaignTick } from "@/lib/campaigns";
+import { enrichCompanyFromWebsite } from "@/lib/website-enrich";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -75,6 +82,7 @@ async function run() {
     console.error("[worker] campaign enqueue failed:", err instanceof Error ? err.message : err);
   });
 
+  const enrichment = await claimEnrichmentJobs(4);
   const jobs = await claimJobs(3);
   const results: { id: number; kind: string; ok: boolean; detail?: string }[] = [];
 
@@ -87,6 +95,25 @@ async function run() {
           results.push({ id: job.id, kind: job.kind, ok: false, detail: "missing orgId" });
           return;
         }
+        let enrichDetail = "";
+        if (job.payload?.enrich === true) {
+          try {
+            const enriched = await enrichCompanyFromWebsite(
+              orgId,
+              job.workspace_id,
+              typeof job.payload.userId === "string" ? job.payload.userId : ""
+            );
+            enrichDetail = enriched.skipped
+              ? ` · website: ${enriched.skipped}`
+              : ` · website: ${enriched.contacts} contacts, ${enriched.emails} emails`;
+          } catch (err) {
+            enrichDetail = " · website enrichment failed";
+            console.error(
+              "[worker] website enrichment failed:",
+              err instanceof Error ? err.message : err
+            );
+          }
+        }
         const result = await scanCompanySignals(orgId, job.workspace_id);
         if (!result.ok) {
           await failJob(job, result.skipped ?? "scan failed");
@@ -94,7 +121,12 @@ async function run() {
           return;
         }
         await completeJob(job.id);
-        results.push({ id: job.id, kind: job.kind, ok: true, detail: `${result.created} signals` });
+        results.push({
+          id: job.id,
+          kind: job.kind,
+          ok: true,
+          detail: `${result.created} signals${enrichDetail}`,
+        });
       } else if (job.kind === "score_recompute") {
         const orgId = Number(job.payload?.orgId);
         if (orgId) {
@@ -126,7 +158,7 @@ async function run() {
     }
   }
 
-  await Promise.all(jobs.map((job) => runJob(job)));
+  await Promise.all([...enrichment, ...jobs].map((job) => runJob(job)));
   return NextResponse.json({ ok: true, processed: results.length, results });
 }
 

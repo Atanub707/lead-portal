@@ -44,6 +44,38 @@ export async function enqueueJob(
   return data.id as number;
 }
 
+export async function claimEnrichmentJobs(limit = 4): Promise<JobRow[]> {
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+  const { data: candidates } = await admin
+    .from("jobs")
+    .select("id, workspace_id, kind, payload, status, attempts")
+    .eq("kind", "signal_scan")
+    .eq("status", "queued")
+    .contains("payload", { enrich: true })
+    .lte("run_after", now)
+    .order("run_after", { ascending: true })
+    .limit(limit);
+
+  const claimed: JobRow[] = [];
+  for (const candidate of candidates ?? []) {
+    const { data } = await admin
+      .from("jobs")
+      .update({
+        status: "running",
+        locked_by: "worker",
+        locked_at: now,
+        attempts: Number(candidate.attempts ?? 0) + 1,
+        updated_at: now,
+      })
+      .eq("id", candidate.id)
+      .eq("status", "queued")
+      .select("id, workspace_id, kind, payload, status, attempts");
+    if (data?.[0]) claimed.push(data[0] as JobRow);
+  }
+  return claimed;
+}
+
 export async function claimJobs(limit = 5): Promise<JobRow[]> {
   const admin = createAdminClient();
   const now = new Date().toISOString();
