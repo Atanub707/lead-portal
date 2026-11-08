@@ -121,6 +121,8 @@ export function CrunchbaseImport({
           });
           setStatus("done");
           router.refresh();
+          window.setTimeout(() => router.refresh(), 15_000);
+          window.setTimeout(() => router.refresh(), 40_000);
         } else if (json?.status === "failed") {
           setError(json.error ?? "The import failed. Please try again.");
           setStatus("idle");
