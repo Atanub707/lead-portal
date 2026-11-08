@@ -564,7 +564,7 @@ export function AgentCopilot({
             {planning ? "Planning…" : plan ? "Plan again" : "Plan it"}
           </button>
           <span className="text-[11px] text-zinc-400">
-            Phase 1–2: search, enrich, score, draft. No sending.
+            Plans draft; sending needs your approval after review.
           </span>
         </div>
 

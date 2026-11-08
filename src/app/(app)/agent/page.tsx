@@ -25,7 +25,8 @@ export default async function AgentPage() {
         <p className="mt-1 max-w-[80ch] text-[13px] leading-relaxed text-zinc-500">
           Describe the outcome you want. Copilot plans, runs only the steps you
           approve, and saves every run so you can refine, resume or retry. It can
-          search, enrich, score and draft — it never sends email.
+          search, enrich, score and draft. It never sends without your approval:
+          reviewed drafts are scheduled with send coins.
         </p>
       </header>
       <div className="mt-6">

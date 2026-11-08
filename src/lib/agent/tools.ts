@@ -57,7 +57,7 @@ export const AGENT_TOOLS = [
     name: "draft_emails",
     label: "Draft emails",
     description:
-      "Generate review-ready cold emails for selected companies that have an email. Never sends. Returns subject, body, recipient classification and quality check.",
+      "Generate review-ready cold emails for selected companies that have an email. Never sends; the human edits and approves a send coin afterward. Returns subject, body, recipient classification and quality check.",
     args: {
       limit: "number? — 1..3, default 2",
       flavor: "string? — short-direct, pain-first, insight-authority, warm-intro, founder-founder",

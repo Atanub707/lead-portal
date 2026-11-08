@@ -155,6 +155,23 @@ function clampPlan(plan: AgentPlan): AgentPlan {
   };
 }
 
+function refreshPlanCopy(plan: AgentPlan): AgentPlan {
+  const sendNote =
+    "This plan only creates a draft. You review and edit it, then approve a send coin to schedule delivery.";
+  const stale = /sending (is|isn't|is not) available|sending is unavailable|no sending (is )?available/i;
+  return {
+    ...plan,
+    warnings: plan.warnings.map((warning) =>
+      stale.test(warning) ? sendNote : warning
+    ),
+    steps: plan.steps.map((step) =>
+      stale.test(step.reason)
+        ? { ...step, reason: `${step.reason.replace(stale, "").trim()} ${sendNote}`.trim() }
+        : step
+    ),
+  };
+}
+
 function historyPrompt(history: z.infer<typeof AgentHistoryMessageSchema>[]): string {
   if (history.length === 0) return "";
   return `\nConversation so far:\n${history
@@ -215,7 +232,7 @@ Rules:
 - You may reorder, add, remove or retune steps, and update quantities and draft flavor.
 - Never invent tools. Use only the listed names.
 - Maximum 6 steps. Always keep a company source (search_companies or list_companies) if the plan has one.
-- Sending is not available; draft_emails only creates drafts.
+- A plan never sends automatically. draft_emails creates drafts; the human approves a send coin after reviewing them.
 - Use deep_search only if the user explicitly asks for more contacts/people.
 - Return the full plan, not a diff.`
     : `User command: "${goal}"
@@ -229,7 +246,7 @@ Return ONLY a JSON plan:
 Rules:
 - Maximum 6 steps. Use the fewest steps that satisfy the command.
 - Never invent tools. Use only the listed names.
-- If the command asks to email someone, use draft_emails only. Sending is not available in this phase.
+- If the command asks to email someone, use draft_emails. Sending is never automatic: after the run, the human reviews and edits the draft, then approves a send coin to schedule it.
 - Use deep_search only if the user explicitly asks for more people/contacts and accept that it costs credits.
 - Prefer list_companies when the command refers to existing leads; use search_companies when it asks to find new companies.
 - Include every action the user explicitly asks for, in order: search/list → enrich websites → score → deep search (only if asked) → draft emails.
@@ -239,7 +256,7 @@ Rules:
     const { text } = await generateText({
       model,
       system:
-        "You are the planning layer of a B2B outreach copilot. You never execute actions; you only produce or revise a safe, minimal tool plan. Be conservative and never promise sending.",
+        "You are the planning layer of a B2B outreach copilot. You never execute or send; you only produce or revise a safe, minimal tool plan. Sending is gated by an explicit human-approved send coin after drafting.",
       prompt,
     });
     const parsedPlan = PlanSchema.safeParse(parseJson(text));
@@ -258,14 +275,14 @@ Rules:
     if (refining) {
       return NextResponse.json({
         ok: true,
-        plan: clampPlan(parsedPlan.data),
+        plan: clampPlan(refreshPlanCopy(parsedPlan.data)),
         ai: true,
         refined: true,
       });
     }
     return NextResponse.json({
       ok: true,
-      plan: clampPlan(augmentPlan(parsedPlan.data, goal)),
+      plan: clampPlan(refreshPlanCopy(augmentPlan(parsedPlan.data, goal))),
       ai: true,
     });
   } catch (err) {
