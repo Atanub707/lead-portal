@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { after, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getActorRun, getDatasetItems } from "@/lib/apify";
 import {
   bareDomain,
@@ -69,7 +69,7 @@ async function enrichImportedBatch(
   userId: string
 ) {
   if (targets.length === 0) return;
-  const deadline = Date.now() + 45_000;
+  const deadline = Date.now() + 38_000;
   let cursor = 0;
 
   async function worker() {
@@ -94,7 +94,7 @@ async function enrichImportedBatch(
     }
   }
 
-  await Promise.all([worker(), worker(), worker()]);
+  await Promise.all([worker(), worker(), worker(), worker()]);
 }
 
 function sampleOf(item: unknown) {
@@ -599,6 +599,14 @@ export async function GET(request: Request) {
     }
   }
 
+  // Run website enrichment before the import is marked complete. The jobs are
+  // durable fallbacks, but the request should not return "done" until the
+  // website data is in the portal. Anything outside the time budget stays
+  // queued for the priority worker.
+  if (enrichTargets.length > 0) {
+    await enrichImportedBatch(admin, enrichTargets, workspaceId, userId);
+  }
+
   await finishImport(admin, row, {
     status: "ok",
     imported,
@@ -606,14 +614,6 @@ export async function GET(request: Request) {
     cost: run.usageTotalUsd,
     details: { ...details, imported_ids: importedIds },
   });
-
-  // Enrich every imported website immediately after the response. The same
-  // work is already queued as a durable fallback job; completing a job here
-  // prevents the worker from repeating it. Anything not finished inside the
-  // time budget stays queued and is claimed with priority by the worker.
-  if (enrichTargets.length > 0) {
-    after(() => enrichImportedBatch(admin, enrichTargets, workspaceId, userId));
-  }
 
   return NextResponse.json({
     status: "ok",
