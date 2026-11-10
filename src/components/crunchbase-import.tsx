@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Loader2, Rocket, X } from "lucide-react";
+import { finishLeadPipeline } from "@/lib/client-pipeline";
 import {
   CRUNCHBASE_COST_PER_RESULT_USD,
   CRUNCHBASE_DETAILED_COST_PER_RESULT_USD,
@@ -14,7 +15,7 @@ import {
   INDUSTRY_OPTIONS,
 } from "@/lib/crunchbase-options";
 
-type Status = "idle" | "posting" | "running" | "done";
+type Status = "idle" | "posting" | "running" | "briefs" | "done";
 
 interface ImportSummary {
   imported: number;
@@ -115,14 +116,30 @@ export function CrunchbaseImport({
           setStatus("idle");
           setImportId(null);
         } else if (json?.status === "ok") {
-          setResult({
+          const summary = {
             imported: Number(json.imported ?? 0),
             skipped: Number(json.skipped ?? 0),
-          });
-          setStatus("done");
-          router.refresh();
-          window.setTimeout(() => router.refresh(), 15_000);
-          window.setTimeout(() => router.refresh(), 40_000);
+          };
+          const ids = json.importedIds ?? [];
+          setResult(summary);
+          setImportId(null);
+          if (ids.length > 0) {
+            setStatus("briefs");
+            void finishLeadPipeline(ids)
+              .then(() => {
+                setStatus("done");
+                router.refresh();
+                window.setTimeout(() => router.refresh(), 15_000);
+                window.setTimeout(() => router.refresh(), 40_000);
+              })
+              .catch(() => {
+                setStatus("done");
+                router.refresh();
+              });
+          } else {
+            setStatus("done");
+            router.refresh();
+          }
         } else if (json?.status === "failed") {
           setError(json.error ?? "The import failed. Please try again.");
           setStatus("idle");
@@ -241,7 +258,7 @@ export function CrunchbaseImport({
         )}
       </div>
 
-      {status === "running" ? (
+      {status === "running" || status === "briefs" ? (
         <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
           <Loader2
             className="h-6 w-6 animate-spin text-zinc-400 motion-reduce:animate-none"
@@ -249,13 +266,17 @@ export function CrunchbaseImport({
           />
           <div aria-live="polite">
             <p className="text-[13px] font-medium text-zinc-800">
-              Searching Crunchbase…
+              {status === "briefs" ? "Building the final lead records…" : "Searching Crunchbase…"}
             </p>
             <p className="mt-1 text-[12px] text-zinc-500 tabular-nums">
-              {elapsed}s elapsed · {safeCount} companies requested
+              {status === "briefs"
+                ? `${result?.imported ?? 0} companies · scanning signals and writing AI briefs`
+                : `${elapsed}s elapsed · ${safeCount} companies requested`}
             </p>
             <p className="mt-1 text-[12px] text-zinc-500">
-              Fetching profiles, deduping and adding them to your pipeline.
+              {status === "briefs"
+                ? "Every imported company is being enriched from its website, scored and briefed."
+                : "Fetching profiles, deduping and adding them to your pipeline."}
             </p>
           </div>
         </div>
@@ -273,7 +294,7 @@ export function CrunchbaseImport({
                 {result.skipped === 1 ? "duplicate" : "duplicates"} skipped
               </p>
               <p className="mt-0.5 text-[12px] text-zinc-500">
-                They&apos;re ready for Deep Research and the Email Composer.
+                Websites scanned, signals checked and AI briefs written.
               </p>
             </div>
           </div>

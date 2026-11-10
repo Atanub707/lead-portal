@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Search } from "lucide-react";
+import { finishLeadPipeline } from "@/lib/client-pipeline";
 
 const BANDS = [
   { value: "", label: "Any size" },
@@ -18,8 +19,8 @@ type Stage =
   | "idle"
   | "searching"
   | "importing"
-  | "contacts"
   | "signals"
+  | "briefs"
   | "done";
 
 export function QuickFind() {
@@ -96,18 +97,17 @@ export function QuickFind() {
       }
 
       setStage("signals");
-      setMessage("Checking signals and scoring…");
-      await Promise.allSettled(
-        importedIds.slice(0, 5).map((orgId) =>
-          fetch("/api/signals/scan", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ orgId }),
-          })
-        )
-      );
-
+      setMessage(`Checking signals and writing AI briefs for ${importedIds.length} companies…`);
+      const pipeline = await finishLeadPipeline(importedIds, (message) => {
+        setMessage(message);
+        if (message.startsWith("Writing")) setStage("briefs");
+      });
       setStage("done");
+      setMessage(
+        `Pipeline complete: ${pipeline.signals} signal scans · ${pipeline.briefs} AI briefs${
+          pipeline.failures > 0 ? ` · ${pipeline.failures} partial failures` : ""
+        }`
+      );
       router.push(`/leads?run=${importId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Search failed");
