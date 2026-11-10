@@ -13,6 +13,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { enqueueJob } from "@/lib/jobs";
 import { sendCampaignTick } from "@/lib/campaigns";
 import { enrichCompanyFromWebsite } from "@/lib/website-enrich";
+import { generateCompanyBrief } from "@/lib/briefs";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -120,12 +121,29 @@ async function run() {
           results.push({ id: job.id, kind: job.kind, ok: false, detail: result.skipped });
           return;
         }
+        let briefDetail = "";
+        if (job.payload?.enrich === true) {
+          try {
+            const brief = await generateCompanyBrief(
+              orgId,
+              job.workspace_id,
+              typeof job.payload.userId === "string" ? job.payload.userId : ""
+            );
+            briefDetail = brief.ok ? " · brief" : " · brief failed";
+          } catch (err) {
+            briefDetail = " · brief failed";
+            console.error(
+              "[worker] brief generation failed:",
+              err instanceof Error ? err.message : err
+            );
+          }
+        }
         await completeJob(job.id);
         results.push({
           id: job.id,
           kind: job.kind,
           ok: true,
-          detail: `${result.created} signals${enrichDetail}`,
+          detail: `${result.created} signals${enrichDetail}${briefDetail}`,
         });
       } else if (job.kind === "score_recompute") {
         const orgId = Number(job.payload?.orgId);
