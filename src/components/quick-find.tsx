@@ -104,7 +104,7 @@ export function QuickFind() {
       });
       setStage("done");
       setMessage(
-        `Pipeline complete: ${pipeline.signals} signal scans · ${pipeline.briefs} AI briefs${
+        `Pipeline complete: ${pipeline.websites} websites · ${pipeline.signals} signal scans · ${pipeline.briefs} AI briefs${
           pipeline.failures > 0 ? ` · ${pipeline.failures} partial failures` : ""
         }`
       );

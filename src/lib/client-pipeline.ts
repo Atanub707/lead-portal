@@ -1,4 +1,5 @@
 export interface LeadPipelineResult {
+  websites: number;
   signals: number;
   briefs: number;
   failures: number;
@@ -15,7 +16,38 @@ export async function finishLeadPipeline(
   onProgress?: (message: string, completed: number, total: number) => void
 ): Promise<LeadPipelineResult> {
   const ids = [...new Set(orgIds.filter((id) => Number.isFinite(id)))];
-  const result: LeadPipelineResult = { signals: 0, briefs: 0, failures: 0 };
+  const result: LeadPipelineResult = { websites: 0, signals: 0, briefs: 0, failures: 0 };
+
+  for (const [index, batch] of chunks(ids, 3).entries()) {
+    onProgress?.(
+      `Scanning websites for ${Math.min(index * 3 + 1, ids.length)}–${Math.min(
+        index * 3 + batch.length,
+        ids.length
+      )} of ${ids.length}…`,
+      index * 3,
+      ids.length
+    );
+    const responses = await Promise.allSettled(
+      batch.map((orgId) =>
+        fetch("/api/leads/website-enrich", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orgIds: [orgId] }),
+        })
+      )
+    );
+    for (const response of responses) {
+      if (response.status !== "fulfilled" || !response.value.ok) {
+        result.failures += 1;
+        continue;
+      }
+      const json = (await response.value.json().catch(() => null)) as
+        | { ok?: boolean }
+        | null;
+      if (json?.ok) result.websites += 1;
+      else result.failures += 1;
+    }
+  }
 
   for (const [index, batch] of chunks(ids, 4).entries()) {
     onProgress?.(
@@ -74,6 +106,12 @@ export async function finishLeadPipeline(
       else result.failures += 1;
     }
   }
+
+  await fetch("/api/leads/pipeline/complete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orgIds: ids }),
+  }).catch(() => undefined);
 
   return result;
 }
