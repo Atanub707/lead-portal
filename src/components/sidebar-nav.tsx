@@ -9,6 +9,7 @@ import {
   Send,
   Sparkles,
   BarChart3,
+  Bot,
   CalendarClock,
   ChevronRight,
   ScrollText,
@@ -136,6 +137,14 @@ export function SidebarNav({
         label="Copilot"
         icon={Sparkles}
         active={pathname.startsWith("/agent")}
+        collapsed={collapsed}
+        onNavigate={onNavigate}
+      />
+      <NavItem
+        href="/autopilot"
+        label="Autopilot"
+        icon={Bot}
+        active={pathname.startsWith("/autopilot")}
         collapsed={collapsed}
         onNavigate={onNavigate}
       />
