@@ -209,14 +209,21 @@ export async function POST(request: Request) {
   try {
     run = await startCrunchbaseActor(filters, count);
   } catch (err) {
+    const raw = err instanceof Error ? err.message : String(err);
     console.error(
       "[crunchbase] start failed:",
-      redactSecrets(err instanceof Error ? err.message : String(err), [
-        process.env.APIFY_API_TOKEN,
-      ])
+      redactSecrets(raw, [process.env.APIFY_API_TOKEN])
     );
+    const tokenInvalid = /\b401\b|user-or-token-not-found|authentication token is not valid/i.test(raw);
+    const actorMissing = /\b404\b|actor.*not found/i.test(raw);
     return NextResponse.json(
-      { error: "Couldn't start the Crunchbase import. Please try again." },
+      {
+        error: tokenInvalid
+          ? "Apify rejected the API token. Generate a new token in Apify Console and update APIFY_API_TOKEN in Vercel, then redeploy."
+          : actorMissing
+            ? "The Crunchbase actor is unavailable. Check the actor on Apify before retrying."
+            : "Couldn't start the Crunchbase import. Please try again.",
+      },
       { status: 502 }
     );
   }
