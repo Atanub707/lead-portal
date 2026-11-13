@@ -85,9 +85,16 @@ export async function POST(request: Request) {
   try {
     run = await startCrunchbaseActor(filters, count);
   } catch (err) {
-    console.error("[quick-find] start failed:", err instanceof Error ? err.message : err);
+    const raw = err instanceof Error ? err.message : String(err);
+    console.error("[quick-find] start failed:", raw);
+    const tokenInvalid = /\b401\b|user-or-token-not-found|authentication token is not valid/i.test(raw);
     return NextResponse.json(
-      { ok: false, error: "Couldn't start the search. Please try again." },
+      {
+        ok: false,
+        error: tokenInvalid
+          ? "Apify rejected the API token. Generate a new token in Apify Console and update APIFY_API_TOKEN in Vercel, then redeploy."
+          : "Couldn't start the search. Please try again.",
+      },
       { status: 502 }
     );
   }
